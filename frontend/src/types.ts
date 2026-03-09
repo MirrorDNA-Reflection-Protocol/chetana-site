@@ -7,7 +7,8 @@ export type PageId =
   | "atlas"
   | "trust"
   | "control"
-  | "proof";
+  | "proof"
+  | "vigilance";
 
 export interface ThreatEntry {
   id: string;

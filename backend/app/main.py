@@ -10,12 +10,21 @@ from __future__ import annotations
 import httpx
 import logging
 import re
+import sys
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from pathlib import Path
+
+# Load shared Chetana soul, gates, prompt from canonical location
+_CHETANA_DIR = Path.home() / ".mirrordna" / "chetana"
+if str(_CHETANA_DIR) not in sys.path:
+    sys.path.insert(0, str(_CHETANA_DIR))
+
+from prompt import build_system_prompt  # noqa: E402
+from gates import gate_output, enforce_disclaimer  # noqa: E402
 
 logger = logging.getLogger("chetana.showcase")
 
@@ -593,6 +602,11 @@ FAQ_ENTRIES = [
         "topic": "whatsapp",
     },
     {
+        "keywords": ["telegram", "telegram bot", "t.me", "chetna", "shield bot"],
+        "reply": "You can check suspicious messages on Telegram via @chetnaShieldBot. Just forward any message, link, or screenshot and get an instant scam verdict. Use /check to scan text, /scam for deep AI analysis, and /lang to switch between English and Hindi.",
+        "topic": "telegram",
+    },
+    {
         "keywords": ["emergency", "report", "helpline", "1930", "cybercrime", "police", "complaint", "fraud report"],
         "reply": "In an emergency: call 1930 (India's national cybercrime helpline, available 24/7). You can also file a complaint at cybercrime.gov.in. If money was transferred, contact your bank immediately to request a freeze.",
         "topic": "emergency",
@@ -679,43 +693,8 @@ async def _fetch_kb_articles_for_chat(query: str) -> list[dict]:
     return []
 
 
-CHETANA_SYSTEM_PROMPT = """You are Chetana — India's AI-powered trust and scam detection assistant. You speak like a knowledgeable, warm, no-nonsense friend who genuinely wants to protect people. You mirror the user's concern and help them feel safe.
-
-Your personality:
-- Warm but direct. No corporate speak. Talk like a real person helping a friend.
-- When someone is scared or confused, be calm and reassuring first, then give clear steps.
-- Use simple language. Many users may not be tech-savvy. Explain like you're talking to your parent.
-- If someone has already been scammed, be empathetic — never blame them. Focus on recovery steps.
-- You can use Hindi words naturally mixed with English when it feels right (like "bilkul", "zaroor", "dhyan rakhiye").
-
-What you know about Chetana's ecosystem:
-- **Consumer Protection**: Users paste suspicious messages, links, UPI IDs, or phone numbers into the scan box. Chetana checks them against live threat intelligence (PhishTank, OpenPhish, URLhaus, CERT-IN, RBI alerts) and gives a trust verdict: LOW_RISK, UNCLEAR, or SUSPICIOUS with a risk score 0-100.
-- **Scam Weather**: Live pressure signals showing which scam types are rising or falling across India right now.
-- **Scam Atlas**: A living threat wiki with 25+ scam types — fake payment screenshots, QR traps, KYC fraud, digital arrest, courier phishing, task scams, lottery scams, SIM swap, deepfake voice calls, and more. Each entry has red flags and safe actions.
-- **Merchant Protection**: Protects businesses against fake payment screenshots, impersonation, and UPI collect scams.
-- **Chetana Nexus** (Enterprise): Trust infrastructure for banks, fintechs, and fraud teams. Includes action eligibility frameworks (inform → warn → verify → escalate → hold), analyst replay, MirrorGraph campaign visualization, and scam campaign clustering.
-- **Family Shield**: Share-safe cards that give family members simplified, non-scary summaries. Great for protecting elderly parents.
-- **Browser Guard**: Chrome extension that checks links and pages in real-time as you browse.
-- **Trust by Design™**: Chetana's governance philosophy — every verdict backed by evidence ladder, privacy-conscious data handling, human boundary on decisions.
-- **Languages**: 12 live Indian languages (Hindi, English, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Odia, Assamese) with 10 more scheduled languages coming soon.
-- **Privacy**: Data transmitted securely, used only for analysis, never sold or shared. No data stored beyond the session unless user consents.
-
-Emergency resources (ALWAYS provide when someone is in danger or has lost money):
-- Police: 100
-- Women's helpline: 181
-- National cybercrime helpline: 1930
-- File complaint online: cybercrime.gov.in (within first hour for best recovery chance)
-- RBI complaint for banking fraud: rbi.org.in
-
-Built by ActiveMirror (N1 Intelligence). Made in India, for India.
-
-Rules:
-- Keep replies concise (2-4 sentences usually). Don't lecture.
-- If someone pastes a suspicious message/link, tell them to use the scan box on the site for a full analysis — you can give initial impressions but the scan engine is more thorough.
-- Never give legal advice. You're advisory, not authoritative.
-- If you don't know something, say so honestly. Don't fabricate.
-- End with a clear next step or suggestion when possible.
-- Generate 2-3 follow-up suggestions the user might want to ask."""
+# System prompt loaded from shared soul + knowledge + gates
+CHETANA_SYSTEM_PROMPT = build_system_prompt("chat")
 
 _LLM_KEYS: dict[str, str] = {}
 
@@ -846,28 +825,127 @@ async def _try_groq(message: str, keys: dict) -> str | None:
     return None
 
 
+_SCAN_SIGNALS = re.compile(
+    r"(https?://|www\.|\.com|\.in|\.tk|\.xyz|"
+    r"upi://|@upi|@ybl|@paytm|@oksbi|@okaxis|@okicici|"
+    r"\b\d{10}\b|"
+    r"OTP|KYC|UPI|aadhaar|PAN\b|frozen|blocked|expired|verify|urgent|"
+    r"arrested|warrant|customs|lottery|prize|reward|congratulations|"
+    r"click here|update now|last chance|act now)",
+    re.IGNORECASE,
+)
+
+
+def _looks_scannable(msg: str) -> bool:
+    """Detect if message looks like suspicious content rather than a question."""
+    hits = len(_SCAN_SIGNALS.findall(msg))
+    return hits >= 2 or (len(msg) > 100 and hits >= 1)
+
+
+async def _inline_scan(content: str) -> dict | None:
+    """Run a fast pattern scan via Kavach and return results."""
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{KAVACH_URL}/scan",
+            json={"text": content, "lang": "en"},
+            timeout=5.0,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.debug("Inline scan failed: %s", e)
+    return None
+
+
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    """LLM-powered chat: OpenAI → Gemini → Groq → keyword fallback."""
+    """LLM-powered chat with auto-scan: detects suspicious content and scans inline."""
     message = req.message.strip()
     if not message:
         return {"reply": "Please type a message.", "articles": [], "suggestions": []}
 
     kb_articles = await _fetch_kb_articles_for_chat(message)
+    scan_result = None
+
+    # Auto-detect scannable content and scan inline
+    if _looks_scannable(message):
+        scan_result = await _inline_scan(message)
+
     keys = _load_llm_keys()
 
+    # If we have a scan result, enrich the LLM prompt with it
+    llm_message = message
+    if scan_result:
+        score = scan_result.get("threat_score", 0)
+        level = scan_result.get("risk_level", "LOW")
+        signals = scan_result.get("signals", [])
+        advice = scan_result.get("advice", [])
+        llm_message = (
+            f"[SCAN RESULT: {level} risk, score {score}/100, "
+            f"signals: {', '.join(signals[:4]) if signals else 'none'}]\n\n"
+            f"User pasted this content for checking:\n{message}\n\n"
+            f"Explain the scan result to the user in a helpful way. "
+            f"Mention the risk score and key signals. If high risk, give emergency steps."
+        )
+
     # Try providers in order: OpenAI → Gemini → Groq
-    reply = await _try_openai(message, keys)
+    reply = await _try_openai(llm_message, keys)
     if not reply:
-        reply = await _try_gemini(message, keys)
+        reply = await _try_gemini(llm_message, keys)
     if not reply:
-        reply = await _try_groq(message, keys)
+        reply = await _try_groq(llm_message, keys)
 
     if reply:
+        # Run through safety gates before returning
+        gated = gate_output(reply)
+        reply = gated["text"]
+        if gated["gated"]:
+            logger.info("Chat gate fired: %s", gated["flags"])
         reply, suggestions = _parse_suggestions(reply)
         if not suggestions:
             suggestions = ["How do I check a suspicious message?", "What scams are trending?", "How to report fraud?"]
-        return {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
+        result = {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
+        if scan_result:
+            result["scan"] = {
+                "risk_score": scan_result.get("threat_score", 0),
+                "risk_level": scan_result.get("risk_level", "LOW"),
+                "signals": scan_result.get("signals", [])[:5],
+                "advice": scan_result.get("advice", [])[:3],
+            }
+            # Push high-risk to Telegram
+            if scan_result.get("threat_score", 0) >= 70:
+                snippet = message[:120].replace("*", "").replace("`", "")
+                import asyncio
+                asyncio.ensure_future(_notify_telegram(
+                    f"🚨 *HIGH RISK via chat*\nScore: {scan_result['threat_score']}/100\n`{snippet}`"
+                ))
+        return result
+
+    # Fallback: if scan result exists, format it without LLM
+    if scan_result:
+        score = scan_result.get("threat_score", 0)
+        level = scan_result.get("risk_level", "LOW")
+        signals = scan_result.get("signals", [])
+        advice = scan_result.get("advice", [])
+        if score >= 70:
+            reply = f"🚨 HIGH RISK (score: {score}/100). "
+        elif score >= 35:
+            reply = f"⚠️ MEDIUM RISK (score: {score}/100). "
+        else:
+            reply = f"✅ LOW RISK (score: {score}/100). "
+        if signals:
+            reply += "Signals: " + ", ".join(signals[:3]) + ". "
+        if advice:
+            reply += advice[0]
+        suggestions = ["What should I do next?", "How to report fraud?", "Tell me about this scam type"]
+        return {
+            "reply": reply, "articles": kb_articles, "suggestions": suggestions,
+            "scan": {
+                "risk_score": score, "risk_level": level,
+                "signals": signals[:5], "advice": (advice if isinstance(advice, list) else [advice])[:3],
+            },
+        }
 
     # Final fallback: keyword matching
     matches = _match_faq(message)
@@ -894,5 +972,7 @@ if frontend_dist.exists():
         """Serve static files or fall back to index.html for SPA routing."""
         file = frontend_dist / path
         if file.is_file():
-            return FileResponse(file)
-        return FileResponse(frontend_dist / "index.html")
+            # Hashed assets get long cache, everything else no-cache
+            headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in str(file) else {"Cache-Control": "no-cache, no-store, must-revalidate"}
+            return FileResponse(file, headers=headers)
+        return FileResponse(frontend_dist / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})

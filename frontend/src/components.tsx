@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
+import { trackVigilance } from "./VigilancePage";
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
 const fadeIn = { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35 } };
@@ -21,7 +22,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
     { id: "home", label: "Home" }, { id: "consumer", label: "Consumer" },
     { id: "merchant", label: "Merchant" }, { id: "nexus", label: "Nexus" },
     { id: "weather", label: "Scam Weather" }, { id: "atlas", label: "Scam Atlas" },
-    { id: "trust", label: "Trust by Design\u2122" }, { id: "proof", label: "Terms" }, { id: "control", label: "Control Center" }
+    { id: "trust", label: "Trust by Design\u2122" }, { id: "vigilance", label: "Vigilance" }, { id: "proof", label: "Terms" }, { id: "control", label: "Control Center" }
   ];
   return (
     <nav className="nav">
@@ -163,7 +164,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: "consumer" | "mercha
 /* ── Scan Box ────────────────────────────────────────────────── */
 type ScanTab = "text" | "link" | "upi" | "phone";
 
-export function ScanBox() {
+export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
   const [tab, setTab] = useState<ScanTab>("text");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
@@ -179,6 +180,11 @@ export function ScanBox() {
 
   const handleScan = async () => {
     if (!content.trim()) return;
+    // Gate: require Proof-of-Memory before first scan
+    if (!localStorage.getItem("chetana_terms_accepted")) {
+      if (onRequireProof) onRequireProof();
+      return;
+    }
     setLoading(true); setResult(null); setError("");
     try {
       let resp: Response;
@@ -194,6 +200,7 @@ export function ScanBox() {
       const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
       const verdict = data.verdict ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
       setResult({ verdict, risk_score: score, surface: data.surface || tab, why_flagged: data.why_flagged || data.signals || [], action_eligibility: data.action_eligibility || "" });
+      trackVigilance("scan", `${tab} check: ${verdict} (${score}/100)`);
     } catch (e: any) {
       setError(e.message || "Check failed. Try again.");
     } finally { setLoading(false); }
@@ -405,6 +412,14 @@ export function TrustPage() {
     <motion.section className="panel" {...fadeIn}>
       <div className="panel-header"><h2><ShieldCheck size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Trust by Design&#8482;</h2><p>Nothing changes without evidence, bounds, and trace.</p></div>
       <div className="trust-grid">{items.map(([title, copy, icon]) => <div className="trust-card" key={title}><div style={{ color: "var(--primary)", marginBottom: 8 }}>{icon}</div><h3>{title}</h3><p>{copy}</p></div>)}</div>
+      <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="proof-banner">
+        <div className="proof-banner-icon"><ShieldCheck size={20} /></div>
+        <div className="proof-banner-text">
+          <strong>Proof-of-Memory Protocol</strong>
+          <span>Cryptographic attestation that users read and understood — not just clicked through. See how we enforce consent.</span>
+        </div>
+        <ChevronRight size={18} className="proof-banner-arrow" />
+      </a>
     </motion.section>
   );
 }
@@ -432,15 +447,72 @@ export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "
   );
 }
 
-/* ── Chat Assistant ──────────────────────────────────────────── */
+/* ── Footer ──────────────────────────────────────────────────── */
+export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  return (
+    <footer className="site-footer">
+      <div className="footer-inner">
+        <div className="footer-brand">
+          <div className="footer-logo">
+            <div className="brand-glyph" style={{ width: 36, height: 36, fontSize: 16 }}><Shield size={16} /></div>
+            <div>
+              <div className="brand-title" style={{ fontSize: 17 }}>Chetana</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>Trust infrastructure for India</div>
+            </div>
+          </div>
+          <p className="footer-desc">AI-powered scam detection and trust verification. Check messages, links, UPI IDs, and phone numbers against live threat intelligence.</p>
+        </div>
+        <div className="footer-links">
+          <div className="footer-col">
+            <h4>Product</h4>
+            <button onClick={() => onNavigate("consumer")}>Consumer</button>
+            <button onClick={() => onNavigate("merchant")}>Merchant</button>
+            <button onClick={() => onNavigate("nexus")}>Nexus</button>
+            <button onClick={() => onNavigate("control")}>Control Center</button>
+          </div>
+          <div className="footer-col">
+            <h4>Intelligence</h4>
+            <button onClick={() => onNavigate("weather")}>Scam Weather</button>
+            <button onClick={() => onNavigate("atlas")}>Scam Atlas</button>
+            <button onClick={() => onNavigate("trust")}>Trust by Design&#8482;</button>
+          </div>
+          <div className="footer-col">
+            <h4>Legal</h4>
+            <button onClick={() => onNavigate("proof")}>Terms & Disclaimer</button>
+            <span className="footer-static">Cybercrime: 1930</span>
+            <span className="footer-static">Women: 181</span>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <div className="footer-powered">
+            <span>Powered by</span>
+            <a href="https://activemirror.ai" target="_blank" rel="noopener" className="powered-brand">ActiveMirror</a>
+            <span className="powered-sep">|</span>
+            <span className="powered-brand">MirrorDNA</span>
+            <span className="powered-sep">|</span>
+            <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="powered-link">Proof-of-Memory Protocol</a>
+          </div>
+          <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror (N1 Intelligence). All rights reserved.</div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ── Chat Assistant (Draggable Floating Pill) ────────────────── */
 interface ChatMsg { role: "user" | "bot"; text: string; articles?: { id: string; title: string }[]; suggestions?: string[]; }
 
 export function ChatAssistant() {
   const [open, setOpen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const [teaser, setTeaser] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 });
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: "bot", text: "Hi! I'm Chetana. I can help you check suspicious messages, explain scam types, or guide you to the right tool. What do you need?", suggestions: ["How do I check a message?", "What scams are trending?", "How to report fraud?", "Tell me about Chetana"] }
   ]);
@@ -448,9 +520,25 @@ export function ChatAssistant() {
   useEffect(() => { const t = setTimeout(() => setTeaser(true), 4000); return () => clearTimeout(t); }, []);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
+  // Drag handlers
+  const onPointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button, input, .chat-messages")) return;
+    setDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setPos({ x: dragStart.current.px + dx, y: dragStart.current.py + dy });
+  };
+  const onPointerUp = () => setDragging(false);
+
   const send = async (text: string) => {
     if (!text.trim()) return;
     setTeaser(false);
+    setMinimized(false);
     const userMsg: ChatMsg = { role: "user", text: text.trim() };
     setMessages(m => [...m, userMsg]);
     setInput(""); setLoading(true);
@@ -464,6 +552,7 @@ export function ChatAssistant() {
     } finally { setLoading(false); }
   };
 
+  // Closed state: floating pill
   if (!open) {
     return (
       <>
@@ -484,14 +573,47 @@ export function ChatAssistant() {
     );
   }
 
+  // Minimized state: floating pill with last message preview
+  if (minimized) {
+    const lastBot = [...messages].reverse().find(m => m.role === "bot");
+    return (
+      <motion.div
+        className="chat-pill"
+        ref={dragRef}
+        style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "grab" }}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      >
+        <div className="chat-pill-glyph"><Shield size={16} /></div>
+        <div className="chat-pill-preview" onClick={() => setMinimized(false)}>
+          <span className="chat-pill-name">Chetana</span>
+          {lastBot && <span className="chat-pill-text">{lastBot.text.slice(0, 50)}{lastBot.text.length > 50 ? "..." : ""}</span>}
+        </div>
+        <button className="chat-pill-expand" onClick={() => setMinimized(false)}><ChevronRight size={14} /></button>
+        <button className="chat-pill-close" onClick={() => { setOpen(false); setMinimized(false); setPos({ x: 0, y: 0 }); }}><X size={14} /></button>
+      </motion.div>
+    );
+  }
+
+  // Full panel: draggable
   return (
-    <motion.div className="chat-panel" initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 25 }}>
-      <div className="chat-header">
+    <motion.div
+      className="chat-panel"
+      ref={dragRef}
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "default" }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+    >
+      <div className="chat-header" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={{ cursor: dragging ? "grabbing" : "grab" }}>
         <div className="chat-header-left">
           <div className="chat-header-glyph"><Shield size={20} /></div>
-          <div><div className="chat-header-title">Chetana Assistant</div><div className="chat-header-sub">Always here to help</div></div>
+          <div><div className="chat-header-title">Chetana Assistant</div><div className="chat-header-sub">Drag to move &middot; Always here</div></div>
         </div>
-        <button className="chat-close" onClick={() => setOpen(false)}><X size={20} /></button>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button className="chat-close" onClick={() => setMinimized(true)} title="Minimize to pill"><span style={{ fontSize: 16, lineHeight: 1 }}>&ndash;</span></button>
+          <button className="chat-close" onClick={() => { setOpen(false); setPos({ x: 0, y: 0 }); }}><X size={18} /></button>
+        </div>
       </div>
       <div className="chat-messages" ref={scrollRef}>
         {messages.map((msg, i) => (
@@ -519,6 +641,7 @@ export function ChatAssistant() {
         <input className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send(input)} placeholder="Ask anything..." />
         <button className="chat-send" onClick={() => send(input)} disabled={!input.trim() || loading}><Send size={16} /></button>
       </div>
+      <div className="chat-footer-brand">Powered by <strong>ActiveMirror</strong></div>
     </motion.div>
   );
 }

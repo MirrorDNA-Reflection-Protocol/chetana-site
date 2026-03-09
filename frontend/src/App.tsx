@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
-import { Nav, Hero, AlertBanner, ScanBox, WeatherBoard, Atlas, MirrorGraph, TuiPanel, DashboardGallery, TrustPage, Onboarding, OnboardingFlow, ChatAssistant } from "./components";
+import { Nav, Hero, AlertBanner, ScanBox, WeatherBoard, Atlas, MirrorGraph, TuiPanel, DashboardGallery, TrustPage, Onboarding, OnboardingFlow, ChatAssistant, Footer } from "./components";
 import ProofPage from "./ProofPage";
+import VigilancePage from "./VigilancePage";
 import { threats, weather, graphNodes, graphEdges, tuiLines } from "./data";
 import { RadarAnim, ScanAnim, GlobeAnim, CountUp } from "./animations";
 
@@ -22,6 +23,7 @@ export default function App() {
       case "atlas": return "Scam Atlas";
       case "trust": return "Trust by Design\u2122";
       case "proof": return "Terms & Disclaimer";
+      case "vigilance": return "Proof-of-Vigilance";
       case "control": return "Control Center";
       default: return "Chetana";
     }
@@ -40,7 +42,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <AnimatePresence>{showOnboarding && <OnboardingFlow onComplete={handleOnboardingComplete} />}</AnimatePresence>
+      {/* Onboarding removed — blocks crawlers and hurts SEO */}
       <Nav page={page} setPage={setPage} />
       <main>
         <AnimatePresence mode="wait">
@@ -60,13 +62,13 @@ export default function App() {
                 </div>
                 <ScanAnim size={160} />
               </section>
-              <ScanBox />
+              <ScanBox onRequireProof={() => setPage("proof")} />
               <WeatherBoard signals={weather.slice(0, 5)} />
               <Atlas threats={threats} />
             </>}
             {page === "merchant" && <>
               <section className="page-intro"><div className="kicker">Merchant</div><h1>{pageTitle}</h1><p>Defend against fake payment screenshots and impersonation.</p></section>
-              <ScanBox />
+              <ScanBox onRequireProof={() => setPage("proof")} />
               <DashboardGallery />
               <Atlas threats={threats.filter(t => t.surface === "payment trust")} />
             </>}
@@ -103,6 +105,7 @@ export default function App() {
               <TrustPage />
             </>}
             {page === "proof" && <ProofPage onAccepted={() => setTermsAccepted(true)} />}
+            {page === "vigilance" && <VigilancePage />}
             {page === "control" && <>
               <section className="page-intro"><div className="kicker">Command Center</div><h1>{pageTitle}</h1><p>TUI, graph, and dashboards together.</p></section>
               <div className="two-up">
@@ -114,6 +117,7 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
+      <Footer onNavigate={setPage} />
       <ChatAssistant />
       {!termsAccepted && (
         <div className="consent-bar">

@@ -5,7 +5,7 @@ import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanBox,
   ConsumerSection, EnterpriseSection, TelegramCTA,
   WeatherBoard, Atlas, MirrorGraph, TuiPanel, DashboardGallery,
-  TrustPage, Onboarding, OnboardingFlow, ChatAssistant, Footer
+  TrustPage, Onboarding, OnboardingFlow, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -26,6 +26,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <BackgroundMesh />
+      <AlertBanner onNavigate={setPage as any} />
       <Nav page={page} setPage={setPage} />
       <main>
         <AnimatePresence mode="wait">
@@ -33,7 +34,6 @@ export default function App() {
 
             {/* ── HOME — Scan-centered hero ────────────────────── */}
             {page === "home" && <>
-              <AlertBanner onNavigate={setPage as any} />
               <Hero onNavigate={setPage as any} />
               <ScanBox onRequireProof={() => setPage("proof")} />
               <StatsStrip />
@@ -151,7 +151,7 @@ export default function App() {
             </>}
 
             {/* ── PROOF / TERMS ────────────────────────────────── */}
-            {page === "proof" && <ProofPage onAccepted={() => setTermsAccepted(true)} />}
+            {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("home"); }} />}
 
             {/* ── VIGILANCE ────────────────────────────────────── */}
             {page === "vigilance" && <VigilancePage />}
@@ -177,7 +177,6 @@ export default function App() {
         </AnimatePresence>
       </main>
       <Footer onNavigate={setPage} />
-      <ChatAssistant />
       {!termsAccepted && (
         <div className="consent-bar">
           <span>Before your first scan, please review our <a onClick={() => setPage("proof")}>Terms & Disclaimer</a>.</span>

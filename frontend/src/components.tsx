@@ -8,7 +8,8 @@ import {
   Shield, ShieldCheck, ShieldAlert, Search, Send, MessageCircle, X,
   Link2, Phone, CreditCard, AlertTriangle, CheckCircle, ChevronRight,
   Globe, Users, Building2, Zap, Eye, BookOpen, BarChart3, Lock, Smartphone,
-  TrendingUp, FileWarning, UserCheck, Layers
+  TrendingUp, FileWarning, UserCheck, Layers, Mic, QrCode, ImageIcon,
+  Upload, FileText, Bot, Paperclip, ChevronDown, Volume2, Flag, Info
 } from "lucide-react";
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
@@ -31,6 +32,7 @@ export function BackgroundMesh() {
 
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
+  const [open, setOpen] = useState(false);
   const items: { id: PageId; label: string }[] = [
     { id: "home", label: "Home" },
     { id: "consumer", label: "Consumer" },
@@ -41,21 +43,28 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
     { id: "trust", label: "Trust" },
     { id: "proof", label: "Terms" },
   ];
+  const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
     <nav className="nav">
-      <div className="brand" onClick={() => setPage("home")}>
+      <div className="brand" onClick={() => navigate("home")}>
         <div className="brand-glyph"><Shield size={18} /></div>
         <div>
           <div className="brand-title">Chetana</div>
           <div className="brand-sub">India's free scam checker</div>
         </div>
       </div>
-      <div className="nav-links">
+      <div className={`nav-links${open ? " open" : ""}`}>
         {items.map((item) => (
-          <button key={item.id} className={page === item.id ? "nav-btn active" : "nav-btn"} onClick={() => setPage(item.id)}>{item.label}</button>
+          <button key={item.id} className={page === item.id ? "nav-btn active" : "nav-btn"} onClick={() => navigate(item.id)}>{item.label}</button>
         ))}
       </div>
-      <div className="india-badge">Made in India</div>
+      <div className="nav-right">
+        <div className="india-badge">🇮🇳 India</div>
+        <div className="not-govt-badge" title="Chetana is a private AI tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Not a govt service</div>
+        <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
+          <span /><span /><span />
+        </button>
+      </div>
     </nav>
   );
 }
@@ -117,26 +126,39 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
   );
 }
 
-/* ── Alert Banner ─────────────────────────────────────────────── */
+/* ── Ticker Banner ────────────────────────────────────────────── */
+const TICKER_ITEMS = [
+  { icon: "🔴", text: "Voice deepfake scams up 22% this week" },
+  { icon: "⚡", text: "1 Indian gets scammed every 3 seconds" },
+  { icon: "🟠", text: "Digital arrest calls up 18% — CBI never calls like this" },
+  { icon: "🔴", text: "UPI payment fraud pressure: 86/100" },
+  { icon: "⚡", text: "Rs 1.2 lakh crore lost to scams in India annually" },
+  { icon: "🟡", text: "Task & investment scams up 15% — fake jobs are rising" },
+  { icon: "🟠", text: "KYC update fraud pressure: 68/100 — don't share OTPs" },
+  { icon: "🔴", text: "Bank impersonation up 8% — verify before you share anything" },
+  { icon: "⚡", text: "Courier phishing up 4% — fake delivery alerts are a trap" },
+  { icon: "🟡", text: "QR traps rising — never scan a QR from an unknown sender" },
+];
+
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   return (
-    <motion.div className="alert-banner" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
-      <div className="alert-banner-inner">
-        <div className="alert-banner-pulse" />
-        <div className="alert-banner-content">
-          <div className="alert-banner-left">
-            <ShieldAlert size={22} />
-            <div>
-              <strong>Indians lose over Rs 1.2 lakh crore to scams every year.</strong>
-              <span>Someone gets scammed every 3 seconds. Don't be next.</span>
-            </div>
-          </div>
-          <button className="alert-banner-cta" onClick={() => onNavigate("consumer")}>
-            Check now <ChevronRight size={14} />
-          </button>
+    <div className="ticker-banner">
+      <div className="ticker-label">
+        <span className="ticker-dot" />
+        LIVE
+      </div>
+      <div className="ticker-track-wrap">
+        <div className="ticker-track">
+          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+            <span key={i} className="ticker-item" onClick={() => onNavigate("weather")}>
+              <span className="ticker-icon">{item.icon}</span>
+              {item.text}
+              <span className="ticker-sep">·</span>
+            </span>
+          ))}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -182,100 +204,288 @@ export function StatsStrip() {
   );
 }
 
-/* ── Scan Box (the star of the show) ─────────────────────────── */
-type ScanTab = "text" | "link" | "upi" | "phone";
+/* ── ScanBox / ScanChat — AI-powered chat scanner ─────────────── */
+type ScanMode = "message" | "link" | "upi" | "phone" | "media" | "voice" | "qr" | "aadhaar";
+
+interface ChatMsg {
+  id: number;
+  role: "user" | "bot";
+  text: string;
+  scanResult?: { verdict: string; score: number; signals: string[]; action: string };
+  file?: string;
+  suggestions?: string[];
+}
+
+const SCAN_MODES: { id: ScanMode; label: string; icon: React.ReactNode; placeholder: string; isFile?: boolean; accept?: string; desc: string }[] = [
+  { id: "message", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious SMS, WhatsApp, or any message...", desc: "SMS, WhatsApp, email" },
+  { id: "link",    label: "Link",    icon: <Link2 size={14} />,          placeholder: "Paste any suspicious URL or link...", desc: "URLs, websites" },
+  { id: "upi",     label: "UPI",     icon: <CreditCard size={14} />,     placeholder: "e.g. name@ybl or name@paytm", desc: "UPI IDs, payment" },
+  { id: "phone",   label: "Phone",   icon: <Phone size={14} />,          placeholder: "10-digit mobile number", desc: "Numbers, callers" },
+  { id: "media",   label: "Image/Video", icon: <ImageIcon size={14} />, placeholder: "", isFile: true, accept: "image/*,video/*", desc: "Deepfake, screenshots" },
+  { id: "voice",   label: "Voice",   icon: <Mic size={14} />,            placeholder: "", isFile: true, accept: "audio/*", desc: "AI voice clone detection" },
+  { id: "qr",      label: "QR Code", icon: <QrCode size={14} />,        placeholder: "", isFile: true, accept: "image/*", desc: "QR code safety check" },
+  { id: "aadhaar", label: "Aadhaar", icon: <FileText size={14} />,      placeholder: "Enter 12-digit Aadhaar number to validate format", desc: "Aadhaar validation" },
+];
+
+function verdictClass(v: string) {
+  if (v === "SUSPICIOUS" || v === "HIGH") return "verdict-suspicious";
+  if (v === "UNCLEAR" || v === "MEDIUM") return "verdict-unclear";
+  return "verdict-low-risk";
+}
+
+function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: string; scanResult: ChatMsg["scanResult"]; suggestions: string[] } {
+  const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
+  const verdict = data.verdict ?? data.risk_level?.toUpperCase() ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
+  const signals: string[] = data.why_flagged || data.signals || data.red_flags || [];
+  const action = data.action_eligibility || data.recommended_action || "";
+  const explanation = data.explanation || data.analysis || "";
+
+  const label = fileName ? `"${fileName}"` : "that";
+  let text = "";
+
+  if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
+    text = `⚠️ **This is HIGH RISK** (${score}/100 threat score).\n\n`;
+    if (explanation) text += explanation + "\n\n";
+    else if (signals.length) text += `Here's what raised the alarm:\n• ${signals.slice(0, 4).join("\n• ")}\n\n`;
+    text += action ? `**What to do:** ${action.replace(/_/g, " ")}` : "**What to do:** Do not respond or share any personal details. Delete this immediately. If money is involved, call your bank now on their official helpline.";
+  } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
+    text = `🔶 **Proceed with caution** (${score}/100 threat score).\n\n`;
+    if (explanation) text += explanation + "\n\n";
+    else text += "I found some suspicious patterns but can't be certain. ";
+    text += "Verify through official channels before taking any action.";
+  } else {
+    text = `✅ **Looks safe** (${score}/100 threat score).\n\n`;
+    if (explanation) text += explanation + "\n\n";
+    else text += `I didn't find any known scam patterns in ${label}. `;
+    text += "Still — stay alert. Scammers constantly change tactics.";
+  }
+
+  const suggestions =
+    verdict === "SUSPICIOUS" || verdict === "HIGH"
+      ? ["What should I do now?", "How do I report this?", "How do I get my money back?"]
+      : verdict === "UNCLEAR" || verdict === "MEDIUM"
+      ? ["How do I verify this is real?", "What are the red flags?", "Is this a known scam?"]
+      : ["What scams should I watch for?", "Check another message", "How does Chetana work?"];
+
+  return { text, scanResult: { verdict, score, signals, action }, suggestions };
+}
+
+const LANGUAGES = [
+  { code: "en", label: "EN", name: "English" },
+  { code: "hi", label: "हि", name: "Hindi" },
+  { code: "ta", label: "த", name: "Tamil" },
+  { code: "te", label: "తె", name: "Telugu" },
+  { code: "bn", label: "বা", name: "Bengali" },
+  { code: "mr", label: "म", name: "Marathi" },
+  { code: "gu", label: "ગુ", name: "Gujarati" },
+  { code: "kn", label: "ಕ", name: "Kannada" },
+  { code: "ml", label: "മ", name: "Malayalam" },
+  { code: "pa", label: "ਪੰ", name: "Punjabi" },
+  { code: "or", label: "ଓ", name: "Odia" },
+  { code: "ur", label: "اردو", name: "Urdu" },
+];
 
 export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
-  const [tab, setTab] = useState<ScanTab>("text");
-  const [content, setContent] = useState("");
+  const [mode, setMode] = useState<ScanMode>("message");
+  const [lang, setLang] = useState("en");
+  const [input, setInput] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
-  const [error, setError] = useState("");
+  const [messages, setMessages] = useState<ChatMsg[]>([{
+    id: 0, role: "bot",
+    text: "Hi! I'm Chetana — India's AI scam checker. Paste any suspicious message, link, UPI ID, phone number, or upload a photo/voice clip. I'll check it and explain what I find.\n\nBuilt on ActiveMirror's MirrorDNA intelligence platform.",
+    suggestions: ["Got a suspicious message", "Check a link", "Check a UPI ID", "Detect a deepfake"],
+  }]);
+  const [showModes, setShowModes] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const msgId = useRef(1);
 
-  const tabs: { id: ScanTab; label: string; icon: React.ReactNode; placeholder: string }[] = [
-    { id: "text", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious message, SMS, or WhatsApp forward..." },
-    { id: "link", label: "Link", icon: <Link2 size={14} />, placeholder: "Paste any URL to check..." },
-    { id: "upi", label: "UPI ID", icon: <CreditCard size={14} />, placeholder: "e.g. name@ybl or name@paytm" },
-    { id: "phone", label: "Phone", icon: <Phone size={14} />, placeholder: "10-digit phone number" },
-  ];
+  const activeMode = SCAN_MODES.find(m => m.id === mode)!;
 
-  const handleScan = async () => {
-    if (!content.trim()) return;
-    if (!localStorage.getItem("chetana_terms_accepted")) {
-      if (onRequireProof) onRequireProof();
-      return;
-    }
-    setLoading(true); setResult(null); setError("");
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
+
+  const addMsg = (msg: Omit<ChatMsg, "id">) => {
+    setMessages(prev => [...prev, { ...msg, id: msgId.current++ }]);
+  };
+
+  const handleSuggestion = (s: string) => {
+    const lower = s.toLowerCase();
+    if (lower.includes("message")) { setMode("message"); setInput(""); }
+    else if (lower.includes("link")) { setMode("link"); setInput(""); }
+    else if (lower.includes("upi")) { setMode("upi"); setInput(""); }
+    else if (lower.includes("deepfake") || lower.includes("photo") || lower.includes("image")) { setMode("media"); }
+    else if (lower.includes("voice")) { setMode("voice"); }
+    else { sendChat(s); return; }
+  };
+
+  const sendChat = async (text: string) => {
+    addMsg({ role: "user", text });
+    setLoading(true);
     try {
-      let resp: Response;
-      if (tab === "upi") {
-        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: content.trim() }) });
-      } else if (tab === "phone") {
-        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: content.trim() }) });
-      } else {
-        resp = await fetch(`${API}/api/scan`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input_type: tab, content: content.trim() }) });
-      }
-      if (!resp.ok) throw new Error(`Server error (${resp.status})`);
-      const data = await resp.json();
-      const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
-      const verdict = data.verdict ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
-      setResult({ verdict, risk_score: score, surface: data.surface || tab, why_flagged: data.why_flagged || data.signals || [], action_eligibility: data.action_eligibility || "" });
-      trackVigilance("scan", `${tab} check: ${verdict} (${score}/100)`);
-    } catch (e: any) {
-      setError(e.message || "Check failed. Try again.");
+      const resp = await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text }) });
+      const data = resp.ok ? await resp.json() : null;
+      addMsg({ role: "bot", text: data?.reply || "Ask me about any scam or suspicious activity — I'm here to help.", suggestions: data?.suggestions });
+    } catch {
+      addMsg({ role: "bot", text: "I couldn't reach the server right now. Try again in a moment." });
     } finally { setLoading(false); }
   };
 
-  const verdictClass = (v: string) => {
-    if (v === "SUSPICIOUS") return "verdict-suspicious";
-    if (v === "UNCLEAR") return "verdict-unclear";
-    if (v === "LOW_RISK") return "verdict-low-risk";
-    return "verdict-default";
-  };
-  const VerdictIcon = ({ v }: { v: string }) => {
-    if (v === "SUSPICIOUS") return <ShieldAlert size={20} color="var(--danger)" />;
-    if (v === "UNCLEAR") return <AlertTriangle size={20} color="var(--amber)" />;
-    if (v === "LOW_RISK") return <ShieldCheck size={20} color="var(--safe)" />;
-    return <Shield size={20} />;
-  };
+  const handleSend = async () => {
+    if (!localStorage.getItem("chetana_terms_accepted")) { if (onRequireProof) onRequireProof(); return; }
 
-  const activeTab = tabs.find(t => t.id === tab)!;
+    const currentMode = activeMode;
+    if (currentMode.isFile && !file) return;
+    if (!currentMode.isFile && !input.trim()) return;
+
+    const userText = currentMode.isFile ? `Check this ${currentMode.label.toLowerCase()}: ${file!.name}` : input.trim();
+    addMsg({ role: "user", text: userText, file: file?.name });
+    setInput(""); setFile(null); setLoading(true);
+
+    // Detect if it's a question rather than a scan
+    const isQuestion = !currentMode.isFile && /^(what|how|why|who|is |does|can|tell|explain|help|when|where|i already|what should)/i.test(input.trim()) && input.length < 120;
+    if (isQuestion) { await sendChat(userText); setLoading(false); return; }
+
+    try {
+      let resp: Response;
+      if (currentMode.id === "upi") {
+        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: input.trim() }) });
+      } else if (currentMode.id === "phone") {
+        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: input.trim() }) });
+      } else if (currentMode.id === "aadhaar") {
+        resp = await fetch(`${API}/api/aadhaar/validate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aadhaar: input.trim() }) });
+      } else if (currentMode.isFile && file) {
+        const fd = new FormData(); fd.append("file", file);
+        const endpoint = currentMode.id === "voice" ? "/api/voice/analyze" : currentMode.id === "qr" ? "/api/extract-text" : "/api/media/analyze";
+        resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
+      } else if (currentMode.id === "link") {
+        resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: input.trim(), lang: "en" }) });
+      } else {
+        resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input.trim(), lang }) });
+      }
+
+      if (!resp.ok) throw new Error(`Server error (${resp.status})`);
+      const data = await resp.json();
+      const { text, scanResult, suggestions } = buildBotReply(currentMode.id, data, file?.name);
+      addMsg({ role: "bot", text, scanResult, suggestions });
+      if (scanResult) trackVigilance("scan", `${currentMode.id}: ${scanResult.verdict} (${scanResult.score}/100)`);
+    } catch (e: any) {
+      addMsg({ role: "bot", text: `I couldn't complete that check right now. ${e.message || "Please try again."}`, suggestions: ["Try again", "Check a different message"] });
+    } finally { setLoading(false); }
+  };
 
   return (
-    <motion.section className="scan-panel" {...fadeInDelay(0.25)}>
-      <div className="scan-tabs">
-        {tabs.map(t => (
-          <button key={t.id} className={`scan-tab ${tab === t.id ? "active" : ""}`} onClick={() => { setTab(t.id); setResult(null); setError(""); }}>
-            {t.icon} {t.label}
-          </button>
-        ))}
+    <motion.section className="scan-panel scan-chat" {...fadeInDelay(0.25)}>
+      {/* Mode selector + language picker */}
+      <div className="scan-mode-bar">
+        <div className="scan-modes">
+          {SCAN_MODES.map(m => (
+            <button key={m.id} className={`scan-mode-btn ${mode === m.id ? "active" : ""}`} onClick={() => { setMode(m.id); setFile(null); }} title={m.desc}>
+              {m.icon} <span>{m.label}</span>
+              {(m.id === "media" || m.id === "voice") && <span className="mode-badge">AI</span>}
+            </button>
+          ))}
+        </div>
+        <select className="lang-picker" value={lang} onChange={e => setLang(e.target.value)} title="Response language">
+          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label} {l.name}</option>)}
+        </select>
       </div>
-      <div className="scan-input-row">
-        <textarea className="scan-textarea" value={content} onChange={e => setContent(e.target.value)} placeholder={activeTab.placeholder} rows={tab === "text" ? 3 : 1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleScan(); } }} />
-        <button className="primary scan-btn" onClick={handleScan} disabled={loading || !content.trim()}>
-          {loading ? <><Zap size={16} /> Scanning...</> : <><Search size={16} /> Scan</>}
-        </button>
-      </div>
-      {error && <div className="scan-error"><AlertTriangle size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />{error}</div>}
-      <AnimatePresence>
-        {result && (
-          <motion.div className="scan-result" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className={`scan-verdict ${verdictClass(result.verdict)}`}>
-              <div className="verdict-header">
-                <span className="verdict-label"><VerdictIcon v={result.verdict} /> {result.verdict.replace(/_/g, " ")}</span>
-                <span className="verdict-score">Threat score: {result.risk_score}/100</span>
-              </div>
-              {result.action_eligibility && <div className="verdict-action">Recommended action: {result.action_eligibility.replace(/_/g, " ")}</div>}
+      {mode === "aadhaar" && (
+        <div className="scan-mode-notice">
+          <Lock size={11} /> Format validation only — Aadhaar numbers are never stored or transmitted beyond analysis.
+        </div>
+      )}
+
+      {/* Chat messages */}
+      <div className="scan-chat-messages" ref={scrollRef}>
+        {messages.map(msg => (
+          <div key={msg.id} className={`chat-bubble-row ${msg.role}`}>
+            {msg.role === "bot" && (
+              <div className="chat-avatar"><Shield size={14} /></div>
+            )}
+            <div className={`chat-bubble ${msg.role}`}>
+              {msg.scanResult && (
+                <div className="scan-verdict-row">
+                  <div className={`scan-verdict-chip ${verdictClass(msg.scanResult.verdict)}`}>
+                    {msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
+                      ? <ShieldAlert size={14} /> : msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
+                      ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
+                    <span>{msg.scanResult.verdict.replace(/_/g, " ")}</span>
+                    <span className="verdict-chip-score">{msg.scanResult.score}/100</span>
+                  </div>
+                  <button className="report-verdict-btn" title="Report an incorrect result" onClick={() => handleSuggestion("This result seems wrong — help me understand")}>
+                    <Flag size={10} /> Wrong?
+                  </button>
+                </div>
+              )}
+              {msg.file && <div className="chat-file-badge"><Paperclip size={12} /> {msg.file}</div>}
+              <div className="chat-bubble-text">{msg.text.split("\n").map((line, i) => {
+                const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
+                return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
+              })}</div>
+              {msg.suggestions && (
+                <div className="chat-suggestions">
+                  {msg.suggestions.map((s, i) => (
+                    <button key={i} className="chat-suggestion-btn" onClick={() => handleSuggestion(s)}>{s}</button>
+                  ))}
+                </div>
+              )}
             </div>
-            {result.why_flagged.length > 0 && (
-              <div className="scan-signals">
-                <strong>Signals detected</strong>
-                <ul>{result.why_flagged.map((s, i) => <li key={i}>{typeof s === "string" ? s : JSON.stringify(s)}</li>)}</ul>
+          </div>
+        ))}
+        {loading && (
+          <div className="chat-bubble-row bot">
+            <div className="chat-avatar"><Shield size={14} /></div>
+            <div className="chat-bubble bot chat-thinking">
+              <span /><span /><span />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input area */}
+      <div className="scan-chat-input">
+        {activeMode.isFile ? (
+          <div className="scan-file-area" onClick={() => fileRef.current?.click()}>
+            <input ref={fileRef} type="file" accept={activeMode.accept} style={{ display: "none" }} onChange={e => setFile(e.target.files?.[0] || null)} />
+            {file ? (
+              <div className="scan-file-selected">
+                <Paperclip size={16} />
+                <span>{file.name}</span>
+                <button onClick={e => { e.stopPropagation(); setFile(null); }}><X size={14} /></button>
+              </div>
+            ) : (
+              <div className="scan-file-prompt">
+                <Upload size={18} />
+                <span>Tap to upload {activeMode.label.toLowerCase()}</span>
+                <small>{activeMode.desc}</small>
               </div>
             )}
-          </motion.div>
+          </div>
+        ) : (
+          <textarea
+            className="scan-chat-textarea"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={activeMode.placeholder}
+            rows={2}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
         )}
-      </AnimatePresence>
+        <button
+          className="primary scan-send-btn"
+          onClick={handleSend}
+          disabled={loading || (activeMode.isFile ? !file : !input.trim())}
+        >
+          {loading ? <Zap size={18} /> : <Send size={18} />}
+        </button>
+      </div>
+
+      <div className="scan-chat-footer">
+        <Bot size={12} /> Powered by ActiveMirror · MirrorDNA Intelligence · Advisory only — not a government service · Verdicts are automated, not legal determinations
+      </div>
     </motion.section>
   );
 }
@@ -587,137 +797,13 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
           </div>
           <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror (N1 Intelligence). All rights reserved.</div>
         </div>
+        <div className="footer-disclaimer">
+          <Info size={11} /> Advisory tool only. Not affiliated with Government of India, RBI, UIDAI, CERT-IN, or any law enforcement agency. Automated verdicts are not legal determinations. Jurisdiction: Bengaluru, Karnataka, India.
+        </div>
       </div>
     </footer>
   );
 }
 
-/* ── Chat Assistant (Draggable Floating) ─────────────────────── */
-interface ChatMsg { role: "user" | "bot"; text: string; articles?: { id: string; title: string }[]; suggestions?: string[]; }
 
-export function ChatAssistant() {
-  const [open, setOpen] = useState(false);
-  const [minimized, setMinimized] = useState(false);
-  const [teaser, setTeaser] = useState(false);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<HTMLDivElement | null>(null);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 });
-  const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: "bot", text: "Hi! I'm Chetana. Got a suspicious message or call? Paste it here and I'll check it. You can also ask me anything about scams in India.", suggestions: ["Someone sent me a collect request", "Is this link safe?", "I already sent money to a scammer", "What is Chetana?"] }
-  ]);
-
-  useEffect(() => { const t = setTimeout(() => setTeaser(true), 5000); return () => clearTimeout(t); }, []);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button, input, .chat-messages")) return;
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    setPos({ x: dragStart.current.px + e.clientX - dragStart.current.x, y: dragStart.current.py + e.clientY - dragStart.current.y });
-  };
-  const onPointerUp = () => setDragging(false);
-
-  const send = async (text: string) => {
-    if (!text.trim()) return;
-    setTeaser(false); setMinimized(false);
-    const userMsg: ChatMsg = { role: "user", text: text.trim() };
-    setMessages(m => [...m, userMsg]);
-    setInput(""); setLoading(true);
-    try {
-      const resp = await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text.trim() }) });
-      if (!resp.ok) throw new Error();
-      const data = await resp.json();
-      setMessages(m => [...m, { role: "bot", text: data.reply, articles: data.articles, suggestions: data.suggestions }]);
-    } catch {
-      setMessages(m => [...m, { role: "bot", text: "Sorry, I couldn't reach the server. Please try again." }]);
-    } finally { setLoading(false); }
-  };
-
-  if (!open) {
-    return (
-      <>
-        <AnimatePresence>
-          {teaser && (
-            <motion.div className="chat-teaser" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} onClick={() => { setOpen(true); setTeaser(false); }} style={{ cursor: "pointer" }}>
-              <p>Need help checking something?</p>
-              <small>Ask me about any suspicious message or call</small>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button className="chat-fab" onClick={() => { setOpen(true); setTeaser(false); }}>
-          <div className="chat-fab-pulse" />
-          <MessageCircle size={24} />
-          <div className="chat-fab-dot" />
-        </button>
-      </>
-    );
-  }
-
-  if (minimized) {
-    const lastBot = [...messages].reverse().find(m => m.role === "bot");
-    return (
-      <motion.div className="chat-pill" ref={dragRef} style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "grab" }}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
-        <div className="chat-pill-glyph"><Shield size={16} /></div>
-        <div className="chat-pill-preview" onClick={() => setMinimized(false)}>
-          <span className="chat-pill-name">Chetana</span>
-          {lastBot && <span className="chat-pill-text">{lastBot.text.slice(0, 50)}{lastBot.text.length > 50 ? "..." : ""}</span>}
-        </div>
-        <button className="chat-pill-expand" onClick={() => setMinimized(false)}><ChevronRight size={14} /></button>
-        <button className="chat-pill-close" onClick={() => { setOpen(false); setMinimized(false); setPos({ x: 0, y: 0 }); }}><X size={14} /></button>
-      </motion.div>
-    );
-  }
-
-  return (
-    <motion.div className="chat-panel" ref={dragRef} style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "default" }}
-      initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 25 }}>
-      <div className="chat-header" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={{ cursor: dragging ? "grabbing" : "grab" }}>
-        <div className="chat-header-left">
-          <div className="chat-header-glyph"><Shield size={20} /></div>
-          <div><div className="chat-header-title">Chetana</div><div className="chat-header-sub">Drag to move</div></div>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button className="chat-close" onClick={() => setMinimized(true)} title="Minimize"><span style={{ fontSize: 16, lineHeight: 1 }}>&ndash;</span></button>
-          <button className="chat-close" onClick={() => { setOpen(false); setPos({ x: 0, y: 0 }); }}><X size={18} /></button>
-        </div>
-      </div>
-      <div className="chat-messages" ref={scrollRef}>
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-msg ${msg.role}`}>
-            <div className="chat-msg-text">{msg.text}</div>
-            {msg.articles && msg.articles.length > 0 && (
-              <div className="chat-articles">
-                {msg.articles.map(a => (
-                  <div key={a.id} className="chat-article-card">
-                    <div className="chat-article-title"><BookOpen size={12} style={{ verticalAlign: "middle", marginRight: 4 }} />{a.title}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {msg.suggestions && msg.suggestions.length > 0 && (
-              <div className="chat-chips">
-                {msg.suggestions.map(s => <button key={s} className="chat-chip" onClick={() => send(s)}>{s}</button>)}
-              </div>
-            )}
-          </div>
-        ))}
-        {loading && <div className="chat-msg bot"><div className="chat-msg-text chat-typing">Thinking...</div></div>}
-      </div>
-      <div className="chat-input-row">
-        <input className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send(input)} placeholder="Ask anything or paste suspicious content..." />
-        <button className="chat-send" onClick={() => send(input)} disabled={!input.trim() || loading}><Send size={16} /></button>
-      </div>
-      <div className="chat-footer-brand">Powered by <strong>ActiveMirror</strong></div>
-    </motion.div>
-  );
-}
+export function ChatAssistant() { return null; }

@@ -11,8 +11,10 @@ import httpx
 import logging
 import re
 import sys
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
@@ -540,6 +542,48 @@ async def radar_public():
     except Exception as e:
         logger.warning("Kavach radar failed: %s", e)
     return {"error": "Radar temporarily unavailable", "scans_today": 0}
+
+
+@app.get("/api/radar/rss", include_in_schema=False)
+async def radar_rss():
+    """RSS feed of live scam weather — for news aggregators and RSS readers."""
+    try:
+        client = await get_client()
+        resp = await client.get(f"http://127.0.0.1:8093/api/weather")
+        signals = resp.json().get("signals", []) if resp.status_code == 200 else []
+    except Exception:
+        signals = []
+
+    now = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+    items = ""
+    for s in signals:
+        tone_label = "🔴 HIGH ALERT" if s.get("tone") == "red" else "🟡 WARNING"
+        items += f"""
+  <item>
+    <title>{tone_label}: {s.get('label','Unknown')} — Risk {s.get('pressure',0)}%</title>
+    <link>https://chetana.activemirror.ai/#weather</link>
+    <description>{s.get('label','Unknown')} scam activity is at {s.get('pressure',0)}% pressure ({s.get('delta','')}) in India. Check any suspicious message at chetana.activemirror.ai</description>
+    <pubDate>{now}</pubDate>
+    <guid isPermaLink="false">chetana-radar-{s.get('id','x')}-{datetime.now(timezone.utc).strftime('%Y%m%d')}</guid>
+  </item>"""
+
+    rss = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Chetana Scam Radar — India Live Threat Feed</title>
+    <link>https://chetana.activemirror.ai</link>
+    <description>Live scam and fraud threat intelligence for India. UPI fraud, phishing, deepfakes, digital arrest scams — updated daily. Free AI scam checker at chetana.activemirror.ai</description>
+    <language>en-in</language>
+    <lastBuildDate>{now}</lastBuildDate>
+    <atom:link href="https://chetana.activemirror.ai/api/radar/rss" rel="self" type="application/rss+xml"/>
+    <image>
+      <url>https://chetana.activemirror.ai/favicon.ico</url>
+      <title>Chetana Scam Radar</title>
+      <link>https://chetana.activemirror.ai</link>
+    </image>{items}
+  </channel>
+</rss>"""
+    return Response(content=rss, media_type="application/rss+xml")
 
 
 @app.get("/api/feeds/status")

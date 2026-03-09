@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
@@ -17,6 +17,8 @@ const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }
 export default function App() {
   const [page, setPage] = useState<PageId>("home");
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
   const handleQuickAccept = () => {
     localStorage.setItem("chetana_terms_accepted", new Date().toISOString());

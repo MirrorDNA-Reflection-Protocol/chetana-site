@@ -227,7 +227,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
             </div>
 
             {/* Merkle visualization */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 16, padding: 16, background: "white", borderRadius: 12, border: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 16, padding: 16, background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--line)" }}>
               <MerkleNode label="ROOT" hash={shortHash(proof.commitment.merkleRoot)} color="var(--safe)" />
               <div style={{ width: 1, height: 16, background: "var(--line)" }} />
               <div style={{ display: "flex", gap: 32 }}>

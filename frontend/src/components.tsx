@@ -7,28 +7,48 @@ import "@xterm/xterm/css/xterm.css";
 import {
   Shield, ShieldCheck, ShieldAlert, Search, Send, MessageCircle, X,
   Link2, Phone, CreditCard, AlertTriangle, CheckCircle, ChevronRight,
-  Globe, Users, Building2, Zap, Eye, BookOpen, BarChart3
+  Globe, Users, Building2, Zap, Eye, BookOpen, BarChart3, Lock, Smartphone,
+  TrendingUp, FileWarning, UserCheck, Layers
 } from "lucide-react";
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
-const fadeIn = { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35 } };
+const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
+const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d } });
+
+/* ── Background Mesh ─────────────────────────────────────────── */
+export function BackgroundMesh() {
+  return (
+    <div className="bg-mesh">
+      <div className="bg-orb bg-orb-1" />
+      <div className="bg-orb bg-orb-2" />
+      <div className="bg-orb bg-orb-3" />
+    </div>
+  );
+}
 
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const items: { id: PageId; label: string }[] = [
-    { id: "home", label: "Home" }, { id: "consumer", label: "Consumer" },
-    { id: "merchant", label: "Merchant" }, { id: "nexus", label: "Nexus" },
-    { id: "weather", label: "Scam Weather" }, { id: "atlas", label: "Scam Atlas" },
-    { id: "trust", label: "Trust by Design\u2122" }, { id: "vigilance", label: "Vigilance" }, { id: "proof", label: "Terms" }, { id: "control", label: "Control Center" }
+    { id: "home", label: "Home" },
+    { id: "consumer", label: "Consumer" },
+    { id: "merchant", label: "Business" },
+    { id: "nexus", label: "Enterprise" },
+    { id: "weather", label: "Scam Trends" },
+    { id: "atlas", label: "Scam Atlas" },
+    { id: "trust", label: "Trust" },
+    { id: "proof", label: "Terms" },
   ];
   return (
     <nav className="nav">
       <div className="brand" onClick={() => setPage("home")}>
-        <div className="brand-glyph"><Shield size={20} /></div>
-        <div><div className="brand-title">Chetana</div><div className="brand-sub">Trust infrastructure for India</div></div>
+        <div className="brand-glyph"><Shield size={18} /></div>
+        <div>
+          <div className="brand-title">Chetana</div>
+          <div className="brand-sub">India's free scam checker</div>
+        </div>
       </div>
       <div className="nav-links">
         {items.map((item) => (
@@ -46,11 +66,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
   const [selected, setSelected] = useState<string | null>(null);
 
   const steps = [
-    {
-      title: "Welcome to Chetana",
-      subtitle: "India's trust layer against scams and fraud",
-      options: null,
-    },
+    { title: "Welcome to Chetana", subtitle: "India's trust layer against scams and fraud", options: null },
     {
       title: "What brought you here?",
       subtitle: "We'll personalize your experience",
@@ -58,7 +74,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
         { id: "suspicious", icon: <AlertTriangle size={18} />, label: "I received something suspicious", color: "var(--danger-light)" },
         { id: "verify", icon: <Search size={18} />, label: "I want to verify something", color: "var(--amber-light)" },
         { id: "learn", icon: <BookOpen size={18} />, label: "I want to learn to stay safe", color: "var(--primary-light)" },
-        { id: "business", icon: <Building2 size={18} />, label: "I'm protecting my business", color: "var(--saffron-light)" },
+        { id: "business", icon: <Building2 size={18} />, label: "I'm protecting my business", color: "var(--saffron-glow)" },
       ],
     },
   ];
@@ -92,7 +108,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
             </div>
           )}
           <button className="primary" onClick={handleNext} disabled={step === 1 && !selected} style={{ width: "100%" }}>
-            {step === 0 ? "Get Started" : "Continue"} <ChevronRight size={16} style={{ marginLeft: 4 }} />
+            {step === 0 ? "Get Started" : "Continue"} <ChevronRight size={16} />
           </button>
           <button className="onboarding-skip" onClick={() => onComplete("home")}>Skip for now</button>
         </motion.div>
@@ -111,8 +127,8 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
           <div className="alert-banner-left">
             <ShieldAlert size={22} />
             <div>
-              <strong>₹1.2 lakh crore lost to digital fraud in India last year.</strong>
-              <span>Every 3 seconds, someone falls for a scam. Don't be next.</span>
+              <strong>Indians lose over Rs 1.2 lakh crore to scams every year.</strong>
+              <span>Someone gets scammed every 3 seconds. Don't be next.</span>
             </div>
           </div>
           <button className="alert-banner-cta" onClick={() => onNavigate("consumer")}>
@@ -124,44 +140,49 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
   );
 }
 
-/* ── Hero ─────────────────────────────────────────────────────── */
-export function Hero({ onNavigate }: { onNavigate: (target: "consumer" | "merchant" | "nexus") => void }) {
+/* ── Hero (Scan-centered) ────────────────────────────────────── */
+export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   return (
     <motion.section className="hero" {...fadeIn}>
-      <div className="hero-copy">
-        <div className="kicker"><Shield size={14} /> Before you trust, check</div>
-        <h1>Protect yourself from scams in seconds.</h1>
-        <p>Check any message, link, UPI ID, or phone number against live threat intelligence. Free. In your language.</p>
-        <div className="hero-actions">
-          <button className="primary" onClick={() => onNavigate("consumer")}><Search size={16} /> Check now</button>
-          <button className="secondary" onClick={() => onNavigate("merchant")}><Building2 size={16} /> For business</button>
-          <button className="ghost" onClick={() => onNavigate("nexus")}>Explore Nexus</button>
-        </div>
-        <div className="trust-strip">
-          <span><Globe size={12} /> 12 languages (22 planned)</span>
-          <span><Eye size={12} /> Privacy-conscious</span>
-          <span><ShieldCheck size={12} /> Trusted by design</span>
-        </div>
-      </div>
-      <div className="hero-visual">
-        <div className="glass-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, minHeight: 400 }}>
-          <div className="graph-orb" />
-          <FloatingCards size={320} />
-          <div style={{ width: "100%", borderTop: "1px solid var(--line)", paddingTop: 16 }}>
-            <div className="glass-header">Live Stats</div>
-            <div style={{ display: "flex", gap: 24, justifyContent: "center" }}>
-              <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--heading)" }}><CountUp end={50} suffix="+" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Scans today</div></div>
-              <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--safe)" }}><CountUp end={136} suffix="" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Threats blocked</div></div>
-              <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--primary)" }}><CountUp end={12} suffix="" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Languages live</div></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="hero-watermark">चेतना</div>
+      <motion.div className="kicker" {...fadeInDelay(0.1)}>
+        <Shield size={14} /> Free scam checker for India
+      </motion.div>
+      <motion.h1 {...fadeInDelay(0.15)}>
+        Got a suspicious message? Check it here.
+      </motion.h1>
+      <motion.p {...fadeInDelay(0.2)}>
+        Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. We'll tell you if it's safe or a scam — in seconds, for free, in 12 Indian languages.
+      </motion.p>
     </motion.section>
   );
 }
 
-/* ── Scan Box ────────────────────────────────────────────────── */
+/* ── Stats Strip ─────────────────────────────────────────────── */
+export function StatsStrip() {
+  return (
+    <motion.div className="stats-strip" {...fadeInDelay(0.3)}>
+      <div className="stat-item">
+        <div className="stat-value"><CountUp end={50} suffix="+" /></div>
+        <div className="stat-label">Messages checked today</div>
+      </div>
+      <div className="stat-item">
+        <div className="stat-value"><CountUp end={136} suffix="" /></div>
+        <div className="stat-label">Scams caught</div>
+      </div>
+      <div className="stat-item">
+        <div className="stat-value"><CountUp end={25} suffix="+" /></div>
+        <div className="stat-label">Types of scams detected</div>
+      </div>
+      <div className="stat-item">
+        <div className="stat-value"><CountUp end={12} suffix="" /></div>
+        <div className="stat-label">Indian languages</div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Scan Box (the star of the show) ─────────────────────────── */
 type ScanTab = "text" | "link" | "upi" | "phone";
 
 export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
@@ -172,15 +193,14 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
   const [error, setError] = useState("");
 
   const tabs: { id: ScanTab; label: string; icon: React.ReactNode; placeholder: string }[] = [
-    { id: "text", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste suspicious message..." },
-    { id: "link", label: "Link", icon: <Link2 size={14} />, placeholder: "Paste URL to check..." },
-    { id: "upi", label: "UPI ID", icon: <CreditCard size={14} />, placeholder: "e.g. name@ybl" },
-    { id: "phone", label: "Phone", icon: <Phone size={14} />, placeholder: "10-digit number" },
+    { id: "text", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious message, SMS, or WhatsApp forward..." },
+    { id: "link", label: "Link", icon: <Link2 size={14} />, placeholder: "Paste any URL to check..." },
+    { id: "upi", label: "UPI ID", icon: <CreditCard size={14} />, placeholder: "e.g. name@ybl or name@paytm" },
+    { id: "phone", label: "Phone", icon: <Phone size={14} />, placeholder: "10-digit phone number" },
   ];
 
   const handleScan = async () => {
     if (!content.trim()) return;
-    // Gate: require Proof-of-Memory before first scan
     if (!localStorage.getItem("chetana_terms_accepted")) {
       if (onRequireProof) onRequireProof();
       return;
@@ -222,11 +242,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
   const activeTab = tabs.find(t => t.id === tab)!;
 
   return (
-    <motion.section className="panel scan-panel" {...fadeIn}>
-      <div className="panel-header">
-        <h2><Search size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Check something suspicious</h2>
-        <p>Paste it below. We'll check it against live threat intelligence.</p>
-      </div>
+    <motion.section className="scan-panel" {...fadeInDelay(0.25)}>
       <div className="scan-tabs">
         {tabs.map(t => (
           <button key={t.id} className={`scan-tab ${tab === t.id ? "active" : ""}`} onClick={() => { setTab(t.id); setResult(null); setError(""); }}>
@@ -235,9 +251,9 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
         ))}
       </div>
       <div className="scan-input-row">
-        <textarea className="scan-textarea" value={content} onChange={e => setContent(e.target.value)} placeholder={activeTab.placeholder} rows={tab === "text" ? 3 : 1} />
+        <textarea className="scan-textarea" value={content} onChange={e => setContent(e.target.value)} placeholder={activeTab.placeholder} rows={tab === "text" ? 3 : 1} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleScan(); } }} />
         <button className="primary scan-btn" onClick={handleScan} disabled={loading || !content.trim()}>
-          {loading ? <><Zap size={16} /> Checking...</> : <><Search size={16} /> Check</>}
+          {loading ? <><Zap size={16} /> Scanning...</> : <><Search size={16} /> Scan</>}
         </button>
       </div>
       {error && <div className="scan-error"><AlertTriangle size={14} style={{ verticalAlign: "middle", marginRight: 6 }} />{error}</div>}
@@ -247,9 +263,9 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
             <div className={`scan-verdict ${verdictClass(result.verdict)}`}>
               <div className="verdict-header">
                 <span className="verdict-label"><VerdictIcon v={result.verdict} /> {result.verdict.replace(/_/g, " ")}</span>
-                <span className="verdict-score">Score: {result.risk_score}/100</span>
+                <span className="verdict-score">Threat score: {result.risk_score}/100</span>
               </div>
-              {result.action_eligibility && <div className="verdict-action">Recommended: {result.action_eligibility.replace(/_/g, " ")}</div>}
+              {result.action_eligibility && <div className="verdict-action">Recommended action: {result.action_eligibility.replace(/_/g, " ")}</div>}
             </div>
             {result.why_flagged.length > 0 && (
               <div className="scan-signals">
@@ -264,11 +280,93 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
   );
 }
 
-/* ── Weather ──────────────────────────────────────────────────── */
+/* ── Consumer Section ────────────────────────────────────────── */
+export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  const features = [
+    { icon: <MessageCircle size={22} />, color: "blue", title: "Check Messages", desc: "Got a weird SMS or WhatsApp forward? Paste it here. We'll tell you if it's a known scam in seconds.", click: "consumer" as PageId },
+    { icon: <Link2 size={22} />, color: "teal", title: "Check Links", desc: "Not sure if a link is safe? Paste it before you click. We check for fake bank sites, phishing, and traps.", click: "consumer" as PageId },
+    { icon: <CreditCard size={22} />, color: "saffron", title: "Check UPI & Payments", desc: "Someone asking you to scan a QR or accept a collect request? Check the UPI ID first. Don't lose money.", click: "consumer" as PageId },
+    { icon: <Users size={22} />, color: "violet", title: "Protect Your Family", desc: "Share simple safety tips with parents and elders. Works in Hindi, Tamil, Telugu, Bengali, and 8 more languages.", click: "atlas" as PageId },
+  ];
+  return (
+    <>
+      <div className="section-header">
+        <motion.div className="kicker" {...fadeIn}><Shield size={14} /> For you & your family</motion.div>
+        <motion.h2 {...fadeInDelay(0.05)}>Protect Yourself From Scams</motion.h2>
+        <motion.p {...fadeInDelay(0.1)}>Check any suspicious message, link, or payment before you act. Free and instant.</motion.p>
+      </div>
+      <div className="feature-grid">
+        {features.map((f, i) => (
+          <motion.div key={f.title} className="feature-card" onClick={() => onNavigate(f.click)} {...fadeInDelay(i * 0.08)}>
+            <div className={`feature-icon ${f.color}`}>{f.icon}</div>
+            <h3>{f.title}</h3>
+            <p>{f.desc}</p>
+          </motion.div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ── Enterprise Section ──────────────────────────────────────── */
+export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  const features = [
+    { icon: <Building2 size={22} />, color: "saffron", title: "Merchant Protection", desc: "Stop losing money to fake payment screenshots and impersonation attacks. Verify every transaction before you ship.", click: "merchant" as PageId },
+    { icon: <Layers size={22} />, color: "violet", title: "Fraud Detection API", desc: "Add Chetana's scam detection to your app, website, or payment flow. One API call — instant fraud verdict for your users.", click: "nexus" as PageId, highlight: true },
+    { icon: <TrendingUp size={22} />, color: "blue", title: "Scam Trend Monitoring", desc: "See which scams are rising right now. Track fraud campaigns targeting your industry and get alerted before they hit.", click: "weather" as PageId },
+    { icon: <UserCheck size={22} />, color: "safe", title: "Train Your Team", desc: "Help your employees spot scams before they fall for them. Real examples, real patterns, real protection.", click: "atlas" as PageId },
+  ];
+  return (
+    <>
+      <div className="section-header">
+        <motion.div className="kicker" {...fadeIn}><Building2 size={14} /> For businesses & enterprises</motion.div>
+        <motion.h2 {...fadeInDelay(0.05)}>Protect Your Business</motion.h2>
+        <motion.p {...fadeInDelay(0.1)}>Fraud costs Indian businesses crores every year. Stop it before it starts.</motion.p>
+      </div>
+      <div className="feature-grid">
+        {features.map((f, i) => (
+          <motion.div key={f.title} className={`feature-card${f.highlight ? " enterprise-highlight" : ""}`} onClick={() => onNavigate(f.click)} {...fadeInDelay(i * 0.08)}>
+            <div className={`feature-icon ${f.color}`}>{f.icon}</div>
+            <h3>{f.title}</h3>
+            <p>{f.desc}</p>
+          </motion.div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ── Onboarding cards ────────────────────────────────────────── */
+export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "merchant" | "nexus") => void }) {
+  return (
+    <motion.section className="panel" {...fadeIn}>
+      <div className="panel-header"><h2>Who are you protecting?</h2><p>Chetana works for individuals, businesses, and enterprises.</p></div>
+      <div className="card-grid">
+        <button className="onboard-card" onClick={() => onNavigate("consumer")}>
+          <div className="onboard-icon consumer"><Shield size={22} /></div>
+          <h3>Protect me</h3><p>Check messages, links, and payment proofs instantly.</p>
+        </button>
+        <button className="onboard-card" onClick={() => onNavigate("merchant")}>
+          <div className="onboard-icon merchant"><Building2 size={22} /></div>
+          <h3>Protect my business</h3><p>Defend against fake payments and impersonation.</p>
+        </button>
+        <button className="onboard-card" onClick={() => onNavigate("nexus")}>
+          <div className="onboard-icon enterprise"><BarChart3 size={22} /></div>
+          <h3>Protect my institution</h3><p>Campaign graphs, analyst replay, enterprise trust.</p>
+        </button>
+      </div>
+    </motion.section>
+  );
+}
+
+/* ── Weather Board ───────────────────────────────────────────── */
 export function WeatherBoard({ signals }: { signals: WeatherSignal[] }) {
   return (
     <motion.section className="panel" {...fadeIn}>
-      <div className="panel-header"><h2><BarChart3 size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Weather</h2><p>Live pressure signals across Indian digital trust.</p></div>
+      <div className="panel-header">
+        <h2><BarChart3 size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Trends Right Now</h2>
+        <p>Which scams are rising in India today? See what's happening live.</p>
+      </div>
       <div className="weather-grid">
         {signals.map((s, i) => (
           <motion.div key={s.id} className={`weather-card ${s.tone}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
@@ -295,7 +393,7 @@ export function Atlas({ threats }: { threats: ThreatEntry[] }) {
   return (
     <motion.section className="panel" {...fadeIn}>
       <div className="panel-header split">
-        <div><h2><BookOpen size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Atlas</h2><p>A living threat wiki. Know the red flags. Know what to do.</p></div>
+        <div><h2><BookOpen size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Encyclopedia</h2><p>Learn to spot every type of scam. Red flags, what to do, and how to stay safe.</p></div>
         <div className="filters">
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search scams..." />
           <select value={surface} onChange={e => setSurface(e.target.value)}>
@@ -316,8 +414,8 @@ export function Atlas({ threats }: { threats: ThreatEntry[] }) {
             <p>{t.summary}</p>
             <div className="tag-row">{t.languages.map(l => <span key={l} className="tag">{l}</span>)}</div>
             <div className="two-col">
-              <div><strong>Red flags</strong><ul>{t.redFlags.map(r => <li key={r}>{r}</li>)}</ul></div>
-              <div><strong>What to do</strong><ul>{t.actions.map(a => <li key={a}>{a}</li>)}</ul></div>
+              <div><strong style={{ color: "var(--heading)" }}>Red flags</strong><ul>{t.redFlags.map(r => <li key={r}>{r}</li>)}</ul></div>
+              <div><strong style={{ color: "var(--heading)" }}>What to do</strong><ul>{t.actions.map(a => <li key={a}>{a}</li>)}</ul></div>
             </div>
           </motion.article>
         ))}
@@ -339,16 +437,16 @@ export function MirrorGraph({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
         { selector: "node", style: {
           "background-color": (ele: any) => {
             const k = ele.data("kind");
-            if (k === "core") return "#2563EB";
-            if (k === "campaign") return "#DC2626";
-            if (k === "enterprise") return "#7C3AED";
-            if (k === "surface") return "#F59E0B";
+            if (k === "core") return "#3b82f6";
+            if (k === "campaign") return "#ef4444";
+            if (k === "enterprise") return "#8b5cf6";
+            if (k === "surface") return "#f59e0b";
             return "#6B7280";
           },
-          label: "data(label)", color: "#d8e2f0", "font-size": 11 as any, "text-wrap": "wrap", "text-max-width": 90 as any, width: 34, height: 34,
-          "border-width": 1, "border-color": "#0b1220"
+          label: "data(label)", color: "#94a3b8", "font-size": 11 as any, "text-wrap": "wrap", "text-max-width": 90 as any, width: 34, height: 34,
+          "border-width": 1, "border-color": "#0a0a1a"
         }},
-        { selector: "edge", style: { width: 2, "line-color": "#3b4d6a", "target-arrow-color": "#3b4d6a", "target-arrow-shape": "triangle", "curve-style": "bezier", label: "data(label)", color: "#91a1b7", "font-size": 9 }},
+        { selector: "edge", style: { width: 2, "line-color": "#1e293b", "target-arrow-color": "#1e293b", "target-arrow-shape": "triangle", "curve-style": "bezier", label: "data(label)", color: "#475569", "font-size": 9 }},
         { selector: ".faded", style: { opacity: 0.15 } }
       ]
     });
@@ -367,15 +465,15 @@ export function TuiPanel({ lines }: { lines: string[] }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!mountRef.current) return;
-    const term = new Terminal({ theme: { background: "#08111d", foreground: "#cde3ff", cursor: "#7ee7d9" }, fontSize: 12, rows: 18 });
+    const term = new Terminal({ theme: { background: "#060610", foreground: "#94a3b8", cursor: "#14b8a6" }, fontSize: 12, rows: 18 });
     const fit = new FitAddon();
     term.loadAddon(fit); term.open(mountRef.current); fit.fit();
     term.writeln("chetana-control-shell v1");
-    term.writeln("────────────────────────────────");
+    term.writeln("\x1b[38;5;240m" + "─".repeat(40) + "\x1b[0m");
     let i = 0;
     const iv = setInterval(() => {
-      if (i >= lines.length) { term.writeln("> system stable."); clearInterval(iv); return; }
-      term.writeln(`> ${lines[i]}`); i++;
+      if (i >= lines.length) { term.writeln("\x1b[32m> system stable.\x1b[0m"); clearInterval(iv); return; }
+      term.writeln(`\x1b[36m>\x1b[0m ${lines[i]}`); i++;
     }, 550);
     const onR = () => fit.fit();
     window.addEventListener("resize", onR);
@@ -403,20 +501,20 @@ export function DashboardGallery() {
 /* ── Trust ────────────────────────────────────────────────────── */
 export function TrustPage() {
   const items: [string, string, React.ReactNode][] = [
-    ["Evidence Ladder", "Every verdict is backed by layered evidence — not guesswork.", <Eye size={20} />],
-    ["Action Eligibility", "We tell you what to do, not just what's wrong.", <CheckCircle size={20} />],
-    ["Privacy Conscious", "Your data is transmitted securely and never sold or shared. Used only for analysis.", <Shield size={20} />],
-    ["Human Boundary", "Some decisions stay advisory. We don't override your judgment.", <Users size={20} />]
+    ["We show our work", "Every result tells you exactly WHY something looks suspicious — not just a score. You see the evidence.", <Eye size={20} />],
+    ["We tell you what to do", "Not just \"this is dangerous.\" We give you clear next steps: block, report, call 1930, or relax.", <CheckCircle size={20} />],
+    ["Your data stays private", "We check your message and forget it. Nothing is stored, sold, or shared. Ever.", <Lock size={20} />],
+    ["You decide, not us", "We give you the facts. The final call is always yours. We never block or act without your say.", <Users size={20} />]
   ];
   return (
     <motion.section className="panel" {...fadeIn}>
-      <div className="panel-header"><h2><ShieldCheck size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Trust by Design&#8482;</h2><p>Nothing changes without evidence, bounds, and trace.</p></div>
-      <div className="trust-grid">{items.map(([title, copy, icon]) => <div className="trust-card" key={title}><div style={{ color: "var(--primary)", marginBottom: 8 }}>{icon}</div><h3>{title}</h3><p>{copy}</p></div>)}</div>
+      <div className="panel-header"><h2><ShieldCheck size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Why Trust Chetana?</h2><p>We built this to protect people, not to collect data or sell fear.</p></div>
+      <div className="trust-grid">{items.map(([title, copy, icon]) => <div className="trust-card" key={title}><div style={{ color: "var(--primary-bright)", marginBottom: 8 }}>{icon}</div><h3>{title}</h3><p>{copy}</p></div>)}</div>
       <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="proof-banner">
         <div className="proof-banner-icon"><ShieldCheck size={20} /></div>
         <div className="proof-banner-text">
           <strong>Proof-of-Memory Protocol</strong>
-          <span>Cryptographic attestation that users read and understood — not just clicked through. See how we enforce consent.</span>
+          <span>Cryptographic attestation that users read and understood — not just clicked through.</span>
         </div>
         <ChevronRight size={18} className="proof-banner-arrow" />
       </a>
@@ -424,26 +522,19 @@ export function TrustPage() {
   );
 }
 
-/* ── Onboarding cards ────────────────────────────────────────── */
-export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "merchant" | "nexus") => void }) {
+/* ── Telegram CTA ────────────────────────────────────────────── */
+export function TelegramCTA() {
   return (
-    <motion.section className="panel" {...fadeIn}>
-      <div className="panel-header"><h2>Who are you protecting?</h2><p>One system, three surfaces.</p></div>
-      <div className="card-grid">
-        <button className="onboard-card" onClick={() => onNavigate("consumer")}>
-          <div className="onboard-icon consumer"><Shield size={22} /></div>
-          <h3>Protect me</h3><p>Check messages, links, and payment proofs instantly.</p>
-        </button>
-        <button className="onboard-card" onClick={() => onNavigate("merchant")}>
-          <div className="onboard-icon merchant"><Building2 size={22} /></div>
-          <h3>Protect my business</h3><p>Defend against fake payments and impersonation.</p>
-        </button>
-        <button className="onboard-card" onClick={() => onNavigate("nexus")}>
-          <div className="onboard-icon enterprise"><BarChart3 size={22} /></div>
-          <h3>Protect my institution</h3><p>Campaign graphs, analyst replay, enterprise trust.</p>
-        </button>
+    <motion.div className="proof-banner" {...fadeIn} style={{ cursor: "pointer", maxWidth: 720, margin: "0 auto 32px" }} onClick={() => window.open("https://t.me/chetnaShieldBot", "_blank")}>
+      <div className="proof-banner-icon" style={{ background: "linear-gradient(135deg, #0088cc, #229ED9)" }}>
+        <Smartphone size={20} />
       </div>
-    </motion.section>
+      <div className="proof-banner-text">
+        <strong>Use Chetana on Telegram</strong>
+        <span>Forward any suspicious message to @chetnaShieldBot on Telegram. Instant reply. No app needed.</span>
+      </div>
+      <ChevronRight size={18} className="proof-banner-arrow" />
+    </motion.div>
   );
 }
 
@@ -454,10 +545,10 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
       <div className="footer-inner">
         <div className="footer-brand">
           <div className="footer-logo">
-            <div className="brand-glyph" style={{ width: 36, height: 36, fontSize: 16 }}><Shield size={16} /></div>
+            <div className="brand-glyph" style={{ width: 36, height: 36 }}><Shield size={16} /></div>
             <div>
               <div className="brand-title" style={{ fontSize: 17 }}>Chetana</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>Trust infrastructure for India</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>India's free scam checker</div>
             </div>
           </div>
           <p className="footer-desc">AI-powered scam detection and trust verification. Check messages, links, UPI IDs, and phone numbers against live threat intelligence.</p>
@@ -468,19 +559,21 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <button onClick={() => onNavigate("consumer")}>Consumer</button>
             <button onClick={() => onNavigate("merchant")}>Merchant</button>
             <button onClick={() => onNavigate("nexus")}>Nexus</button>
-            <button onClick={() => onNavigate("control")}>Control Center</button>
+            <button onClick={() => { window.open("https://t.me/chetnaShieldBot", "_blank"); }}>Telegram Bot</button>
           </div>
           <div className="footer-col">
             <h4>Intelligence</h4>
             <button onClick={() => onNavigate("weather")}>Scam Weather</button>
             <button onClick={() => onNavigate("atlas")}>Scam Atlas</button>
             <button onClick={() => onNavigate("trust")}>Trust by Design&#8482;</button>
+            <button onClick={() => onNavigate("vigilance")}>Vigilance</button>
           </div>
           <div className="footer-col">
-            <h4>Legal</h4>
-            <button onClick={() => onNavigate("proof")}>Terms & Disclaimer</button>
+            <h4>Emergency</h4>
             <span className="footer-static">Cybercrime: 1930</span>
-            <span className="footer-static">Women: 181</span>
+            <span className="footer-static">Women helpline: 181</span>
+            <span className="footer-static">cybercrime.gov.in</span>
+            <button onClick={() => onNavigate("proof")}>Terms & Disclaimer</button>
           </div>
         </div>
         <div className="footer-bottom">
@@ -490,7 +583,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <span className="powered-sep">|</span>
             <span className="powered-brand">MirrorDNA</span>
             <span className="powered-sep">|</span>
-            <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="powered-link">Proof-of-Memory Protocol</a>
+            <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="powered-link">Proof-of-Memory</a>
           </div>
           <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror (N1 Intelligence). All rights reserved.</div>
         </div>
@@ -499,7 +592,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   );
 }
 
-/* ── Chat Assistant (Draggable Floating Pill) ────────────────── */
+/* ── Chat Assistant (Draggable Floating) ─────────────────────── */
 interface ChatMsg { role: "user" | "bot"; text: string; articles?: { id: string; title: string }[]; suggestions?: string[]; }
 
 export function ChatAssistant() {
@@ -514,13 +607,12 @@ export function ChatAssistant() {
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 });
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: "bot", text: "Hi! I'm Chetana. I can help you check suspicious messages, explain scam types, or guide you to the right tool. What do you need?", suggestions: ["How do I check a message?", "What scams are trending?", "How to report fraud?", "Tell me about Chetana"] }
+    { role: "bot", text: "Hi! I'm Chetana. Got a suspicious message or call? Paste it here and I'll check it. You can also ask me anything about scams in India.", suggestions: ["Someone sent me a collect request", "Is this link safe?", "I already sent money to a scammer", "What is Chetana?"] }
   ]);
 
-  useEffect(() => { const t = setTimeout(() => setTeaser(true), 4000); return () => clearTimeout(t); }, []);
+  useEffect(() => { const t = setTimeout(() => setTeaser(true), 5000); return () => clearTimeout(t); }, []);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages]);
 
-  // Drag handlers
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("button, input, .chat-messages")) return;
     setDragging(true);
@@ -529,16 +621,13 @@ export function ChatAssistant() {
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragging) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    setPos({ x: dragStart.current.px + dx, y: dragStart.current.py + dy });
+    setPos({ x: dragStart.current.px + e.clientX - dragStart.current.x, y: dragStart.current.py + e.clientY - dragStart.current.y });
   };
   const onPointerUp = () => setDragging(false);
 
   const send = async (text: string) => {
     if (!text.trim()) return;
-    setTeaser(false);
-    setMinimized(false);
+    setTeaser(false); setMinimized(false);
     const userMsg: ChatMsg = { role: "user", text: text.trim() };
     setMessages(m => [...m, userMsg]);
     setInput(""); setLoading(true);
@@ -552,7 +641,6 @@ export function ChatAssistant() {
     } finally { setLoading(false); }
   };
 
-  // Closed state: floating pill
   if (!open) {
     return (
       <>
@@ -566,25 +654,19 @@ export function ChatAssistant() {
         </AnimatePresence>
         <button className="chat-fab" onClick={() => { setOpen(true); setTeaser(false); }}>
           <div className="chat-fab-pulse" />
-          <MessageCircle size={26} />
+          <MessageCircle size={24} />
           <div className="chat-fab-dot" />
         </button>
       </>
     );
   }
 
-  // Minimized state: floating pill with last message preview
   if (minimized) {
     const lastBot = [...messages].reverse().find(m => m.role === "bot");
     return (
-      <motion.div
-        className="chat-pill"
-        ref={dragRef}
-        style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "grab" }}
+      <motion.div className="chat-pill" ref={dragRef} style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "grab" }}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      >
+        initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
         <div className="chat-pill-glyph"><Shield size={16} /></div>
         <div className="chat-pill-preview" onClick={() => setMinimized(false)}>
           <span className="chat-pill-name">Chetana</span>
@@ -596,22 +678,16 @@ export function ChatAssistant() {
     );
   }
 
-  // Full panel: draggable
   return (
-    <motion.div
-      className="chat-panel"
-      ref={dragRef}
-      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "default" }}
-      initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-    >
+    <motion.div className="chat-panel" ref={dragRef} style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, cursor: dragging ? "grabbing" : "default" }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 25 }}>
       <div className="chat-header" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} style={{ cursor: dragging ? "grabbing" : "grab" }}>
         <div className="chat-header-left">
           <div className="chat-header-glyph"><Shield size={20} /></div>
-          <div><div className="chat-header-title">Chetana Assistant</div><div className="chat-header-sub">Drag to move &middot; Always here</div></div>
+          <div><div className="chat-header-title">Chetana</div><div className="chat-header-sub">Drag to move</div></div>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
-          <button className="chat-close" onClick={() => setMinimized(true)} title="Minimize to pill"><span style={{ fontSize: 16, lineHeight: 1 }}>&ndash;</span></button>
+          <button className="chat-close" onClick={() => setMinimized(true)} title="Minimize"><span style={{ fontSize: 16, lineHeight: 1 }}>&ndash;</span></button>
           <button className="chat-close" onClick={() => { setOpen(false); setPos({ x: 0, y: 0 }); }}><X size={18} /></button>
         </div>
       </div>
@@ -638,7 +714,7 @@ export function ChatAssistant() {
         {loading && <div className="chat-msg bot"><div className="chat-msg-text chat-typing">Thinking...</div></div>}
       </div>
       <div className="chat-input-row">
-        <input className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send(input)} placeholder="Ask anything..." />
+        <input className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send(input)} placeholder="Ask anything or paste suspicious content..." />
         <button className="chat-send" onClick={() => send(input)} disabled={!input.trim() || loading}><Send size={16} /></button>
       </div>
       <div className="chat-footer-brand">Powered by <strong>ActiveMirror</strong></div>

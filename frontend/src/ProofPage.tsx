@@ -129,7 +129,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
     setProofGenerated(true);
     localStorage.setItem("chetana_proof", JSON.stringify(proofObj));
     localStorage.setItem("chetana_terms_accepted", timestamp);
-    if (onAccepted) setTimeout(() => onAccepted(), 2000);
+    // onAccepted called by user clicking "Start Scanning"
   };
 
   const copyProof = () => {
@@ -246,6 +246,11 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
             <p style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
               Protocol: {proof.protocol} | Issuer: {proof.issuer} | {proof.jurisdiction}
             </p>
+            <div style={{ textAlign: "center", marginTop: 20 }}>
+              <button className="primary" onClick={() => onAccepted && onAccepted()} style={{ padding: "12px 32px", fontSize: 15, display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <ShieldCheck size={18} /> Start Scanning
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -69,15 +69,14 @@ app = FastAPI(title="Chetana Showcase API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8093"],
+    allow_origins=["http://localhost:5173", "http://localhost:8093", "https://chetana.activemirror.ai"],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
 
-# Serve the built frontend
+# Serve the built frontend at root (must be AFTER all API routes are defined,
+# so we mount it at startup instead of module level)
 frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/app", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
 # ── Shared async HTTP client ──────────────────────────────────────────
 
@@ -747,3 +746,16 @@ async def chat(req: ChatRequest):
         "articles": kb_articles,
         "suggestions": suggestions,
     }
+
+
+# ── Serve frontend static files at root (MUST be after all API routes) ──
+if frontend_dist.exists():
+    from fastapi.responses import FileResponse
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        """Serve static files or fall back to index.html for SPA routing."""
+        file = frontend_dist / path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(frontend_dist / "index.html")

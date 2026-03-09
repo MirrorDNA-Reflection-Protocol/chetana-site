@@ -391,17 +391,36 @@ async def kb_article(article_id: str):
     return {"error": "Article not found or KB unavailable"}
 
 
+SUPPORTED_LANGUAGES = [
+    {"code": "en", "name": "English", "status": "live"},
+    {"code": "hi", "name": "Hindi", "status": "live"},
+    {"code": "ta", "name": "Tamil", "status": "live"},
+    {"code": "te", "name": "Telugu", "status": "live"},
+    {"code": "kn", "name": "Kannada", "status": "live"},
+    {"code": "ml", "name": "Malayalam", "status": "live"},
+    {"code": "bn", "name": "Bengali", "status": "live"},
+    {"code": "mr", "name": "Marathi", "status": "live"},
+    {"code": "gu", "name": "Gujarati", "status": "live"},
+    {"code": "pa", "name": "Punjabi", "status": "live"},
+    {"code": "or", "name": "Odia", "status": "live"},
+    {"code": "as", "name": "Assamese", "status": "live"},
+    {"code": "ur", "name": "Urdu", "status": "coming_soon"},
+    {"code": "mai", "name": "Maithili", "status": "coming_soon"},
+    {"code": "sat", "name": "Santali", "status": "coming_soon"},
+    {"code": "ks", "name": "Kashmiri", "status": "coming_soon"},
+    {"code": "ne", "name": "Nepali", "status": "coming_soon"},
+    {"code": "sd", "name": "Sindhi", "status": "coming_soon"},
+    {"code": "kok", "name": "Konkani", "status": "coming_soon"},
+    {"code": "doi", "name": "Dogri", "status": "coming_soon"},
+    {"code": "mni", "name": "Manipuri", "status": "coming_soon"},
+    {"code": "brx", "name": "Bodo", "status": "coming_soon"},
+]
+
+
 @app.get("/api/languages")
 async def languages():
-    """Proxy language list to Kavach."""
-    try:
-        client = await get_client()
-        resp = await client.get(f"{KAVACH_URL}/api/languages")
-        if resp.status_code == 200:
-            return resp.json()
-    except Exception as e:
-        logger.warning("Kavach languages failed: %s", e)
-    return {"languages": ["English", "Hindi", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi", "Gujarati", "Punjabi", "Odia", "Assamese", "Urdu", "Maithili", "Santali", "Kashmiri", "Nepali", "Sindhi", "Konkani", "Dogri", "Manipuri", "Bodo"]}
+    """Return all 22 scheduled Indian languages with live/coming_soon status."""
+    return {"languages": SUPPORTED_LANGUAGES, "live_count": 12, "total_count": 22}
 
 
 @app.get("/api/radar/public")
@@ -435,12 +454,12 @@ async def feeds_status():
 FAQ_ENTRIES = [
     {
         "keywords": ["scan", "check", "message", "link", "how does", "scanning", "analyze", "paste", "verify"],
-        "reply": "Chetana scans messages, links, payment proofs, QR codes, and media against live threat intelligence. Just paste the suspicious content into the scan box and we analyze it in real time. Works in 22 Indian languages.",
+        "reply": "Chetana scans messages, links, payment proofs, QR codes, and media against live threat intelligence. Just paste the suspicious content into the scan box and we analyze it in real time. Works in 12 Indian languages (22 planned — all scheduled languages).",
         "topic": "scanning",
     },
     {
         "keywords": ["consumer", "protect me", "personal", "individual", "user"],
-        "reply": "The Consumer layer lets you check messages, links, payment proofs, and QR codes. It works in 22 Indian languages with family-safe explanations and emergency guidance. Just paste any suspicious content to get an instant trust verdict.",
+        "reply": "The Consumer layer lets you check messages, links, payment proofs, and QR codes. It works in 12 Indian languages (22 planned — all scheduled languages) with family-safe explanations and emergency guidance. Just paste any suspicious content to get an instant trust verdict.",
         "topic": "consumer",
     },
     {

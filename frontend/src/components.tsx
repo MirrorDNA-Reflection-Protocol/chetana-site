@@ -137,7 +137,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: "consumer" | "mercha
           <button className="ghost" onClick={() => onNavigate("nexus")}>Explore Nexus</button>
         </div>
         <div className="trust-strip">
-          <span><Globe size={12} /> 22 languages</span>
+          <span><Globe size={12} /> 12 languages (22 planned)</span>
           <span><Eye size={12} /> Privacy-conscious</span>
           <span><ShieldCheck size={12} /> Trusted by design</span>
         </div>
@@ -151,7 +151,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: "consumer" | "mercha
             <div style={{ display: "flex", gap: 24, justifyContent: "center" }}>
               <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--heading)" }}><CountUp end={50} suffix="+" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Scans today</div></div>
               <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--safe)" }}><CountUp end={136} suffix="" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Threats blocked</div></div>
-              <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--primary)" }}><CountUp end={22} suffix="" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Languages</div></div>
+              <div style={{ textAlign: "center" }}><div style={{ fontSize: 28, fontWeight: 800, color: "var(--primary)" }}><CountUp end={12} suffix="" /></div><div style={{ fontSize: 11, color: "var(--muted)" }}>Languages live</div></div>
             </div>
           </div>
         </div>

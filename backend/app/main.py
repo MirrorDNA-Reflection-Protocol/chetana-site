@@ -20,6 +20,50 @@ from pathlib import Path
 logger = logging.getLogger("chetana.showcase")
 
 KAVACH_URL = "http://127.0.0.1:8790"
+TELEGRAM_API = "https://api.telegram.org"
+
+
+# ── Telegram notification (fire-and-forget) ───────────────────────────
+
+def _load_telegram_config() -> tuple[str, str]:
+    """Load bot token and chat ID from env or secrets.env."""
+    import os
+    token = os.getenv("KAVACH_TELEGRAM_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if token and chat_id:
+        return token, chat_id
+    secrets = Path.home() / ".mirrordna" / "secrets.env"
+    if secrets.exists():
+        for line in secrets.read_text().splitlines():
+            line = line.strip().removeprefix("export ").strip()
+            if line.startswith("KAVACH_TELEGRAM_TOKEN=") and not token:
+                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif line.startswith("TELEGRAM_CHAT_ID=") and not chat_id:
+                chat_id = line.split("=", 1)[1].strip().strip('"').strip("'")
+    return token, chat_id
+
+
+_TG_TOKEN, _TG_CHAT_ID = _load_telegram_config()
+
+
+async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
+    """Send a Telegram message. Non-blocking best-effort."""
+    if not _TG_TOKEN:
+        return False
+    target = chat_id or _TG_CHAT_ID
+    if not target:
+        return False
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{TELEGRAM_API}/bot{_TG_TOKEN}/sendMessage",
+            json={"chat_id": target, "text": text, "parse_mode": "Markdown"},
+            timeout=5.0,
+        )
+        return resp.status_code == 200
+    except Exception as e:
+        logger.debug("Telegram notify failed: %s", e)
+        return False
 
 app = FastAPI(title="Chetana Showcase API", version="1.0.0")
 
@@ -295,7 +339,7 @@ async def scan(req: ScanRequest):
                 verdict = "LOW_RISK"
                 action = "inform_only"
 
-            return {
+            result = {
                 "verdict": verdict,
                 "risk_score": score,
                 "surface": "link trust" if req.input_type == "link" else "general trust",
@@ -303,6 +347,20 @@ async def scan(req: ScanRequest):
                 "action_eligibility": action,
                 "engine": data.get("engine", "kavach"),
             }
+
+            # Push high-risk alerts to Telegram (fire-and-forget)
+            if score >= 70:
+                snippet = req.content[:120].replace("*", "").replace("`", "")
+                alert = (
+                    f"🚨 *HIGH RISK scan on site*\n"
+                    f"Score: {score}/100 | Surface: {result['surface']}\n"
+                    f"Signals: {', '.join(signals[:3]) if signals else 'n/a'}\n"
+                    f"Content: `{snippet}`"
+                )
+                import asyncio
+                asyncio.ensure_future(_notify_telegram(alert))
+
+            return result
     except Exception as e:
         logger.warning("Kavach proxy failed: %s", e)
 
@@ -313,6 +371,39 @@ async def scan(req: ScanRequest):
         "why_flagged": ["Live analysis temporarily unavailable"],
         "action_eligibility": "retry",
     }
+
+
+# ── Quick scan (pattern-only, fastest path) ───────────────────────────
+
+@app.post("/api/scan/quick")
+async def scan_quick(req: ScanRequest):
+    """Fast pattern-only scan via Kavach — no AI, instant results."""
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{KAVACH_URL}/scan",
+            json={"text": req.content, "lang": "en"},
+            timeout=3.0,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning("Quick scan failed: %s", e)
+    return {"threat_score": 0, "risk_level": "UNKNOWN", "signals": [], "error": "unavailable"}
+
+
+# ── Telegram alert endpoint ──────────────────────────────────────────
+
+class AlertRequest(BaseModel):
+    message: str = Field(..., max_length=4000)
+    chat_id: Optional[str] = None
+
+
+@app.post("/api/alert")
+async def send_alert(req: AlertRequest):
+    """Push a message through the Telegram bot. Admin use."""
+    sent = await _notify_telegram(req.message, req.chat_id)
+    return {"sent": sent, "channel": "telegram"}
 
 
 # ── Replay ────────────────────────────────────────────────────────────

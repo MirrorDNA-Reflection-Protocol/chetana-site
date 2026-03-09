@@ -1042,10 +1042,78 @@ async def security_txt():
     return PlainTextResponse(
         "Contact: mailto:trust@activemirror.ai\n"
         "Preferred-Languages: en, hi\n"
-        "Policy: https://chetana.activemirror.ai/#proof\n"
+        "Policy: https://chetana.activemirror.ai/privacy\n"
         "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
         media_type="text/plain"
     )
+
+
+@app.get("/privacy", include_in_schema=False)
+async def privacy_policy():
+    from fastapi.responses import HTMLResponse as _HTML
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Chetana</title>
+  <meta name="description" content="Chetana privacy policy. Free scam detection for India. No data sold. No personal data stored.">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.7; }
+    h1 { font-size: 2rem; margin-bottom: .25rem; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; }
+    .badge { display:inline-block; background:#d1fae5; color:#065f46; padding:2px 10px; border-radius:99px; font-size:.8rem; font-weight:600; margin-bottom:1.5rem; }
+    a { color: #059669; }
+    footer { margin-top:3rem; font-size:.85rem; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:1rem; }
+  </style>
+</head>
+<body>
+  <h1>Chetana Privacy Policy</h1>
+  <span class="badge">No data sold. No profiles built.</span>
+
+  <h2>What Chetana is</h2>
+  <p>Chetana is a free AI-powered scam detection service for India. It checks links, phone numbers, UPI IDs, and messages for fraud signals — in 12 Indian languages. It includes a web interface, Telegram bot, and browser extension.</p>
+
+  <h2>Data we process</h2>
+  <p>When you submit content for scanning (a URL, phone number, UPI ID, text, image, or audio clip), that content is transmitted to our API at <code>chetana.activemirror.ai</code> over HTTPS. We process it to produce a trust verdict and return it to you.</p>
+  <ul>
+    <li>We do <strong>not</strong> store your submissions after analysis completes.</li>
+    <li>We do <strong>not</strong> link submissions to your identity, IP address, or device.</li>
+    <li>We do <strong>not</strong> sell, share, or transfer your data to third parties.</li>
+    <li>Deepfake image/audio uploads are processed in memory and discarded immediately.</li>
+  </ul>
+
+  <h2>Chetana Browser Guard extension</h2>
+  <p>The browser extension performs passive trust scoring on pages you visit. It sends page URLs and selected text to the Chetana API for analysis. No browsing history is stored on our servers. Domain scan results are cached locally in your browser's <code>chrome.storage.local</code> for up to 24 hours to reduce API calls — this data never leaves your device.</p>
+  <p>The extension can operate fully offline using a local pattern gate that requires no network access. When Ollama is installed locally, analysis happens entirely on-device.</p>
+
+  <h2>WhatsApp Web scanning</h2>
+  <p>When enabled on <code>web.whatsapp.com</code>, the extension reads visible message text from your open WhatsApp Web tab to check for scam signals. This text is sent to the Chetana API only when a suspicion threshold is exceeded. We do not read, store, or log message content beyond the analysis request.</p>
+
+  <h2>Telemetry</h2>
+  <p>We collect aggregate, non-identifiable usage metrics (e.g., scan counts by type and language) to understand how Chetana is used and improve it. No personal identifiers are included.</p>
+
+  <h2>Data residency</h2>
+  <p>Chetana servers are operated in India. Your data does not leave India when you use the standard API. The sovereign AI stack (Ollama + local models) keeps all processing on your own device.</p>
+
+  <h2>Third-party services</h2>
+  <p>Chetana uses external threat intelligence feeds (e.g., Safe Browsing APIs, PhishTank, TRAI DND registry) to verify phone numbers and URLs. These services receive only the specific identifier being checked — no other context.</p>
+
+  <h2>Children</h2>
+  <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+  <h2>Changes</h2>
+  <p>We may update this policy. Significant changes will be noted at <a href="https://chetana.activemirror.ai/privacy">chetana.activemirror.ai/privacy</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Questions: <a href="mailto:trust@activemirror.ai">trust@activemirror.ai</a></p>
+
+  <footer>
+    Last updated: March 2026 · Chetana is a product of ActiveMirror / MirrorDNA · Made in India
+  </footer>
+</body>
+</html>"""
+    return _HTML(content=html)
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──

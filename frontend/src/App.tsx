@@ -10,6 +10,7 @@ const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }
 
 export default function App() {
   const [page, setPage] = useState<PageId>("home");
+  const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [showOnboarding, setShowOnboarding] = useState(() => !sessionStorage.getItem("chetana_onboarded"));
 
   const pageTitle = useMemo(() => {
@@ -30,6 +31,11 @@ export default function App() {
     sessionStorage.setItem("chetana_onboarded", "1");
     setShowOnboarding(false);
     setPage(target);
+  };
+
+  const handleQuickAccept = () => {
+    localStorage.setItem("chetana_terms_accepted", new Date().toISOString());
+    setTermsAccepted(true);
   };
 
   return (
@@ -96,7 +102,7 @@ export default function App() {
               </section>
               <TrustPage />
             </>}
-            {page === "proof" && <ProofPage />}
+            {page === "proof" && <ProofPage onAccepted={() => setTermsAccepted(true)} />}
             {page === "control" && <>
               <section className="page-intro"><div className="kicker">Command Center</div><h1>{pageTitle}</h1><p>TUI, graph, and dashboards together.</p></section>
               <div className="two-up">
@@ -109,6 +115,12 @@ export default function App() {
         </AnimatePresence>
       </main>
       <ChatAssistant />
+      {!termsAccepted && (
+        <div className="consent-bar">
+          <span>By using Chetana, you agree to our <a onClick={() => setPage("proof")}>Terms of Use & Disclaimer</a>.</span>
+          <button onClick={handleQuickAccept}>I Accept</button>
+        </div>
+      )}
     </div>
   );
 }

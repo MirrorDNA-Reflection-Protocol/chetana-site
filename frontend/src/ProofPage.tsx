@@ -58,7 +58,7 @@ const FULL_TEXT = TERMS_SECTIONS.map(s => s.title + " " + s.body).join(" ");
 const WORD_COUNT = FULL_TEXT.split(/\s+/).length;
 
 /* ── Proof-of-Memory Component ───────────────────────────────── */
-export default function ProofPage() {
+export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = {}) {
   const docRef = useRef<HTMLDivElement | null>(null);
   const [scrollDepth, setScrollDepth] = useState(0);
   const [dwellTime, setDwellTime] = useState(0);
@@ -129,6 +129,7 @@ export default function ProofPage() {
     setProofGenerated(true);
     localStorage.setItem("chetana_proof", JSON.stringify(proofObj));
     localStorage.setItem("chetana_terms_accepted", timestamp);
+    if (onAccepted) setTimeout(() => onAccepted(), 2000);
   };
 
   const copyProof = () => {

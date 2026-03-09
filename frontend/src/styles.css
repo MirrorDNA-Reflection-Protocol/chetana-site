@@ -68,8 +68,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 .india-badge { display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--heading); border-radius: 999px; background: linear-gradient(135deg, #FF993315, #13880815); border: 1.5px solid #13880830; white-space: nowrap; flex-shrink: 0; text-transform: uppercase; }
 
 /* ── Alert Banner ─────────────────────────────────────────────── */
-.alert-banner { margin: -8px -24px 0; padding: 0 24px; }
-.alert-banner-inner { position: relative; overflow: hidden; border-radius: 16px; background: linear-gradient(135deg, #1E1B4B, #312E81, #4C1D95); padding: 0; }
+.alert-banner { position: sticky; top: 57px; z-index: 35; margin: 0 -24px; padding: 0 24px; }
+.alert-banner-inner { position: relative; overflow: hidden; border-radius: 0 0 16px 16px; background: linear-gradient(135deg, #1E1B4B, #312E81, #4C1D95); padding: 0; }
 .alert-banner-pulse { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(245,158,11,0.08), transparent); animation: banner-sweep 3s ease-in-out infinite; }
 @keyframes banner-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .alert-banner-content { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 24px; }
@@ -293,6 +293,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .stat-item { text-align: center; }
 .stat-value { font-size: 24px; font-weight: 800; color: var(--heading); }
 .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+/* ── Consent Bar ────────────────────────────────────────────── */
+.consent-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 55; background: var(--heading); color: white; padding: 14px 24px; display: flex; align-items: center; justify-content: center; gap: 16px; font-size: 14px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); }
+.consent-bar a { color: var(--saffron); text-decoration: underline; cursor: pointer; font-weight: 600; }
+.consent-bar button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 8px 20px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.consent-bar button:hover { background: var(--primary-hover); }
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 1100px) {

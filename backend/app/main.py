@@ -74,12 +74,19 @@ async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
         logger.debug("Telegram notify failed: %s", e)
         return False
 
-app = FastAPI(title="Chetana Showcase API", version="1.0.0")
+app = FastAPI(
+    title="Chetana API",
+    description="India's free AI scam detection API. Check messages, links, UPI IDs, phone numbers, deepfakes, and voice clones against live threat intelligence.",
+    version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8093", "https://chetana.activemirror.ai"],
-    allow_methods=["GET", "POST"],
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["Content-Type"],
 )
 
@@ -961,6 +968,40 @@ async def chat(req: ChatRequest):
         suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?", "Tell me about Chetana"]
 
     return {"reply": reply, "articles": kb_articles, "suggestions": suggestions}
+
+
+# ── Discovery / SEO routes (before catch-all) ────────────────────────
+from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    return PlainTextResponse(
+        "User-agent: *\nAllow: /\nSitemap: https://chetana.activemirror.ai/sitemap.xml\n",
+        media_type="text/plain"
+    )
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://chetana.activemirror.ai/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://chetana.activemirror.ai/#consumer</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://chetana.activemirror.ai/#merchant</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/#weather</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://chetana.activemirror.ai/#atlas</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/#trust</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+</urlset>"""
+    return PlainTextResponse(xml, media_type="application/xml")
+
+@app.get("/.well-known/security.txt", include_in_schema=False)
+async def security_txt():
+    return PlainTextResponse(
+        "Contact: mailto:trust@activemirror.ai\n"
+        "Preferred-Languages: en, hi\n"
+        "Policy: https://chetana.activemirror.ai/#proof\n"
+        "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
+        media_type="text/plain"
+    )
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──

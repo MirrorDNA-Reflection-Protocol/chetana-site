@@ -679,73 +679,210 @@ async def _fetch_kb_articles_for_chat(query: str) -> list[dict]:
     return []
 
 
+CHETANA_SYSTEM_PROMPT = """You are Chetana — India's AI-powered trust and scam detection assistant. You speak like a knowledgeable, warm, no-nonsense friend who genuinely wants to protect people. You mirror the user's concern and help them feel safe.
+
+Your personality:
+- Warm but direct. No corporate speak. Talk like a real person helping a friend.
+- When someone is scared or confused, be calm and reassuring first, then give clear steps.
+- Use simple language. Many users may not be tech-savvy. Explain like you're talking to your parent.
+- If someone has already been scammed, be empathetic — never blame them. Focus on recovery steps.
+- You can use Hindi words naturally mixed with English when it feels right (like "bilkul", "zaroor", "dhyan rakhiye").
+
+What you know about Chetana's ecosystem:
+- **Consumer Protection**: Users paste suspicious messages, links, UPI IDs, or phone numbers into the scan box. Chetana checks them against live threat intelligence (PhishTank, OpenPhish, URLhaus, CERT-IN, RBI alerts) and gives a trust verdict: LOW_RISK, UNCLEAR, or SUSPICIOUS with a risk score 0-100.
+- **Scam Weather**: Live pressure signals showing which scam types are rising or falling across India right now.
+- **Scam Atlas**: A living threat wiki with 25+ scam types — fake payment screenshots, QR traps, KYC fraud, digital arrest, courier phishing, task scams, lottery scams, SIM swap, deepfake voice calls, and more. Each entry has red flags and safe actions.
+- **Merchant Protection**: Protects businesses against fake payment screenshots, impersonation, and UPI collect scams.
+- **Chetana Nexus** (Enterprise): Trust infrastructure for banks, fintechs, and fraud teams. Includes action eligibility frameworks (inform → warn → verify → escalate → hold), analyst replay, MirrorGraph campaign visualization, and scam campaign clustering.
+- **Family Shield**: Share-safe cards that give family members simplified, non-scary summaries. Great for protecting elderly parents.
+- **Browser Guard**: Chrome extension that checks links and pages in real-time as you browse.
+- **Trust by Design™**: Chetana's governance philosophy — every verdict backed by evidence ladder, privacy-conscious data handling, human boundary on decisions.
+- **Languages**: 12 live Indian languages (Hindi, English, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Odia, Assamese) with 10 more scheduled languages coming soon.
+- **Privacy**: Data transmitted securely, used only for analysis, never sold or shared. No data stored beyond the session unless user consents.
+
+Emergency resources (ALWAYS provide when someone is in danger or has lost money):
+- Police: 100
+- Women's helpline: 181
+- National cybercrime helpline: 1930
+- File complaint online: cybercrime.gov.in (within first hour for best recovery chance)
+- RBI complaint for banking fraud: rbi.org.in
+
+Built by ActiveMirror (N1 Intelligence). Made in India, for India.
+
+Rules:
+- Keep replies concise (2-4 sentences usually). Don't lecture.
+- If someone pastes a suspicious message/link, tell them to use the scan box on the site for a full analysis — you can give initial impressions but the scan engine is more thorough.
+- Never give legal advice. You're advisory, not authoritative.
+- If you don't know something, say so honestly. Don't fabricate.
+- End with a clear next step or suggestion when possible.
+- Generate 2-3 follow-up suggestions the user might want to ask."""
+
+_LLM_KEYS: dict[str, str] = {}
+
+
+def _load_llm_keys() -> dict[str, str]:
+    """Load all LLM API keys from env and secrets.env. Cached after first call."""
+    if _LLM_KEYS:
+        return _LLM_KEYS
+    import os
+    key_names = [
+        "OPENAI_API_KEY", "GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3",
+        "GROQ_API_KEY", "GROQ_API_KEY_2",
+    ]
+    for name in key_names:
+        val = os.getenv(name, "")
+        if val:
+            _LLM_KEYS[name] = val
+    secrets = Path.home() / ".mirrordna" / "secrets.env"
+    if secrets.exists():
+        for line in secrets.read_text().splitlines():
+            line = line.strip().removeprefix("export ").strip()
+            for name in key_names:
+                if line.startswith(f"{name}=") and name not in _LLM_KEYS:
+                    _LLM_KEYS[name] = line.split("=", 1)[1].strip().strip('"').strip("'")
+    return _LLM_KEYS
+
+
+def _parse_suggestions(reply: str) -> tuple[str, list[str]]:
+    """Extract suggestion questions from LLM reply if present."""
+    suggestions = []
+    if "\n-" in reply or "\n•" in reply:
+        lines = reply.split("\n")
+        main_lines = []
+        for line in lines:
+            stripped = line.strip().lstrip("-•").strip()
+            if line.strip().startswith(("-", "•")) and len(stripped) < 60 and "?" in stripped:
+                suggestions.append(stripped)
+            else:
+                main_lines.append(line)
+        if suggestions:
+            reply = "\n".join(main_lines).strip()
+    return reply, suggestions
+
+
+async def _try_openai(message: str, keys: dict) -> str | None:
+    """Try OpenAI GPT-4o-mini."""
+    key = keys.get("OPENAI_API_KEY")
+    if not key:
+        return None
+    try:
+        client = await get_client()
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": CHETANA_SYSTEM_PROMPT},
+                    {"role": "user", "content": message},
+                ],
+                "max_tokens": 300, "temperature": 0.7,
+            },
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            return resp.json()["choices"][0]["message"]["content"].strip()
+        logger.warning("OpenAI failed: %s", resp.status_code)
+    except Exception as e:
+        logger.warning("OpenAI error: %s", e)
+    return None
+
+
+async def _try_gemini(message: str, keys: dict) -> str | None:
+    """Try Gemini Flash (cycles through available keys)."""
+    for key_name in ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"]:
+        key = keys.get(key_name)
+        if not key:
+            continue
+        try:
+            client = await get_client()
+            resp = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "systemInstruction": {"parts": [{"text": CHETANA_SYSTEM_PROMPT}]},
+                    "contents": [{"parts": [{"text": message}]}],
+                    "generationConfig": {"maxOutputTokens": 300, "temperature": 0.7},
+                },
+                timeout=15.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
+                if text:
+                    return text.strip()
+            logger.warning("Gemini %s failed: %s", key_name, resp.status_code)
+        except Exception as e:
+            logger.warning("Gemini %s error: %s", key_name, e)
+    return None
+
+
+async def _try_groq(message: str, keys: dict) -> str | None:
+    """Try Groq Llama."""
+    for key_name in ["GROQ_API_KEY", "GROQ_API_KEY_2"]:
+        key = keys.get(key_name)
+        if not key:
+            continue
+        try:
+            client = await get_client()
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": CHETANA_SYSTEM_PROMPT},
+                        {"role": "user", "content": message},
+                    ],
+                    "max_tokens": 300, "temperature": 0.7,
+                },
+                timeout=15.0,
+            )
+            if resp.status_code == 200:
+                return resp.json()["choices"][0]["message"]["content"].strip()
+            logger.warning("Groq %s failed: %s", key_name, resp.status_code)
+        except Exception as e:
+            logger.warning("Groq %s error: %s", key_name, e)
+    return None
+
+
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    """Keyword-matched chat assistant. No LLM, fast and deterministic."""
+    """LLM-powered chat: OpenAI → Gemini → Groq → keyword fallback."""
     message = req.message.strip()
     if not message:
         return {"reply": "Please type a message.", "articles": [], "suggestions": []}
 
-    matches = _match_faq(message)
     kb_articles = await _fetch_kb_articles_for_chat(message)
+    keys = _load_llm_keys()
 
+    # Try providers in order: OpenAI → Gemini → Groq
+    reply = await _try_openai(message, keys)
+    if not reply:
+        reply = await _try_gemini(message, keys)
+    if not reply:
+        reply = await _try_groq(message, keys)
+
+    if reply:
+        reply, suggestions = _parse_suggestions(reply)
+        if not suggestions:
+            suggestions = ["How do I check a suspicious message?", "What scams are trending?", "How to report fraud?"]
+        return {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
+
+    # Final fallback: keyword matching
+    matches = _match_faq(message)
     if matches:
-        best = matches[0]
-        reply = best["reply"]
-        # Build suggestions from other matching topics
-        suggestions = []
-        topic_map = {
-            "scanning": "How does scanning work?",
-            "consumer": "Tell me about consumer protection",
-            "merchant": "How does merchant protection work?",
-            "nexus": "What is Chetana Nexus?",
-            "weather": "What is Scam Weather?",
-            "atlas": "What scam types exist?",
-            "trust": "How does Trust by Design work?",
-            "family": "Tell me about Family Shield",
-            "browser": "What is Browser Guard?",
-            "whatsapp": "How does the WhatsApp Bot work?",
-            "emergency": "How to report fraud?",
-            "privacy": "How does Chetana handle privacy?",
-            "upi": "How to check UPI payments?",
-            "qr": "What are QR scams?",
-            "kyc": "What is KYC fraud?",
-            "digital_arrest": "What is digital arrest scam?",
-            "deepfake": "What are voice deepfake scams?",
-            "languages": "What languages does Chetana support?",
-            "about": "Tell me about Chetana",
-            "greeting": "How does scanning work?",
-        }
-        seen_topics = {best["topic"]}
-        for m in matches[1:4]:
-            if m["topic"] not in seen_topics:
-                seen_topics.add(m["topic"])
-                if m["topic"] in topic_map:
-                    suggestions.append(topic_map[m["topic"]])
-        # Always suggest a few if we have few suggestions
-        if len(suggestions) < 2:
-            for fallback_topic in ["emergency", "atlas", "scanning", "about"]:
-                if fallback_topic not in seen_topics and len(suggestions) < 3:
-                    seen_topics.add(fallback_topic)
-                    suggestions.append(topic_map[fallback_topic])
+        reply = matches[0]["reply"]
+        suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
     else:
         reply = (
             "I'm not sure about that specific topic, but I can help you check suspicious messages, "
-            "understand scam types, learn about Chetana's trust tools, or find emergency resources. "
+            "understand scam types, or find emergency resources. "
             "Try asking about UPI scams, KYC fraud, digital arrest, or how scanning works."
         )
-        suggestions = [
-            "How does scanning work?",
-            "What scam types exist?",
-            "How to report fraud?",
-            "Tell me about Chetana",
-        ]
+        suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?", "Tell me about Chetana"]
 
-    return {
-        "reply": reply,
-        "articles": kb_articles,
-        "suggestions": suggestions,
-    }
+    return {"reply": reply, "articles": kb_articles, "suggestions": suggestions}
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──

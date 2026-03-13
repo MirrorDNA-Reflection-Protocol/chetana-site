@@ -1,0 +1,151 @@
+# Jugalbandi Manager + Chetana WhatsApp Scaffold
+# Usage: docker compose up -d
+# Chetana backend must be running on host at :8093
+#
+# Before starting:
+#   1. Copy .env.example to .env and fill in values
+#   2. Ensure Chetana backend is running: curl http://localhost:8093/health
+
+services:
+  # -- JB Manager API (bot management, webhook receiver) --
+  api:
+    image: ghcr.io/opennyai/jugalbandi-manager/api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME:-postgres}
+      - POSTGRES_DATABASE_USERNAME=${POSTGRES_DATABASE_USERNAME:-postgres}
+      - POSTGRES_DATABASE_PASSWORD=${POSTGRES_DATABASE_PASSWORD:-postgres}
+      - POSTGRES_DATABASE_HOST=postgres
+      - POSTGRES_DATABASE_PORT=5432
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_USE_SASL=false
+      - KAFKA_CHANNEL_TOPIC=channel
+      - KAFKA_FLOW_TOPIC=flow
+      - KAFKA_INDEXER_TOPIC=indexer
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - WA_API_HOST=${WA_API_HOST:-https://graph.facebook.com/v17.0}
+      - STORAGE_TYPE=local
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - jb_media:/mnt/jb_files
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # -- Kafka (message broker between JB services) --
+  kafka:
+    image: docker.io/bitnami/kafka:3.6
+    ports:
+      - "9092:19092"
+    volumes:
+      - kafka_data:/bitnami
+    environment:
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+
+  # -- Channel service (WhatsApp in/out) --
+  channel:
+    image: ghcr.io/opennyai/jugalbandi-manager/channel:latest
+    environment:
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME:-postgres}
+      - POSTGRES_DATABASE_USERNAME=${POSTGRES_DATABASE_USERNAME:-postgres}
+      - POSTGRES_DATABASE_PASSWORD=${POSTGRES_DATABASE_PASSWORD:-postgres}
+      - POSTGRES_DATABASE_HOST=postgres
+      - POSTGRES_DATABASE_PORT=5432
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_USE_SASL=false
+      - KAFKA_LANGUAGE_TOPIC=language
+      - KAFKA_FLOW_TOPIC=flow
+      - KAFKA_CHANNEL_TOPIC=channel
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - STORAGE_TYPE=local
+      - WA_API_HOST=${WA_API_HOST:-https://graph.facebook.com/v17.0}
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - jb_media:/mnt/jb_files
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # -- Language service (Bhashini STT/TTS/translate) --
+  language:
+    image: ghcr.io/opennyai/jugalbandi-manager/language:latest
+    environment:
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME:-postgres}
+      - POSTGRES_DATABASE_USERNAME=${POSTGRES_DATABASE_USERNAME:-postgres}
+      - POSTGRES_DATABASE_PASSWORD=${POSTGRES_DATABASE_PASSWORD:-postgres}
+      - POSTGRES_DATABASE_HOST=postgres
+      - POSTGRES_DATABASE_PORT=5432
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_USE_SASL=false
+      - KAFKA_FLOW_TOPIC=flow
+      - KAFKA_CHANNEL_TOPIC=channel
+      - KAFKA_LANGUAGE_TOPIC=language
+      - BHASHINI_USER_ID=${BHASHINI_USER_ID}
+      - BHASHINI_API_KEY=${BHASHINI_API_KEY}
+      - BHASHINI_PIPELINE_ID=${BHASHINI_PIPELINE_ID}
+      - STORAGE_TYPE=local
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - jb_media:/mnt/jb_files
+
+  # -- Flow service (runs the ChetanaFSM) --
+  flow:
+    image: ghcr.io/opennyai/jugalbandi-manager/flow:latest
+    environment:
+      - POSTGRES_DATABASE_NAME=${POSTGRES_DATABASE_NAME:-postgres}
+      - POSTGRES_DATABASE_USERNAME=${POSTGRES_DATABASE_USERNAME:-postgres}
+      - POSTGRES_DATABASE_PASSWORD=${POSTGRES_DATABASE_PASSWORD:-postgres}
+      - POSTGRES_DATABASE_HOST=postgres
+      - POSTGRES_DATABASE_PORT=5432
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_USE_SASL=false
+      - KAFKA_FLOW_TOPIC=flow
+      - KAFKA_CHANNEL_TOPIC=channel
+      - KAFKA_LANGUAGE_TOPIC=language
+      - KAFKA_RETRIEVER_TOPIC=retriever
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    depends_on:
+      - kafka
+      - postgres
+    volumes:
+      - jb_media:/mnt/jb_files
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # So FSM can reach Chetana at host.docker.internal:8093
+
+  # -- Postgres (pgvector for bot state + conversation history) --
+  postgres:
+    image: ankane/pgvector
+    ports:
+      - "5433:5432"  # 5433 to avoid conflict with any host postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # -- JB Manager Frontend (bot management UI) --
+  frontend:
+    image: ghcr.io/opennyai/jugalbandi-manager/frontend:latest
+    ports:
+      - "4173:4173"
+    environment:
+      - VITE_SERVER_HOST=http://localhost:8000
+
+volumes:
+  kafka_data:
+    driver: local
+  postgres_data:
+    driver: local
+  jb_media:
+    driver: local

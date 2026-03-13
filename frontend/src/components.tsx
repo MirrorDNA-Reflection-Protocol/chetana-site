@@ -285,9 +285,31 @@ const LANGUAGES = [
   { code: "ur", label: "اردو", name: "Urdu" },
 ];
 
+const LANG_TO_BCP47: Record<string, string> = {
+  en: "en-IN", hi: "hi-IN", ta: "ta-IN", te: "te-IN", bn: "bn-IN",
+  mr: "mr-IN", gu: "gu-IN", kn: "kn-IN", ml: "ml-IN", pa: "pa-IN",
+  or: "or-IN", ur: "ur-IN",
+};
+
+function getSpeechRecognition(): (new () => any) | null {
+  const w = window as any;
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
+// Auto-detect browser language, map to supported Chetana language
+function detectBrowserLang(): string {
+  const supported = LANGUAGES.map(l => l.code);
+  const browserLangs = navigator.languages || [navigator.language || "en"];
+  for (const bl of browserLangs) {
+    const code = bl.split("-")[0].toLowerCase();
+    if (supported.includes(code)) return code;
+  }
+  return "en";
+}
+
 export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
   const [mode, setMode] = useState<ScanMode>("message");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(() => detectBrowserLang());
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -297,11 +319,47 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     suggestions: ["Got a suspicious message", "Check a link", "Check a UPI ID", "Detect a deepfake"],
   }]);
   const [showModes, setShowModes] = useState(false);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
   const msgId = useRef(1);
 
+  const SpeechRecClass = useMemo(() => getSpeechRecognition(), []);
+
+  const toggleMic = () => {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    if (!SpeechRecClass) return;
+    const recognition = new SpeechRecClass();
+    recognition.lang = LANG_TO_BCP47[lang] || "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev ? prev + " " + transcript : transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
   const activeMode = SCAN_MODES.find(m => m.id === mode)!;
+
+  const speakText = (text: string) => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ""));
+      utterance.lang = LANG_TO_BCP47[lang] || "en-IN";
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -361,7 +419,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
         const endpoint = currentMode.id === "voice" ? "/api/voice/analyze" : currentMode.id === "qr" ? "/api/extract-text" : "/api/media/analyze";
         resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
       } else if (currentMode.id === "link") {
-        resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: input.trim(), lang: "en" }) });
+        resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: input.trim(), lang }) });
       } else {
         resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input.trim(), lang }) });
       }
@@ -425,6 +483,11 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
                 const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
                 return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
               })}</div>
+              {msg.role === "bot" && msg.text && (
+                <button className="speak-btn" onClick={() => speakText(msg.text)} title="Read aloud">
+                  <Volume2 size={13} />
+                </button>
+              )}
               {msg.suggestions && (
                 <div className="chat-suggestions">
                   {msg.suggestions.map((s, i) => (
@@ -474,6 +537,16 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
         )}
+        {SpeechRecClass && !activeMode.isFile && (
+          <button
+            className={`mic-btn${listening ? " listening" : ""}`}
+            onClick={toggleMic}
+            title={listening ? "Stop listening" : "Voice input"}
+            type="button"
+          >
+            <Mic size={18} />
+          </button>
+        )}
         <button
           className="primary scan-send-btn"
           onClick={handleSend}
@@ -485,6 +558,51 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
 
       <div className="scan-chat-footer">
         <Bot size={12} /> Powered by ActiveMirror · MirrorDNA Intelligence · Advisory only — not a government service · Verdicts are automated, not legal determinations
+      </div>
+    </motion.section>
+  );
+}
+
+/* ── Stories — Cinematic Visual Section ─────────────────────── */
+const STORIES = [
+  { img: "/01-hero-grandmother.png", alt: "Elderly Indian woman checking phone", caption: "Amma got a suspicious KYC message. Chetana told her it was a scam — before she shared her OTP." },
+  { img: "/02-student-train.png", alt: "Student on Mumbai train checking phone", caption: "Raj checked a WhatsApp forward on his commute. Chetana flagged it as a known phishing link in 2 seconds." },
+  { img: "/03-family-kitchen.png", alt: "Indian family gathered around kitchen table", caption: "The Sharma family now checks every suspicious message together. Zero scams in 6 months." },
+  { img: "/04-safe-hands.png", alt: "Elderly hands holding phone with safety shield", caption: "When you see the green shield, you know you're safe. That's the Chetana promise." },
+  { img: "/05-street-scene.png", alt: "Indian marketplace with people on phones", caption: "From Mumbai to Madurai — 1.4 billion Indians deserve a free scam checker that speaks their language." },
+];
+
+export function StoriesSection() {
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setActive(a => (a + 1) % STORIES.length), 5000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <motion.section className="stories-section" {...fadeIn}>
+      <div className="stories-header">
+        <h2>Real people. Real protection.</h2>
+        <p>Chetana guards India — one message at a time</p>
+      </div>
+      <div className="stories-carousel">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            className="story-card"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.4 }}
+          >
+            <img src={STORIES[active].img} alt={STORIES[active].alt} className="story-img" loading="lazy" />
+            <div className="story-caption">{STORIES[active].caption}</div>
+          </motion.div>
+        </AnimatePresence>
+        <div className="stories-dots">
+          {STORIES.map((_, i) => (
+            <button key={i} className={`story-dot${i === active ? " active" : ""}`} onClick={() => setActive(i)} aria-label={`Story ${i + 1}`} />
+          ))}
+        </div>
       </div>
     </motion.section>
   );

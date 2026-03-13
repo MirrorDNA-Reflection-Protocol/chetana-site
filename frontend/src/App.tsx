@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanBox,
-  ConsumerSection, EnterpriseSection, TelegramCTA,
+  StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA,
   WeatherBoard, Atlas, MirrorGraph, TuiPanel, DashboardGallery,
   TrustPage, Onboarding, OnboardingFlow, Footer
 } from "./components";
@@ -39,6 +39,7 @@ export default function App() {
               <Hero onNavigate={setPage as any} />
               <ScanBox onRequireProof={() => setPage("proof")} />
               <StatsStrip />
+              <StoriesSection />
               <TelegramCTA />
               <ConsumerSection onNavigate={setPage} />
               <EnterpriseSection onNavigate={setPage} />

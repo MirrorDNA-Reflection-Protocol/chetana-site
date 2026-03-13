@@ -115,11 +115,102 @@ async def _close_client():
         await _client.aclose()
 
 
+# ── Sarvam Translate (local Ollama, free) ─────────────────────────────
+
+SARVAM_MODEL = "hf.co/mradermacher/sarvam-translate-i1-GGUF:Q4_K_M"
+OLLAMA_URL = "http://127.0.0.1:11434"
+
+LANG_NAMES = {
+    "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "kn": "Kannada",
+    "ml": "Malayalam", "bn": "Bengali", "mr": "Marathi", "gu": "Gujarati",
+    "pa": "Punjabi", "or": "Odia", "as": "Assamese", "ur": "Urdu",
+}
+
+
+def detect_script_lang(text: str) -> str | None:
+    """Detect Indian language from Unicode script ranges. Returns lang code or None."""
+    import unicodedata
+    script_counts: dict[str, int] = {}
+    script_map = {
+        "DEVANAGARI": "hi",  # Hindi/Marathi — disambiguate below
+        "TAMIL": "ta",
+        "TELUGU": "te",
+        "BENGALI": "bn",
+        "GUJARATI": "gu",
+        "KANNADA": "kn",
+        "MALAYALAM": "ml",
+        "GURMUKHI": "pa",
+        "ORIYA": "or",
+    }
+    for ch in text:
+        try:
+            name = unicodedata.name(ch, "")
+        except ValueError:
+            continue
+        for script, code in script_map.items():
+            if script in name:
+                script_counts[code] = script_counts.get(code, 0) + 1
+                break
+    if not script_counts:
+        return None
+    dominant = max(script_counts, key=script_counts.get)  # type: ignore
+    # Devanagari could be Hindi or Marathi — check for Marathi-specific characters
+    if dominant == "hi" and any(ch in text for ch in "ळ"):
+        return "mr"
+    return dominant
+
+
+async def sarvam_translate(text: str, lang: str) -> str:
+    """Translate text to an Indian language using local Sarvam model via Ollama.
+    Returns original text if lang is 'en' or translation fails."""
+    if lang == "en" or lang not in LANG_NAMES:
+        return text
+    target = LANG_NAMES[lang]
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={
+                "model": SARVAM_MODEL,
+                "prompt": f"Translate to {target}: {text}",
+                "stream": False,
+            },
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("response", "").strip() or text
+    except Exception as e:
+        logger.warning("Sarvam translate failed (%s→%s): %s", lang, target, e)
+    return text
+
+
+async def translate_scan_result(result: dict, lang: str) -> dict:
+    """Translate user-facing strings in a scan result dict."""
+    if lang == "en" or lang not in LANG_NAMES:
+        return result
+    # Translate the why_flagged signals
+    if "why_flagged" in result and result["why_flagged"]:
+        translated = []
+        for signal in result["why_flagged"]:
+            translated.append(await sarvam_translate(signal, lang))
+        result["why_flagged"] = translated
+    # Translate summary if present
+    if "summary" in result and result["summary"]:
+        result["summary"] = await sarvam_translate(result["summary"], lang)
+    return result
+
+
 # ── Request models ────────────────────────────────────────────────────
 
 class ScanRequest(BaseModel):
     input_type: Literal["text", "link", "payment_proof", "media"] = "text"
     content: str = Field(..., max_length=10000)
+    lang: str = "en"
+
+
+class FullScanRequest(BaseModel):
+    text: str = Field(..., max_length=10000)
+    lang: str = "en"
 
 
 class UpiCheckRequest(BaseModel):
@@ -365,6 +456,9 @@ async def scan(req: ScanRequest):
                 "engine": data.get("engine", "kavach"),
             }
 
+            # Translate to user's language via local Sarvam model
+            result = await translate_scan_result(result, req.lang)
+
             # Push high-risk alerts to Telegram (fire-and-forget)
             if score >= 70:
                 snippet = req.content[:120].replace("*", "").replace("`", "")
@@ -380,6 +474,78 @@ async def scan(req: ScanRequest):
             return result
     except Exception as e:
         logger.warning("Kavach proxy failed: %s", e)
+
+    return {
+        "verdict": "SERVICE_UNAVAILABLE",
+        "risk_score": 0,
+        "surface": "unknown",
+        "why_flagged": ["Live analysis temporarily unavailable"],
+        "action_eligibility": "retry",
+    }
+
+
+# ── Full scan (frontend primary endpoint, with translation) ───────────
+
+@app.post("/api/scan/full")
+async def scan_full(req: FullScanRequest):
+    """Full scan with Sarvam translation — the endpoint the frontend actually calls."""
+    # Auto-detect language from input text (overrides browser lang if user typed in a script)
+    detected = detect_script_lang(req.text)
+    lang = detected if detected else req.lang
+
+    try:
+        client = await get_client()
+        # Detect if text looks like a URL
+        is_link = req.text.startswith("http://") or req.text.startswith("https://")
+        if is_link:
+            resp = await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.text, "lang": "en"})
+        else:
+            resp = await client.post(f"{KAVACH_URL}/scan", json={"text": req.text, "lang": "en"})
+
+        if resp.status_code == 200:
+            data = resp.json()
+            score = data.get("score", data.get("threat_score", 0))
+            risk = data.get("risk_level", "UNKNOWN")
+            signals = data.get("signals", [])
+
+            if score >= 70:
+                verdict = "SUSPICIOUS"
+                action = "warn_and_verify"
+            elif score >= 40:
+                verdict = "UNCLEAR"
+                action = "inform_and_suggest"
+            else:
+                verdict = "LOW_RISK"
+                action = "inform_only"
+
+            result = {
+                "verdict": verdict,
+                "risk_score": score,
+                "surface": "link trust" if is_link else "general trust",
+                "why_flagged": signals[:5] if signals else ["Analysis complete"],
+                "action_eligibility": action,
+                "engine": data.get("engine", "kavach"),
+            }
+
+            # Translate to user's language via local Sarvam model
+            result = await translate_scan_result(result, lang)
+            result["lang"] = lang  # tell frontend which language was used
+
+            # Push high-risk alerts to Telegram
+            if score >= 70:
+                snippet = req.text[:120].replace("*", "").replace("`", "")
+                alert = (
+                    f"🚨 *HIGH RISK scan on site*\n"
+                    f"Score: {score}/100 | Surface: {result['surface']}\n"
+                    f"Signals: {', '.join(signals[:3]) if signals else 'n/a'}\n"
+                    f"Content: `{snippet}`"
+                )
+                import asyncio
+                asyncio.ensure_future(_notify_telegram(alert))
+
+            return result
+    except Exception as e:
+        logger.warning("Full scan failed: %s", e)
 
     return {
         "verdict": "SERVICE_UNAVAILABLE",
@@ -421,6 +587,85 @@ async def send_alert(req: AlertRequest):
     """Push a message through the Telegram bot. Admin use."""
     sent = await _notify_telegram(req.message, req.chat_id)
     return {"sent": sent, "channel": "telegram"}
+
+
+# ── Text-to-Speech (Sarvam Bulbul / Bhashini fallback) ────────────────
+
+import os as _os
+_SARVAM_API_KEY = _os.environ.get("SARVAM_API_KEY", "")
+_BHASHINI_USER_ID = _os.environ.get("BHASHINI_USER_ID", "")
+_BHASHINI_API_KEY = _os.environ.get("BHASHINI_API_KEY", "")
+
+# Also check secrets.env
+if not _SARVAM_API_KEY:
+    _secrets = Path.home() / ".mirrordna" / "secrets.env"
+    if _secrets.exists():
+        for _line in _secrets.read_text().splitlines():
+            _line = _line.strip().removeprefix("export ").strip()
+            if _line.startswith("SARVAM_API_KEY="):
+                _SARVAM_API_KEY = _line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif _line.startswith("BHASHINI_USER_ID="):
+                _BHASHINI_USER_ID = _line.split("=", 1)[1].strip().strip('"').strip("'")
+            elif _line.startswith("BHASHINI_API_KEY="):
+                _BHASHINI_API_KEY = _line.split("=", 1)[1].strip().strip('"').strip("'")
+
+SARVAM_TTS_LANG_MAP = {
+    "hi": "hi-IN", "bn": "bn-IN", "ta": "ta-IN", "te": "te-IN",
+    "gu": "gu-IN", "kn": "kn-IN", "ml": "ml-IN", "mr": "mr-IN",
+    "pa": "pa-IN", "or": "od-IN", "en": "en-IN",
+}
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., max_length=2000)
+    lang: str = "en"
+
+
+@app.post("/api/tts")
+async def text_to_speech(req: TTSRequest):
+    """Convert text to speech using Sarvam Bulbul (free credits) or Bhashini."""
+    tts_lang = SARVAM_TTS_LANG_MAP.get(req.lang)
+
+    # Try Sarvam Bulbul first (₹1000 free credits, no credit card)
+    if _SARVAM_API_KEY and tts_lang:
+        try:
+            client = await get_client()
+            resp = await client.post(
+                "https://api.sarvam.ai/text-to-speech",
+                headers={
+                    "api-subscription-key": _SARVAM_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "inputs": [req.text[:500]],
+                    "target_language_code": tts_lang,
+                    "model": "bulbul:v2",
+                    "enable_preprocessing": True,
+                },
+                timeout=10.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                audio_b64 = data.get("audios", [None])[0]
+                if audio_b64:
+                    return {"audio": audio_b64, "format": "wav", "engine": "sarvam-bulbul"}
+        except Exception as e:
+            logger.warning("Sarvam TTS failed: %s", e)
+
+    # Fallback: browser-native TTS (return signal to frontend)
+    return {"audio": None, "format": "browser", "engine": "browser-speechsynthesis",
+            "hint": "Use browser SpeechSynthesis API as fallback"}
+
+
+@app.get("/api/tts/status")
+async def tts_status():
+    """Check which TTS engines are available."""
+    return {
+        "sarvam": bool(_SARVAM_API_KEY),
+        "bhashini": bool(_BHASHINI_API_KEY),
+        "browser": True,
+        "languages": list(SARVAM_TTS_LANG_MAP.keys()) if _SARVAM_API_KEY else ["en"],
+    }
 
 
 # ── Replay ────────────────────────────────────────────────────────────
@@ -876,6 +1121,39 @@ async def _try_groq(message: str, keys: dict) -> str | None:
     return None
 
 
+OLLAMA_CHAT_SYSTEM = (
+    "You are Chetana, India's AI scam protection assistant built by ActiveMirror. "
+    "Answer questions about digital safety, scams, and fraud in India. "
+    "Be helpful, concise, and culturally aware. "
+    "If the user writes in an Indian language, respond in that same language."
+)
+
+
+async def _try_ollama_chat(message: str) -> str | None:
+    """Try local Ollama with Sarvam multilingual model as chat fallback."""
+    try:
+        client = await get_client()
+        resp = await client.post(
+            "http://127.0.0.1:11434/api/generate",
+            json={
+                "model": "hf.co/Mungert/sarvam-m-GGUF:Q4_K_M",
+                "prompt": message,
+                "system": OLLAMA_CHAT_SYSTEM,
+                "stream": False,
+            },
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            reply = data.get("response", "").strip()
+            if reply:
+                return reply
+        logger.warning("Ollama chat failed: %s", resp.status_code)
+    except Exception as e:
+        logger.debug("Ollama chat error: %s", e)
+    return None
+
+
 _SCAN_SIGNALS = re.compile(
     r"(https?://|www\.|\.com|\.in|\.tk|\.xyz|"
     r"upi://|@upi|@ybl|@paytm|@oksbi|@okaxis|@okicici|"
@@ -1004,6 +1282,17 @@ async def chat(req: ChatRequest):
         reply = matches[0]["reply"]
         suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
     else:
+        # Try local Ollama (Sarvam multilingual model) before generic fallback
+        reply = await _try_ollama_chat(message)
+        if reply:
+            gated = gate_output(reply)
+            reply = gated["text"]
+            if gated["gated"]:
+                logger.info("Ollama chat gate fired: %s", gated["flags"])
+            reply, suggestions = _parse_suggestions(reply)
+            if not suggestions:
+                suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
+            return {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
         reply = (
             "I'm not sure about that specific topic, but I can help you check suspicious messages, "
             "understand scam types, or find emergency resources. "

@@ -41,8 +41,11 @@ export default function App() {
               <StatsStrip />
               <StoriesSection />
               <TelegramCTA />
+              <hr className="section-glow-divider" />
               <ConsumerSection onNavigate={setPage} />
+              <hr className="section-glow-divider" />
               <EnterpriseSection onNavigate={setPage} />
+              <hr className="section-glow-divider" />
               <WeatherBoard signals={weather.slice(0, 6)} />
               <TrustPage />
             </>}

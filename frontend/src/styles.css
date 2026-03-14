@@ -1188,3 +1188,254 @@ select { appearance: none; cursor: pointer; }
   .hero-watermark { font-size: 80px; }
   .weather-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Visual Effects — Aurora, Spotlight, BorderBeam, Meteors, Grid
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Aurora Background ─────────────────────────────────────────── */
+.aurora-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.aurora-layer {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  opacity: 0.6;
+}
+.aurora-band {
+  position: absolute;
+  inset: 0;
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+  filter: blur(80px);
+}
+.aurora-band-1 {
+  background: linear-gradient(
+    135deg,
+    transparent 20%,
+    rgba(59, 130, 246, 0.12) 35%,
+    rgba(139, 92, 246, 0.08) 50%,
+    transparent 65%
+  );
+}
+.aurora-band-2 {
+  background: linear-gradient(
+    -45deg,
+    transparent 25%,
+    rgba(245, 158, 11, 0.06) 40%,
+    rgba(20, 184, 166, 0.06) 55%,
+    transparent 70%
+  );
+}
+.aurora-band-3 {
+  background: linear-gradient(
+    90deg,
+    transparent 30%,
+    rgba(99, 102, 241, 0.06) 45%,
+    rgba(59, 130, 246, 0.04) 60%,
+    transparent 75%
+  );
+}
+.aurora-noise {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px;
+}
+
+/* ── Spotlight Card ────────────────────────────────────────────── */
+.spotlight-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.2);
+  transition: border-color .3s, box-shadow .3s;
+}
+.spotlight-card:hover {
+  border-color: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 8px 50px rgba(0,0,0,0.3), 0 0 30px rgba(59, 130, 246, 0.06);
+}
+
+/* ── Border Beam ───────────────────────────────────────────────── */
+.border-beam-wrap {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.border-beam {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.border-beam::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle, 0deg),
+    transparent 60%,
+    var(--beam-color-from, #3b82f6) 78%,
+    var(--beam-color-to, #8b5cf6) 90%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: border-beam-spin var(--beam-duration, 8s) linear infinite;
+  animation-delay: var(--beam-delay, 0s);
+}
+@keyframes border-beam-spin {
+  0% { --beam-angle: 0deg; }
+  100% { --beam-angle: 360deg; }
+}
+@property --beam-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* ── Animated Gradient Text ────────────────────────────────────── */
+.animated-gradient-text {
+  background: linear-gradient(
+    90deg,
+    #f8fafc 0%,
+    #60a5fa 20%,
+    #a78bfa 40%,
+    #f59e0b 60%,
+    #60a5fa 80%,
+    #f8fafc 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Grid Pattern ──────────────────────────────────────────────── */
+.grid-pattern {
+  opacity: 0.5;
+}
+
+/* ── Meteors ───────────────────────────────────────────────────── */
+.meteors-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.meteor {
+  position: absolute;
+  top: -10%;
+  height: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(59, 130, 246, 0.6),
+    rgba(59, 130, 246, 0)
+  );
+  animation: meteor-fall linear infinite;
+  border-radius: 999px;
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.3);
+}
+.meteor::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 80px;
+  background: linear-gradient(to bottom, rgba(59, 130, 246, 0.4), transparent);
+}
+@keyframes meteor-fall {
+  0% {
+    transform: translateY(-100px) rotate(-25deg);
+    opacity: 1;
+  }
+  70% { opacity: 1; }
+  100% {
+    transform: translateY(120vh) rotate(-25deg);
+    opacity: 0;
+  }
+}
+
+/* ── Enhanced Hero (upgraded) ──────────────────────────────────── */
+.hero-enhanced {
+  position: relative;
+  overflow: visible;
+}
+.hero-enhanced .grid-pattern {
+  z-index: 0;
+}
+
+/* ── Glow Pulse for Scan Panel ─────────────────────────────────── */
+.scan-panel-glow {
+  position: relative;
+}
+.scan-panel-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1), rgba(245, 158, 11, 0.08));
+  z-index: -1;
+  filter: blur(20px);
+  opacity: 0.5;
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.02); }
+}
+
+/* ── Feature card spotlight upgrade ────────────────────────────── */
+.feature-card.spotlight-card {
+  padding: 0;
+}
+.feature-card.spotlight-card > *:not(.spotlight-beam) {
+  padding: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Stats glow numbers ────────────────────────────────────────── */
+.stat-value-glow {
+  position: relative;
+}
+.stat-value-glow::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* ── Section divider glow line ─────────────────────────────────── */
+.section-glow-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.2) 30%, rgba(139, 92, 246, 0.2) 50%, rgba(245, 158, 11, 0.15) 70%, transparent 100%);
+  margin: 60px 0;
+  border: none;
+}
+
+/* ── Floating badge glow ───────────────────────────────────────── */
+.kicker-glow {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), inset 0 0 20px rgba(59, 130, 246, 0.05);
+  animation: kicker-breathe 3s ease-in-out infinite;
+}
+@keyframes kicker-breathe {
+  0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), inset 0 0 20px rgba(59, 130, 246, 0.05); }
+  50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.25), inset 0 0 30px rgba(59, 130, 246, 0.08); }
+}

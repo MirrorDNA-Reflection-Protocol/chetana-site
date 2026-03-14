@@ -1,0 +1,18 @@
+@import "tailwindcss" layer(tailwind);
+
+@layer tailwind {
+  @theme {
+    --color-bg: #060610;
+    --color-bg-raised: rgba(15, 20, 42, 0.5);
+    --color-bg-card: rgba(15, 23, 50, 0.4);
+    --color-primary: #3b82f6;
+    --color-primary-bright: #60a5fa;
+    --color-saffron: #f59e0b;
+    --color-violet: #8b5cf6;
+    --color-teal: #14b8a6;
+    --color-safe: #10b981;
+    --color-danger: #ef4444;
+  }
+}
+
+/* Tailwind preflight scoped to .tw- prefix to avoid conflicts with existing CSS */

@@ -14,19 +14,22 @@ import {
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
+import { AuroraBackground, SpotlightCard, BorderBeam, AnimatedGradientText, TextReveal, GridPattern, ScrollReveal, Meteors } from "./effects";
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
 const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
 const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d } });
 
-/* ── Background Mesh ─────────────────────────────────────────── */
+/* ── Background Mesh (Aurora + Grid + Meteors) ───────────────── */
 export function BackgroundMesh() {
   return (
-    <div className="bg-mesh">
-      <div className="bg-orb bg-orb-1" />
-      <div className="bg-orb bg-orb-2" />
-      <div className="bg-orb bg-orb-3" />
-    </div>
+    <>
+      <AuroraBackground />
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+        <GridPattern size={40} color="rgba(59, 130, 246, 0.06)" />
+        <Meteors count={8} />
+      </div>
+    </>
   );
 }
 
@@ -165,16 +168,18 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
 /* ── Hero (Scan-centered) ────────────────────────────────────── */
 export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   return (
-    <motion.section className="hero" {...fadeIn}>
+    <motion.section className="hero hero-enhanced" {...fadeIn}>
       <div className="hero-watermark">चेतना</div>
-      <motion.div className="kicker" {...fadeInDelay(0.1)}>
+      <motion.div className="kicker kicker-glow" {...fadeInDelay(0.1)}>
         <Shield size={14} /> Free scam checker for India
       </motion.div>
       <motion.h1 {...fadeInDelay(0.15)}>
-        Got a suspicious message? Check it here.
+        <AnimatedGradientText>
+          Got a suspicious message? Check it here.
+        </AnimatedGradientText>
       </motion.h1>
       <motion.p {...fadeInDelay(0.2)}>
-        Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. We'll tell you if it's safe or a scam — in seconds, for free, in 12 Indian languages.
+        <TextReveal text="Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. We'll tell you if it's safe or a scam — in seconds, for free, in 12 Indian languages." stagger={0.02} />
       </motion.p>
     </motion.section>
   );
@@ -183,24 +188,26 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
 /* ── Stats Strip ─────────────────────────────────────────────── */
 export function StatsStrip() {
   return (
+    <ScrollReveal>
     <motion.div className="stats-strip" {...fadeInDelay(0.3)}>
       <div className="stat-item">
-        <div className="stat-value"><CountUp end={50} suffix="+" /></div>
+        <div className="stat-value stat-value-glow"><CountUp end={50} suffix="+" /></div>
         <div className="stat-label">Messages checked today</div>
       </div>
       <div className="stat-item">
-        <div className="stat-value"><CountUp end={136} suffix="" /></div>
+        <div className="stat-value stat-value-glow"><CountUp end={136} suffix="" /></div>
         <div className="stat-label">Scams caught</div>
       </div>
       <div className="stat-item">
-        <div className="stat-value"><CountUp end={25} suffix="+" /></div>
+        <div className="stat-value stat-value-glow"><CountUp end={25} suffix="+" /></div>
         <div className="stat-label">Types of scams detected</div>
       </div>
       <div className="stat-item">
-        <div className="stat-value"><CountUp end={12} suffix="" /></div>
+        <div className="stat-value stat-value-glow"><CountUp end={12} suffix="" /></div>
         <div className="stat-label">Indian languages</div>
       </div>
     </motion.div>
+    </ScrollReveal>
   );
 }
 
@@ -435,7 +442,8 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
   };
 
   return (
-    <motion.section className="scan-panel scan-chat" {...fadeInDelay(0.25)}>
+    <motion.section className="scan-panel scan-chat scan-panel-glow" {...fadeInDelay(0.25)} style={{ position: "relative" }}>
+      <BorderBeam size={250} duration={10} color="#3b82f6" colorTo="#8b5cf6" />
       {/* Mode selector + language picker */}
       <div className="scan-mode-bar">
         <div className="scan-modes">
@@ -579,6 +587,7 @@ export function StoriesSection() {
     return () => clearInterval(t);
   }, []);
   return (
+    <ScrollReveal>
     <motion.section className="stories-section" {...fadeIn}>
       <div className="stories-header">
         <h2>Real people. Real protection.</h2>
@@ -605,6 +614,7 @@ export function StoriesSection() {
         </div>
       </div>
     </motion.section>
+    </ScrollReveal>
   );
 }
 
@@ -625,11 +635,15 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
       </div>
       <div className="feature-grid">
         {features.map((f, i) => (
-          <motion.div key={f.title} className="feature-card" onClick={() => onNavigate(f.click)} {...fadeInDelay(i * 0.08)}>
-            <div className={`feature-icon ${f.color}`}>{f.icon}</div>
-            <h3>{f.title}</h3>
-            <p>{f.desc}</p>
-          </motion.div>
+          <ScrollReveal key={f.title} delay={i * 0.08}>
+            <SpotlightCard className="feature-card spotlight-card" spotlightColor={f.color === "blue" ? "rgba(59,130,246,0.12)" : f.color === "teal" ? "rgba(20,184,166,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(139,92,246,0.12)"}>
+              <div style={{ padding: 28, position: "relative", zIndex: 1 }} onClick={() => onNavigate(f.click)}>
+                <div className={`feature-icon ${f.color}`}>{f.icon}</div>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </div>
+            </SpotlightCard>
+          </ScrollReveal>
         ))}
       </div>
     </>
@@ -653,11 +667,15 @@ export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => v
       </div>
       <div className="feature-grid">
         {features.map((f, i) => (
-          <motion.div key={f.title} className={`feature-card${f.highlight ? " enterprise-highlight" : ""}`} onClick={() => onNavigate(f.click)} {...fadeInDelay(i * 0.08)}>
-            <div className={`feature-icon ${f.color}`}>{f.icon}</div>
-            <h3>{f.title}</h3>
-            <p>{f.desc}</p>
-          </motion.div>
+          <ScrollReveal key={f.title} delay={i * 0.08}>
+            <SpotlightCard className={`feature-card spotlight-card${f.highlight ? " enterprise-highlight" : ""}`} spotlightColor={f.color === "blue" ? "rgba(59,130,246,0.12)" : f.color === "safe" ? "rgba(16,185,129,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(139,92,246,0.12)"}>
+              <div style={{ padding: 28, position: "relative", zIndex: 1 }} onClick={() => onNavigate(f.click)}>
+                <div className={`feature-icon ${f.color}`}>{f.icon}</div>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </div>
+            </SpotlightCard>
+          </ScrollReveal>
         ))}
       </div>
     </>

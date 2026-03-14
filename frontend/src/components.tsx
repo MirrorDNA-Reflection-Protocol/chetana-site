@@ -50,7 +50,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
   return (
     <nav className="nav">
       <div className="brand" onClick={() => navigate("home")}>
-        <div className="brand-glyph"><Shield size={18} /></div>
+        <div className="brand-glyph"><img src="/chetana-logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
         <div>
           <div className="brand-title">Chetana</div>
           <div className="brand-sub">India's free scam checker</div>
@@ -170,17 +170,29 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   return (
     <motion.section className="hero hero-enhanced" {...fadeIn}>
       <div className="hero-watermark">चेतना</div>
-      <motion.div className="kicker kicker-glow" {...fadeInDelay(0.1)}>
-        <Shield size={14} /> Free scam checker for India
-      </motion.div>
-      <motion.h1 {...fadeInDelay(0.15)}>
-        <AnimatedGradientText>
-          Got a suspicious message? Check it here.
-        </AnimatedGradientText>
-      </motion.h1>
-      <motion.p {...fadeInDelay(0.2)}>
-        <TextReveal text="Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. We'll tell you if it's safe or a scam — in seconds, for free, in 12 Indian languages." stagger={0.02} />
-      </motion.p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'center', maxWidth: 960, margin: '0 auto' }}>
+        <div>
+          <motion.div className="kicker kicker-glow" {...fadeInDelay(0.1)}>
+            <Shield size={14} /> Free scam checker for India
+          </motion.div>
+          <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>
+            <AnimatedGradientText>
+              Got a suspicious message? Check it here.
+            </AnimatedGradientText>
+          </motion.h1>
+          <motion.p {...fadeInDelay(0.2)} style={{ fontSize: '1rem', lineHeight: 1.7 }}>
+            Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. AI tells you if it's safe or a scam — in seconds, for free, in 12 Indian languages.
+          </motion.p>
+        </div>
+        <motion.div {...fadeInDelay(0.25)} style={{ display: 'flex', justifyContent: 'center' }}>
+          <img
+            src="/hero-chetana-phone.png"
+            alt="Chetana app detecting scams on a phone"
+            style={{ maxHeight: 400, borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            loading="eager"
+          />
+        </motion.div>
+      </div>
     </motion.section>
   );
 }

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#050d15"/>
+      <stop offset="50%" stop-color="#09121e"/>
+      <stop offset="100%" stop-color="#07111b"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7ee7d9"/>
+      <stop offset="100%" stop-color="#a695ff"/>
+    </linearGradient>
+    <radialGradient id="orb1" cx="0.15" cy="0.2" r="0.4">
+      <stop offset="0%" stop-color="#7ee7d9" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="0.85" cy="0.8" r="0.35">
+      <stop offset="0%" stop-color="#a695ff" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#orb1)"/>
+  <rect width="1200" height="630" fill="url(#orb2)"/>
+  <!-- Border -->
+  <rect x="1" y="1" width="1198" height="628" rx="0" fill="none" stroke="#97abc5" stroke-width="1" opacity="0.15"/>
+  <!-- Glyph -->
+  <text x="100" y="330" font-size="120" fill="url(#teal)" font-family="system-ui, sans-serif" opacity="0.9">&#x25C8;</text>
+  <!-- Title -->
+  <text x="240" y="260" font-size="72" font-weight="700" fill="#e7eff9" font-family="Inter, system-ui, sans-serif" letter-spacing="-2">Chetana</text>
+  <!-- Tagline -->
+  <text x="240" y="320" font-size="24" fill="#97abc5" font-family="Inter, system-ui, sans-serif">Trust infrastructure for Indian digital life</text>
+  <!-- Signals strip -->
+  <g transform="translate(240, 370)" font-family="Inter, system-ui, sans-serif" font-size="14">
+    <rect width="140" height="32" rx="16" fill="#7ee7d9" fill-opacity="0.1" stroke="#7ee7d9" stroke-opacity="0.25" stroke-width="1"/>
+    <text x="70" y="21" text-anchor="middle" fill="#7ee7d9">Scam Weather</text>
+    <rect x="156" width="130" height="32" rx="16" fill="#a695ff" fill-opacity="0.1" stroke="#a695ff" stroke-opacity="0.25" stroke-width="1"/>
+    <text x="221" y="21" text-anchor="middle" fill="#a695ff">Scam Atlas</text>
+    <rect x="302" width="140" height="32" rx="16" fill="#ffcf7a" fill-opacity="0.1" stroke="#ffcf7a" stroke-opacity="0.25" stroke-width="1"/>
+    <text x="372" y="21" text-anchor="middle" fill="#ffcf7a">Trust Graph</text>
+    <rect x="458" width="170" height="32" rx="16" fill="#8fd8a9" fill-opacity="0.1" stroke="#8fd8a9" stroke-opacity="0.25" stroke-width="1"/>
+    <text x="543" y="21" text-anchor="middle" fill="#8fd8a9">12+ Languages</text>
+  </g>
+  <!-- Mirror DNA mark -->
+  <text x="240" y="560" font-size="13" fill="#97abc5" font-family="Inter, system-ui, sans-serif" letter-spacing="3" opacity="0.5">ACTIVEMIRROR.AI</text>
+  <!-- Decorative graph nodes -->
+  <g opacity="0.25">
+    <circle cx="900" cy="200" r="6" fill="#7ee7d9"/>
+    <circle cx="960" cy="250" r="4" fill="#a695ff"/>
+    <circle cx="1020" cy="180" r="5" fill="#ff7d85"/>
+    <circle cx="880" cy="300" r="3" fill="#ffcf7a"/>
+    <circle cx="1050" cy="280" r="5" fill="#7ee7d9"/>
+    <circle cx="940" cy="340" r="4" fill="#a695ff"/>
+    <circle cx="990" cy="150" r="3" fill="#8fd8a9"/>
+    <line x1="900" y1="200" x2="960" y2="250" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="960" y1="250" x2="1020" y2="180" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="900" y1="200" x2="880" y2="300" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="1020" y1="180" x2="1050" y2="280" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="960" y1="250" x2="940" y2="340" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="1020" y1="180" x2="990" y2="150" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="880" y1="300" x2="940" y2="340" stroke="#3b4d6a" stroke-width="1"/>
+    <line x1="1050" y1="280" x2="940" y2="340" stroke="#3b4d6a" stroke-width="1"/>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Chetana Scam Checker",
+  "name_for_model": "chetana_scam_checker",
+  "description_for_human": "India's free AI scam checker. Check suspicious messages, links, UPI IDs, phone numbers, and detect deepfakes. 12 Indian languages.",
+  "description_for_model": "Chetana checks Indian digital scams. Use it to: (1) scan suspicious SMS/WhatsApp messages for scam patterns, (2) check URLs for phishing, (3) verify UPI IDs against fraud databases, (4) lookup phone numbers for scam reports, (5) detect deepfake images/videos/voice. Returns a risk verdict (LOW_RISK / UNCLEAR / SUSPICIOUS) with explanation. Free. Privacy-first. Supports Hindi, Tamil, Telugu, Bengali, Marathi, and 7 more Indian languages.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://chetana.activemirror.ai/api/openapi.json"
+  },
+  "logo_url": "https://chetana.activemirror.ai/favicon.svg",
+  "contact_email": "trust@activemirror.ai",
+  "legal_info_url": "https://chetana.activemirror.ai/#proof"
+}

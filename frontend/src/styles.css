@@ -1,3 +1,14 @@
+/* ── Google Translate widget dark theme override ─────────────── */
+.goog-te-gadget { font-family: inherit !important; font-size: 0 !important; }
+.goog-te-gadget > span { display: none !important; }
+.goog-te-combo { background: rgba(255,255,255,0.08) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 16px !important; padding: 4px 10px !important; color: rgba(255,255,255,0.6) !important; font-size: 11px !important; font-family: inherit !important; cursor: pointer !important; outline: none !important; appearance: none !important; -webkit-appearance: none !important; min-width: 80px; }
+.goog-te-combo option { background: #1a1a2e; color: #ccc; }
+.goog-te-banner-frame { display: none !important; }
+body { top: 0 !important; }
+.skiptranslate { display: none !important; }
+#google_translate_element .skiptranslate { display: inline !important; }
+#google_translate_element { line-height: 1; }
+
 /* ── Chetana — Sovereign Dark Theme ──────────────────────────── */
 /* Design law: Feel futuristic & sovereign. Calm & high-trust.   */
 /* Visually rare. Operationally serious. Jaw-dropping.           */
@@ -1003,6 +1014,8 @@ select { appearance: none; cursor: pointer; }
   border-radius: 6px; cursor: pointer; transition: all .15s;
 }
 .report-verdict-btn:hover { color: var(--muted); border-color: rgba(255,255,255,0.12); }
+.risk-gauge { flex: 1; min-width: 60px; max-width: 120px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.risk-gauge-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
 .scan-mode-bar {
   display: flex; align-items: center; gap: 8px;
   padding: 12px 16px; border-bottom: 1px solid var(--line);

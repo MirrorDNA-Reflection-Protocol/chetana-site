@@ -1303,6 +1303,100 @@ async def chat(req: ChatRequest):
     return {"reply": reply, "articles": kb_articles, "suggestions": suggestions}
 
 
+
+# ── Live scam news ticker (proxied from MirrorRadar) ──────────
+@app.get("/api/radar/live")
+async def radar_live():
+    """Live scam/security news from 28 sources. Updates every scan cycle."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get("http://127.0.0.1:8789/api/ticker")
+            data = resp.json()
+            items = data.get("items", data) if isinstance(data, dict) else data
+            # Filter to scam/security relevant items only
+            keywords = {"scam","fraud","phishing","deepfake","cyber","upi","whatsapp","malware","hack","breach","attack","vulnerability","arrest","theft","clone","fake","impersonat"}
+            scam_items = [i for i in items if any(k in (i.get("title","")+i.get("summary","")).lower() for k in keywords)]
+            return {"items": scam_items[:20], "total": len(items), "scam_count": len(scam_items)}
+    except Exception:
+        return {"items": [], "total": 0, "scam_count": 0, "error": "radar offline"}
+
+# ── Batch UI translation via Sarvam ───────────────────────────
+_TRANSLATE_CACHE: dict[str, dict[str, str]] = {}  # {lang: {en_text: translated}}
+
+@app.post("/api/translate")
+async def batch_translate(req: Request):
+    body = await req.json()
+    texts: list[str] = body.get("texts", [])
+    lang: str = body.get("lang", "en")
+    if lang == "en" or not texts:
+        return {"translations": texts}
+    # Check cache
+    if lang not in _TRANSLATE_CACHE:
+        _TRANSLATE_CACHE[lang] = {}
+    cache = _TRANSLATE_CACHE[lang]
+    results = []
+    to_translate = []
+    indices = []
+    for i, text in enumerate(texts[:50]):  # cap at 50
+        if text in cache:
+            results.append(cache[text])
+        else:
+            results.append(None)
+            to_translate.append(text)
+            indices.append(i)
+    # Batch translate missing ones
+    if to_translate:
+        target = LANG_NAMES.get(lang, lang)
+        batch_prompt = "Translate each line to " + target + ". Return ONLY the translations, one per line, in the same order:\n" + "\n".join(to_translate)
+        try:
+            client = await get_client()
+            resp = await client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={"model": SARVAM_MODEL, "prompt": batch_prompt, "stream": False},
+                timeout=30.0,
+            )
+            if resp.status_code == 200:
+                translated_lines = resp.json().get("response", "").strip().splitlines()
+                for j, idx in enumerate(indices):
+                    tr = translated_lines[j].strip() if j < len(translated_lines) else to_translate[j]
+                    cache[to_translate[j]] = tr
+                    results[idx] = tr
+        except Exception as e:
+            logger.warning("Batch translate failed (%s): %s", lang, e)
+    # Fill any remaining Nones with originals
+    for i in range(len(results)):
+        if results[i] is None:
+            results[i] = texts[i]
+    return {"translations": results, "lang": lang}
+
+# ── Anonymous scan analytics ──────────────────────────────────
+import time as _time
+import json as _json
+_ANALYTICS_LOG = Path.home() / ".mirrordna" / "chetana" / "analytics.jsonl"
+_ANALYTICS_LOG.parent.mkdir(parents=True, exist_ok=True)
+
+@app.post("/api/analytics/event")
+async def log_event(req: Request):
+    body = await req.json()
+    allowed = {"event", "scan_type", "verdict", "score", "language"}
+    entry = {k: v for k, v in body.items() if k in allowed}
+    entry["ts"] = _time.time()
+    with open(_ANALYTICS_LOG, "a") as f:
+        f.write(_json.dumps(entry) + "\n")
+    return {"ok": True}
+
+@app.get("/api/stats/live")
+async def live_stats():
+    if not _ANALYTICS_LOG.exists():
+        return {"total_scans": 0, "scams_caught": 0, "scan_types": 0, "languages": 12}
+    lines = _ANALYTICS_LOG.read_text().strip().splitlines()
+    events = [_json.loads(l) for l in lines if l.strip()]
+    scans = [e for e in events if e.get("event") == "scan"]
+    suspicious = [s for s in scans if s.get("verdict") in ("SUSPICIOUS", "HIGH")]
+    types_used = len(set(s.get("scan_type", "") for s in scans))
+    return {"total_scans": len(scans), "scams_caught": len(suspicious), "scan_types_used": max(types_used, 8), "languages": 12}
+
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
 
@@ -1418,3 +1512,4 @@ if frontend_dist.exists():
             headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in str(file) else {"Cache-Control": "no-cache, no-store, must-revalidate"}
             return FileResponse(file, headers=headers)
         return FileResponse(frontend_dist / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+

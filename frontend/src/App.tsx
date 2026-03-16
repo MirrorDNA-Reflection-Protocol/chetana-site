@@ -185,8 +185,8 @@ export default function App() {
       <Footer onNavigate={setPage} />
       {!termsAccepted && (
         <div className="consent-bar">
-          <span>Before your first scan, please review our <a onClick={() => setPage("proof")}>Terms & Disclaimer</a>.</span>
-          <button onClick={() => setPage("proof")}>Review Terms</button>
+          <span>One quick step before your first scan — <a onClick={() => setPage("proof")}>read & agree</a> (takes 1 min).</span>
+          <button onClick={() => setPage("proof")}>Get started</button>
         </div>
       )}
     </div>

@@ -9,12 +9,13 @@ import {
   Link2, Phone, CreditCard, AlertTriangle, CheckCircle, ChevronRight,
   Globe, Users, Building2, Zap, Eye, BookOpen, BarChart3, Lock, Smartphone,
   TrendingUp, FileWarning, UserCheck, Layers, Mic, QrCode, ImageIcon,
-  Upload, FileText, Bot, Paperclip, ChevronDown, Volume2, Flag, Info
+  Upload, FileText, Bot, Paperclip, ChevronDown, Volume2, Flag, Info, Share2
 } from "lucide-react";
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
 import { AuroraBackground, SpotlightCard, BorderBeam, AnimatedGradientText, TextReveal, GridPattern, ScrollReveal, Meteors } from "./effects";
+// i18n handled by Google Translate widget (index.html)
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
 const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
@@ -141,6 +142,8 @@ const TICKER_ITEMS = [
   { icon: "🔴", text: "Bank impersonation up 8% — verify before you share anything" },
   { icon: "⚡", text: "Courier phishing up 4% — fake delivery alerts are a trap" },
   { icon: "🟡", text: "QR traps rising — never scan a QR from an unknown sender" },
+  { icon: "🔴", text: "Eid gift card scams surging — verify offers before sharing payment details" },
+  { icon: "⚡", text: "Festival season = scam season — fake deals, lottery, and gift frauds spike during holidays" },
 ];
 
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
@@ -168,55 +171,75 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
 /* ── Hero (Scan-centered) ────────────────────────────────────── */
 export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   return (
-    <motion.section className="hero hero-enhanced" {...fadeIn}>
-      <div className="hero-watermark">चेतना</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'center', maxWidth: 960, margin: '0 auto' }}>
-        <div>
-          <motion.div className="kicker kicker-glow" {...fadeInDelay(0.1)}>
-            <Shield size={14} /> Free scam checker for India
-          </motion.div>
-          <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>
-            <AnimatedGradientText>
-              Got a suspicious message? Check it here.
-            </AnimatedGradientText>
-          </motion.h1>
-          <motion.p {...fadeInDelay(0.2)} style={{ fontSize: '1rem', lineHeight: 1.7 }}>
-            Paste any SMS, WhatsApp forward, link, UPI ID, or phone number below. AI tells you if it's safe or a scam — in seconds, for free, in 12 Indian languages.
-          </motion.p>
-        </div>
-        <motion.div {...fadeInDelay(0.25)} style={{ display: 'flex', justifyContent: 'center' }}>
-          <img
-            src="/hero-chetana-phone.png"
-            alt="Chetana app detecting scams on a phone"
-            style={{ maxHeight: 400, borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
-            loading="eager"
-          />
+    <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
+      {/* Full-bleed video background */}
+      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/AI_Scam_Detection_Video_Generation.mp4" />
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
+
+      {/* Content */}
+      <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
+        <motion.div {...fadeInDelay(0.1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 24, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>
+          <Shield size={12} /> Free scam checker for India
         </motion.div>
+
+        <motion.h1 {...fadeInDelay(0.2)} style={{ fontSize: 'clamp(2.2rem, 7vw, 4rem)', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 16 }}>
+          <AnimatedGradientText>Check karo.</AnimatedGradientText>
+          <br />
+          <AnimatedGradientText>Safe raho.</AnimatedGradientText>
+        </motion.h1>
+
+        <motion.p {...fadeInDelay(0.3)} style={{ fontSize: 'clamp(0.9rem, 2.5vw, 1.1rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.55)', maxWidth: 480, margin: '0 auto' }}>
+          Suspicious message, link, QR, or payment? Chetana helps you verify before you trust.
+        </motion.p>
+
+        <motion.div {...fadeInDelay(0.35)} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 20 }}>
+          {['Messages', 'Links', 'Photos & videos', 'UPI & payments', 'QR codes', 'Voice & deepfakes', 'Social media ads'].map(t => (
+            <span key={t} style={{ padding: '5px 14px', borderRadius: 24, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t}</span>
+          ))}
+        </motion.div>
+
+        <motion.div {...fadeInDelay(0.4)} style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
+          <button onClick={() => document.querySelector('.scan-chat')?.scrollIntoView({ behavior: 'smooth' })} style={{ padding: '14px 28px', borderRadius: 50, background: '#3b82f6', color: '#fff', fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer' }}>Check now →</button>
+          <button onClick={() => document.querySelector('.stats-strip')?.scrollIntoView({ behavior: 'smooth' })} style={{ padding: '14px 28px', borderRadius: 50, background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 500, fontSize: 14, border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}>See how it works ↓</button>
+        </motion.div>
+
+        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 20, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Free. No login. No app needed.</span>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.15)' }}>|</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Globe size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
+            <div id="google_translate_element" style={{ display: 'inline-block' }} />
+            <button onClick={() => { const f = document.querySelector('.goog-te-combo') as HTMLSelectElement; if (f) { f.value = 'en'; f.dispatchEvent(new Event('change')); } }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>English</button>
+          </div>
+        </motion.div>
+
       </div>
-    </motion.section>
+    </section>
   );
 }
 
 /* ── Stats Strip ─────────────────────────────────────────────── */
 export function StatsStrip() {
+  const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0 });
+  useEffect(() => {
+    fetch("/api/stats/live").then(r => r.json()).then(setStats).catch(() => {});
+    const iv = setInterval(() => { fetch("/api/stats/live").then(r => r.json()).then(setStats).catch(() => {}); }, 30000);
+    return () => clearInterval(iv);
+  }, []);
   return (
     <ScrollReveal>
     <motion.div className="stats-strip" {...fadeInDelay(0.3)}>
-      <div className="stat-item">
-        <div className="stat-value stat-value-glow"><CountUp end={50} suffix="+" /></div>
-        <div className="stat-label">Messages checked today</div>
+      <div className="stat-item" translate="no">
+        <div className="stat-value stat-value-glow"><CountUp end={stats.total_scans} suffix="" /></div>
+        <div className="stat-label">Scans run</div>
       </div>
-      <div className="stat-item">
-        <div className="stat-value stat-value-glow"><CountUp end={136} suffix="" /></div>
-        <div className="stat-label">Scams caught</div>
+      <div className="stat-item" translate="no">
+        <div className="stat-value stat-value-glow"><CountUp end={stats.scams_caught} suffix="" /></div>
+        <div className="stat-label">Threats caught</div>
       </div>
-      <div className="stat-item">
-        <div className="stat-value stat-value-glow"><CountUp end={25} suffix="+" /></div>
-        <div className="stat-label">Types of scams detected</div>
-      </div>
-      <div className="stat-item">
+      <div className="stat-item" translate="no">
         <div className="stat-value stat-value-glow"><CountUp end={12} suffix="" /></div>
-        <div className="stat-label">Indian languages</div>
+        <div className="stat-label">Languages</div>
       </div>
     </motion.div>
     </ScrollReveal>
@@ -235,16 +258,18 @@ interface ChatMsg {
   suggestions?: string[];
 }
 
-const SCAN_MODES: { id: ScanMode; label: string; icon: React.ReactNode; placeholder: string; isFile?: boolean; accept?: string; desc: string }[] = [
-  { id: "message", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious SMS, WhatsApp, or any message...", desc: "SMS, WhatsApp, email" },
-  { id: "link",    label: "Link",    icon: <Link2 size={14} />,          placeholder: "Paste any suspicious URL or link...", desc: "URLs, websites" },
-  { id: "upi",     label: "UPI",     icon: <CreditCard size={14} />,     placeholder: "e.g. name@ybl or name@paytm", desc: "UPI IDs, payment" },
-  { id: "phone",   label: "Phone",   icon: <Phone size={14} />,          placeholder: "10-digit mobile number", desc: "Numbers, callers" },
-  { id: "media",   label: "Image/Video", icon: <ImageIcon size={14} />, placeholder: "", isFile: true, accept: "image/*,video/*", desc: "Deepfake, screenshots" },
-  { id: "voice",   label: "Voice",   icon: <Mic size={14} />,            placeholder: "", isFile: true, accept: "audio/*", desc: "AI voice clone detection" },
-  { id: "qr",      label: "QR Code", icon: <QrCode size={14} />,        placeholder: "", isFile: true, accept: "image/*", desc: "QR code safety check" },
-  { id: "aadhaar", label: "Aadhaar", icon: <FileText size={14} />,      placeholder: "Enter 12-digit Aadhaar number to validate format", desc: "Aadhaar validation" },
-];
+function getScanModes(): { id: ScanMode; label: string; icon: React.ReactNode; placeholder: string; isFile?: boolean; accept?: string; desc: string }[] {
+  return [
+    { id: "message", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious message...", desc: "SMS, WhatsApp, email" },
+    { id: "link",    label: "Link",    icon: <Link2 size={14} />,          placeholder: "Paste a suspicious link...", desc: "URLs, websites" },
+    { id: "upi",     label: "UPI",     icon: <CreditCard size={14} />,     placeholder: "e.g. name@ybl or name@paytm", desc: "UPI IDs, payment" },
+    { id: "phone",   label: "Phone",   icon: <Phone size={14} />,          placeholder: "10-digit mobile number", desc: "Numbers, callers" },
+    { id: "media",   label: "Image/Video", icon: <ImageIcon size={14} />, placeholder: "", isFile: true, accept: "image/*,video/*", desc: "Deepfake, screenshots" },
+    { id: "voice",   label: "Voice",   icon: <Mic size={14} />,            placeholder: "", isFile: true, accept: "audio/*", desc: "AI voice clone detection" },
+    { id: "qr",      label: "QR Code", icon: <QrCode size={14} />,        placeholder: "", isFile: true, accept: "image/*", desc: "QR code safety check" },
+    { id: "aadhaar", label: "Aadhaar", icon: <FileText size={14} />,      placeholder: "Aadhaar validation", desc: "Aadhaar validation" },
+  ];
+}
 
 function verdictClass(v: string) {
   if (v === "SUSPICIOUS" || v === "HIGH") return "verdict-suspicious";
@@ -263,20 +288,23 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   let text = "";
 
   if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
-    text = `⚠️ **This is HIGH RISK** (${score}/100 threat score).\n\n`;
+    text = `⚠️ **High scam risk. Avoid action.** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else if (signals.length) text += `Here's what raised the alarm:\n• ${signals.slice(0, 4).join("\n• ")}\n\n`;
-    text += action ? `**What to do:** ${action.replace(/_/g, " ")}` : "**What to do:** Do not respond or share any personal details. Delete this immediately. If money is involved, call your bank now on their official helpline.";
+    else if (signals.length) text += `Signals found:\n• ${signals.slice(0, 4).join("\n• ")}\n\n`;
+    text += action ? `**What to do:** ${action.replace(/_/g, " ")}` : "**What to do:** Do not click, pay, share OTPs, or continue until verified elsewhere.";
+    text += "\n\n_Check karo. Safe raho._";
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
-    text = `🔶 **Proceed with caution** (${score}/100 threat score).\n\n`;
+    text = `🔶 **Something feels off.** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else text += "I found some suspicious patterns but can't be certain. ";
-    text += "Verify through official channels before taking any action.";
+    else text += "Suspicious patterns detected but not certain. ";
+    text += "Review carefully before clicking, paying, or replying.";
+    if (score >= 40 && score <= 60) text += "\n\n**Not sure?** Forward this to someone you trust, or call your bank directly to verify.";
+    text += "\n\n_Check karo. Safe raho._";
   } else {
-    text = `✅ **Looks safe** (${score}/100 threat score).\n\n`;
+    text = `✅ **Looks safe.** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else text += `I didn't find any known scam patterns in ${label}. `;
-    text += "Still — stay alert. Scammers constantly change tactics.";
+    else text += `No obvious scam signals found in ${label}. `;
+    text += "\n\n_Check karo. Safe raho._";
   }
 
   const suggestions =
@@ -328,14 +356,19 @@ function detectBrowserLang(): string {
 
 export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
   const [mode, setMode] = useState<ScanMode>("message");
-  const [lang, setLang] = useState(() => detectBrowserLang());
+  const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const scanCount = parseInt(localStorage.getItem("chetana_scan_count") || "0");
+  const isReturning = scanCount > 0;
+  const welcomeText = isReturning
+    ? `Welcome back. You've run ${scanCount} scan${scanCount > 1 ? "s" : ""} so far. Drop anything suspicious — I'll check it.\n\n_Check karo. Safe raho._`
+    : "Paste, upload, or drop anything suspicious — messages, links, QR codes, payment screenshots, phone numbers, or voice clips. I'll check it.\n\n_Check karo. Safe raho._";
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
-    text: "Hi! I'm Chetana — India's AI scam checker. Paste any suspicious message, link, UPI ID, phone number, or upload a photo/voice clip. I'll check it and explain what I find.\n\nBuilt on ActiveMirror's MirrorDNA intelligence platform.",
-    suggestions: ["Got a suspicious message", "Check a link", "Check a UPI ID", "Detect a deepfake"],
+    text: welcomeText,
+    suggestions: isReturning ? ["Check a message", "Check a link", "Upload a screenshot", "My scan history"] : ["Got a suspicious message", "Check a link", "Check a UPI ID", "Detect a deepfake"],
   }]);
   const [showModes, setShowModes] = useState(false);
   const [listening, setListening] = useState(false);
@@ -368,7 +401,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     setListening(true);
   };
 
-  const activeMode = SCAN_MODES.find(m => m.id === mode)!;
+  const activeMode = getScanModes().find(m => m.id === mode)!;
 
   const speakText = (text: string) => {
     if ("speechSynthesis" in window) {
@@ -390,7 +423,20 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
 
   const handleSuggestion = (s: string) => {
     const lower = s.toLowerCase();
-    if (lower.includes("message")) { setMode("message"); setInput(""); }
+    if (lower.includes("history") || lower.includes("scan history")) {
+      const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
+      if (history.length === 0) {
+        addMsg({ role: "bot", text: "No scans yet. Drop a suspicious message, link, or screenshot to get started." });
+      } else {
+        const summary = history.slice(0, 10).map((h: any) => {
+          const d = new Date(h.ts);
+          return `${h.verdict} (${h.score}/100) — ${h.type} — ${d.toLocaleDateString()}`;
+        }).join("\n");
+        addMsg({ role: "bot", text: `**Your last ${Math.min(history.length, 10)} scans:**\n${summary}\n\nTotal: ${history.length} scans. _Check karo. Safe raho._` });
+      }
+      return;
+    }
+    if (lower.includes("message") || lower.includes("screenshot")) { setMode("message"); setInput(""); }
     else if (lower.includes("link")) { setMode("link"); setInput(""); }
     else if (lower.includes("upi")) { setMode("upi"); setInput(""); }
     else if (lower.includes("deepfake") || lower.includes("photo") || lower.includes("image")) { setMode("media"); }
@@ -402,7 +448,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     addMsg({ role: "user", text });
     setLoading(true);
     try {
-      const resp = await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text }) });
+      const resp = await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, lang }) });
       const data = resp.ok ? await resp.json() : null;
       addMsg({ role: "bot", text: data?.reply || "Ask me about any scam or suspicious activity — I'm here to help.", suggestions: data?.suggestions });
     } catch {
@@ -428,13 +474,13 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     try {
       let resp: Response;
       if (currentMode.id === "upi") {
-        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: input.trim() }) });
+        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: input.trim(), lang }) });
       } else if (currentMode.id === "phone") {
-        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: input.trim() }) });
+        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: input.trim(), lang }) });
       } else if (currentMode.id === "aadhaar") {
-        resp = await fetch(`${API}/api/aadhaar/validate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aadhaar: input.trim() }) });
+        resp = await fetch(`${API}/api/aadhaar/validate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aadhaar: input.trim(), lang }) });
       } else if (currentMode.isFile && file) {
-        const fd = new FormData(); fd.append("file", file);
+        const fd = new FormData(); fd.append("file", file); fd.append("lang", lang);
         const endpoint = currentMode.id === "voice" ? "/api/voice/analyze" : currentMode.id === "qr" ? "/api/extract-text" : "/api/media/analyze";
         resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
       } else if (currentMode.id === "link") {
@@ -447,26 +493,46 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
       const data = await resp.json();
       const { text, scanResult, suggestions } = buildBotReply(currentMode.id, data, file?.name);
       addMsg({ role: "bot", text, scanResult, suggestions });
-      if (scanResult) trackVigilance("scan", `${currentMode.id}: ${scanResult.verdict} (${scanResult.score}/100)`);
+      if (scanResult) {
+        trackVigilance("scan", `${currentMode.id}: ${scanResult.verdict} (${scanResult.score}/100)`);
+        try { new Audio("/ting.wav").play(); } catch {}
+        // Haptic feedback — distinct patterns per verdict
+        try {
+          const v = scanResult.verdict;
+          if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100, 50, 100, 50, 100]); // danger: 3 sharp
+          else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80, 60, 80]); // caution: 2 pulses
+          else navigator.vibrate(50); // safe: single soft
+        } catch {}
+        // Analytics
+        fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ event: "scan", scan_type: currentMode.id, verdict: scanResult.verdict, score: scanResult.score }) }).catch(() => {});
+        // Zero-login trust: save scan to local history
+        try {
+          const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
+          history.unshift({ verdict: scanResult.verdict, score: scanResult.score, type: currentMode.id, ts: Date.now() });
+          if (history.length > 100) history.length = 100;
+          localStorage.setItem("chetana_history", JSON.stringify(history));
+          localStorage.setItem("chetana_scan_count", String((parseInt(localStorage.getItem("chetana_scan_count") || "0")) + 1));
+        } catch {}
+      }
     } catch (e: any) {
       addMsg({ role: "bot", text: `I couldn't complete that check right now. ${e.message || "Please try again."}`, suggestions: ["Try again", "Check a different message"] });
     } finally { setLoading(false); }
   };
 
   return (
-    <motion.section className="scan-panel scan-chat scan-panel-glow" {...fadeInDelay(0.25)} style={{ position: "relative" }}>
+    <motion.section className="scan-panel scan-chat scan-panel-glow notranslate" translate="no" {...fadeInDelay(0.25)} style={{ position: "relative" }}>
       <BorderBeam size={250} duration={10} color="#3b82f6" colorTo="#8b5cf6" />
       {/* Mode selector + language picker */}
       <div className="scan-mode-bar">
         <div className="scan-modes">
-          {SCAN_MODES.map(m => (
+          {getScanModes().map(m => (
             <button key={m.id} className={`scan-mode-btn ${mode === m.id ? "active" : ""}`} onClick={() => { setMode(m.id); setFile(null); }} title={m.desc}>
               {m.icon} <span>{m.label}</span>
               {(m.id === "media" || m.id === "voice") && <span className="mode-badge">AI</span>}
             </button>
           ))}
         </div>
-        <select className="lang-picker" value={lang} onChange={e => setLang(e.target.value)} title="Response language">
+        <select className="lang-picker" value={lang} onChange={e => { setLang(e.target.value); localStorage.setItem("chetana_lang", e.target.value); }} title="Response language">
           {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label} {l.name}</option>)}
         </select>
       </div>
@@ -493,8 +559,28 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
                     <span>{msg.scanResult.verdict.replace(/_/g, " ")}</span>
                     <span className="verdict-chip-score">{msg.scanResult.score}/100</span>
                   </div>
-                  <button className="report-verdict-btn" title="Report an incorrect result" onClick={() => handleSuggestion("This result seems wrong — help me understand")}>
+                  {/* Risk gauge */}
+                  <div className="risk-gauge" title={`Risk: ${msg.scanResult.score}/100`}>
+                    <div className="risk-gauge-fill" style={{ width: `${msg.scanResult.score}%`, background: msg.scanResult.score >= 70 ? '#ef4444' : msg.scanResult.score >= 40 ? '#f59e0b' : '#10b981' }} />
+                  </div>
+                  <button className="report-verdict-btn" title="Report an incorrect result" onClick={() => {
+                    fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ event: "feedback", feedback: "wrong_verdict", verdict: msg.scanResult!.verdict, score: msg.scanResult!.score }) }).catch(() => {});
+                    handleSuggestion("This result seems wrong — help me understand");
+                  }}>
                     <Flag size={10} /> Wrong?
+                  </button>
+                  <button className="report-verdict-btn" title="Share this result" onClick={() => {
+                    const shareText = `Check karo. Safe raho.\nChetana verdict: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\n\nVerify before you trust: https://chetana.activemirror.ai`;
+                    if (navigator.share) { navigator.share({ title: "Chetana Scam Check", text: shareText }).catch(() => {}); }
+                    else { navigator.clipboard.writeText(shareText).then(() => alert("Result copied! Share it with friends & family.")); }
+                  }}>
+                    <Share2 size={10} /> Share
+                  </button>
+                  <button className="report-verdict-btn" title="Share on WhatsApp" onClick={() => {
+                    const text = encodeURIComponent(`Chetana scam check: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\n\nCheck karo. Safe raho.\nhttps://chetana.activemirror.ai`);
+                    window.open(`https://wa.me/?text=${text}`, '_blank');
+                  }}>
+                    <Smartphone size={10} /> WhatsApp
                   </button>
                 </div>
               )}
@@ -542,7 +628,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
             ) : (
               <div className="scan-file-prompt">
                 <Upload size={18} />
-                <span>Tap to upload {activeMode.label.toLowerCase()}</span>
+                <span>"Tap to upload" {activeMode.label.toLowerCase()}</span>
                 <small>{activeMode.desc}</small>
               </div>
             )}
@@ -577,7 +663,15 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
       </div>
 
       <div className="scan-chat-footer">
-        <Bot size={12} /> Powered by ActiveMirror · MirrorDNA Intelligence · Advisory only — not a government service · Verdicts are automated, not legal determinations
+        <Bot size={12} /> "Advisory only — not a government service" · "Verdicts are automated, not legal determinations"
+        <span style={{ margin: '0 4px' }}>·</span>
+        <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => {
+          setMode("message");
+          setInput("");
+          addMsg({ role: "bot", text: "Want to report a scam? Paste the scam message, link, or phone number and I'll flag it in our database. You're helping protect others.\n\n_Check karo. Safe raho._", suggestions: ["Paste a scam message", "Report a scam link", "Report a scam phone number"] });
+        }}>Report a scam</button>
+        <span style={{ margin: '0 4px' }}>·</span>
+        <span>Emergency: 1930</span>
       </div>
     </motion.section>
   );
@@ -641,7 +735,7 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
   return (
     <>
       <div className="section-header">
-        <motion.div className="kicker" {...fadeIn}><Shield size={14} /> For you & your family</motion.div>
+        <motion.div className="kicker" {...fadeIn}><Shield size={14} /> "For you & your family"</motion.div>
         <motion.h2 {...fadeInDelay(0.05)}>Protect Yourself From Scams</motion.h2>
         <motion.p {...fadeInDelay(0.1)}>Check any suspicious message, link, or payment before you act. Free and instant.</motion.p>
       </div>
@@ -673,7 +767,7 @@ export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => v
   return (
     <>
       <div className="section-header">
-        <motion.div className="kicker" {...fadeIn}><Building2 size={14} /> For businesses & enterprises</motion.div>
+        <motion.div className="kicker" {...fadeIn}><Building2 size={14} /> "For businesses & enterprises"</motion.div>
         <motion.h2 {...fadeInDelay(0.05)}>Protect Your Business</motion.h2>
         <motion.p {...fadeInDelay(0.1)}>Fraud costs Indian businesses crores every year. Stop it before it starts.</motion.p>
       </div>
@@ -932,6 +1026,22 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <span className="footer-static">Women helpline: 181</span>
             <span className="footer-static">cybercrime.gov.in</span>
             <button onClick={() => onNavigate("proof")}>Terms & Disclaimer</button>
+          </div>
+          <div className="footer-col">
+            <h4>Stay Updated</h4>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Get weekly scam alerts</p>
+            <form onSubmit={e => {
+              e.preventDefault();
+              const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement)?.value;
+              if (email) {
+                fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ event: "subscribe", email }) }).catch(() => {});
+                (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value = "";
+                alert("Subscribed! You'll get weekly scam alerts.");
+              }
+            }} style={{ display: 'flex', gap: 4 }}>
+              <input name="email" type="email" placeholder="your@email.com" required style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }} />
+              <button type="submit" style={{ padding: '6px 12px', borderRadius: 8, background: '#3b82f6', color: '#fff', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Subscribe</button>
+            </form>
           </div>
         </div>
         <div className="footer-bottom">

@@ -3,24 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chetana — Trust Infrastructure for Indian Digital Life</title>
-    <meta name="description" content="Before you trust, check. Chetana is a living trust surface for scams, links, payments, media, and deception. Instant consumer protection. Family-safe guidance. Merchant defense." />
+    <title>Check karo. Safe raho. | Chetana</title>
+    <meta name="description" content="Check suspicious links, QR codes, payment screenshots, and messages before you trust them. Chetana helps you stay safe online. Free. 12 Indian languages." />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="https://chetana.activemirror.ai/" />
+
+    <!-- Geo targeting -->
+    <meta name="geo.region" content="IN" />
+    <meta name="geo.placename" content="India" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Chetana — Trust Infrastructure for Indian Digital Life" />
-    <meta property="og:description" content="Before you trust, check. Living scam weather, threat atlas, and trust graph for Indian digital life. 12+ languages. Privacy-first." />
-    <meta property="og:image" content="/og-image.svg" />
-    <meta property="og:site_name" content="Chetana by ActiveMirror" />
+    <meta property="og:url" content="https://chetana.activemirror.ai/" />
+    <meta property="og:title" content="Check karo. Safe raho. | Chetana" />
+    <meta property="og:description" content="Verify suspicious links, messages, QR codes, and payment requests before you click or pay." />
+    <meta property="og:image" content="https://chetana.activemirror.ai/hero-chetana-phone.jpg" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="577" />
+    <meta property="og:site_name" content="Chetana by Active Mirror" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Chetana — Trust Infrastructure for Indian Digital Life" />
-    <meta name="twitter:description" content="Before you trust, check. Living scam weather, threat atlas, and trust graph." />
-    <meta name="twitter:image" content="/og-image.svg" />
+    <meta name="twitter:title" content="Check karo. Safe raho. | Chetana" />
+    <meta name="twitter:description" content="Verify suspicious links, messages, QR codes, and payment requests before you click or pay." />
+    <meta name="twitter:image" content="https://chetana.activemirror.ai/hero-chetana-phone.jpg" />
 
     <!-- Theme -->
     <meta name="theme-color" content="#07111b" />
@@ -44,5 +52,17 @@
     <div id="root"></div>
     <noscript><h1>Chetana — India's Free AI Scam Checker</h1><p>Check any suspicious SMS, WhatsApp message, link, UPI ID, or phone number. Free. Instant. 12 Indian languages.</p><p>Emergency: Cybercrime Helpline 1930 | cybercrime.gov.in | Women helpline 181</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Google Translate — full page translation, 100+ languages -->
+    <script>
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+          pageLanguage: 'en',
+          includedLanguages: 'en,hi,ta,te,bn,mr,gu,kn,ml,pa,or,ur,as,kok,ne,sd,mai,sat,doi,mni,bho',
+          layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL,
+          autoDisplay: false,
+        }, 'google_translate_element');
+      }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </body>
 </html>

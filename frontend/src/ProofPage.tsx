@@ -150,9 +150,9 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 800, margin: "0 auto" }}>
       {/* Header */}
       <section className="page-intro" style={{ textAlign: "center", paddingBottom: 24 }}>
-        <div className="kicker" style={{ justifyContent: "center" }}><ShieldCheck size={14} /> Proof-of-Memory Protocol</div>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>Terms of Use & Disclaimer</h1>
-        <p style={{ maxWidth: "50ch", margin: "0 auto" }}>Read the terms below. Your attention is tracked to generate a cryptographic proof that you understood — not just clicked through.</p>
+        <div className="kicker" style={{ justifyContent: "center" }}><ShieldCheck size={14} /> One-time setup</div>
+        <h1 style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>Quick read before you scan</h1>
+        <p style={{ maxWidth: "50ch", margin: "0 auto" }}>Chetana is free and private. Just scroll through these short terms — takes about a minute — and you're good to go.</p>
       </section>
 
       {/* Attention Metrics Bar */}

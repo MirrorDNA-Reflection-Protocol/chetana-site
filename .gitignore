@@ -1,6 +1,8 @@
 node_modules/
 dist/
 backend/frontend_dist/
+frontend/public/version.json
+frontend/public/.well-known/edge-truth.json
 *.tsbuildinfo
 __pycache__/
 *.pyc

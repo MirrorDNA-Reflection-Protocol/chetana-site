@@ -442,7 +442,11 @@ async def atlas():
 
 @app.post("/api/scan")
 async def scan(req: ScanRequest):
-    """Proxy scan to live Kavach API for real analysis."""
+    """Proxy scan to live Kavach API — gated by Decode Firewall."""
+    # Gate text input
+    text_block = _gate_text(req.content) if hasattr(req, 'content') and req.content else None
+    if text_block:
+        return text_block
     try:
         client = await get_client()
         if req.input_type == "link":
@@ -1655,10 +1659,114 @@ async def privacy_policy():
 import httpx
 from fastapi import UploadFile, File, Form
 
+# ── Decode Firewall Gate ──────────────────────────────────────────────────
+_decode_fw_path = Path.home() / ".mirrordna" / "lib" / "decode_firewall.py"
+if str(_decode_fw_path.parent) not in sys.path:
+    sys.path.insert(0, str(_decode_fw_path.parent))
+try:
+    from decode_firewall import DecodeFirewall, TrustState
+    _fw = DecodeFirewall()
+    logger.info("Decode Firewall loaded")
+except ImportError:
+    _fw = None
+    logger.warning("Decode Firewall not available — uploads ungated")
+
+
+def _gate_upload(content: bytes, filename: str, declared_type: str) -> dict | None:
+    """Run upload through Decode Firewall. Returns error dict if blocked, None if OK."""
+    if not _fw:
+        return None
+    result = _fw.inspect(
+        content,
+        source_kind="upload",
+        source_name=filename or "",
+        declared_type=declared_type or "",
+        context_policy="image_upload" if (declared_type or "").startswith("image/") else "default",
+    )
+    if result.trust_state == TrustState.BLOCKED.value:
+        logger.warning("Decode Firewall BLOCKED upload %s: %s", filename, result.reason_codes)
+        return {
+            "error": "Upload blocked by security gate",
+            "verdict": "BLOCKED",
+            "risk_score": 100,
+            "why_flagged": [f"Security: {rc}" for rc in result.reason_codes[:5]],
+            "action_eligibility": "blocked",
+            "trust_state": "blocked",
+            "reason_codes": result.reason_codes,
+            "firewall_object_id": result.object_id,
+        }
+    if result.trust_state == TrustState.INSPECT.value:
+        logger.info("Decode Firewall INSPECT upload %s: %s", filename, result.reason_codes)
+    return None
+
+
+def _gate_text(text: str) -> dict | None:
+    """Run text input through Decode Firewall. Returns error dict if blocked, None if OK."""
+    if not _fw:
+        return None
+    result = _fw.inspect_text(text, source_kind="chat_input", context_policy="plaintext")
+    if result.trust_state == TrustState.BLOCKED.value:
+        logger.warning("Decode Firewall BLOCKED text input: %s", result.reason_codes)
+        return {
+            "error": "Input blocked by security gate",
+            "verdict": "BLOCKED",
+            "risk_score": 100,
+            "why_flagged": [f"Security: {rc}" for rc in result.reason_codes[:5]],
+            "action_eligibility": "blocked",
+            "trust_state": "blocked",
+            "reason_codes": result.reason_codes,
+        }
+    return None
+
+
+# ── Firewall API endpoints ────────────────────────────────────────────────
+
+@app.post("/api/decode-firewall/inspect")
+async def fw_inspect(file: UploadFile = File(None), text: str = Form(None)):
+    """Inspect arbitrary content through the Decode Firewall."""
+    if not _fw:
+        return {"error": "Decode Firewall not loaded"}
+    if file:
+        content = await file.read()
+        result = _fw.inspect(content, source_kind="api_inspect", source_name=file.filename or "", declared_type=file.content_type or "")
+    elif text:
+        result = _fw.inspect_text(text, source_kind="api_inspect")
+    else:
+        return {"error": "Provide file or text"}
+    return result.to_dict()
+
+@app.post("/api/decode-firewall/release")
+async def fw_release(object_id: str = Form(...), target: str = Form(...)):
+    """Release a quarantined object."""
+    if not _fw:
+        return {"error": "Decode Firewall not loaded"}
+    return _fw.release(object_id, target)
+
+@app.get("/api/decode-firewall/object/{object_id}")
+async def fw_object(object_id: str):
+    """Get stored analysis for an object."""
+    if not _fw:
+        return {"error": "Decode Firewall not loaded"}
+    obj = _fw.show(object_id)
+    return obj or {"error": "Not found"}
+
+@app.get("/api/decode-firewall/events/{object_id}")
+async def fw_events(object_id: str):
+    """Get event trail for an object."""
+    if not _fw:
+        return {"error": "Decode Firewall not loaded"}
+    return _fw.events(object_id)
+
+
+# ── Upload endpoints (now gated) ─────────────────────────────────────────
+
 @app.post("/api/media/analyze")
 async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en")):
-    """Proxy image/video analysis to Kavach."""
+    """Proxy image/video analysis to Kavach — gated by Decode Firewall."""
     content = await file.read()
+    block = _gate_upload(content, file.filename, file.content_type)
+    if block:
+        return block
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             f"{KAVACH_URL}/api/media/analyze",
@@ -1669,8 +1777,11 @@ async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en
 
 @app.post("/api/voice/analyze")
 async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en")):
-    """Proxy voice/audio analysis to Kavach."""
+    """Proxy voice/audio analysis to Kavach — gated by Decode Firewall."""
     content = await file.read()
+    block = _gate_upload(content, file.filename, file.content_type)
+    if block:
+        return block
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             f"{KAVACH_URL}/api/voice/analyze",
@@ -1681,25 +1792,34 @@ async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en
 
 @app.post("/api/media/ocr")
 async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
-    """OCR: extract text from screenshot/image, then scan for scams."""
+    """OCR: extract text from screenshot/image, then scan — gated by Decode Firewall."""
     content = await file.read()
+    block = _gate_upload(content, file.filename, file.content_type)
+    if block:
+        return block
     async with httpx.AsyncClient(timeout=30.0) as client:
-        # Step 1: OCR extract text
         ocr_resp = await client.post(
             f"{KAVACH_URL}/api/extract-text",
             files={"file": (file.filename, content, file.content_type)},
         )
         ocr_data = ocr_resp.json()
         extracted = ocr_data.get("text", "").strip()
+
+        # Gate OCR-extracted text (prompt injection defense)
+        if extracted:
+            text_block = _gate_text(extracted)
+            if text_block:
+                text_block["ocr_text"] = extracted[:200]
+                text_block["ocr_blocked"] = True
+                return text_block
+
         if not extracted:
-            # Fallback to deepfake analysis if no text found
             df_resp = await client.post(
                 f"{KAVACH_URL}/api/media/analyze",
                 files={"file": (file.filename, content, file.content_type)},
                 data={"lang": lang},
             )
             return df_resp.json()
-        # Step 2: Scan extracted text
         scan_resp = await client.post(
             f"{KAVACH_URL}/api/scan/full",
             json={"text": extracted, "lang": lang},
@@ -1711,8 +1831,11 @@ async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
 
 @app.post("/api/media/card")
 async def proxy_media_card(file: UploadFile = File(...), caption: str = Form(default="")):
-    """Generate a shareable verdict card (SVG) for a scanned image."""
+    """Generate a shareable verdict card — gated by Decode Firewall."""
     content = await file.read()
+    block = _gate_upload(content, file.filename, file.content_type)
+    if block:
+        return block
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             f"{KAVACH_URL}/scan_media_card",

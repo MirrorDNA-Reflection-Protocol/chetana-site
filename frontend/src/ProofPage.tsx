@@ -100,7 +100,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
   // Compute attention score
   useEffect(() => {
     const scrollW = Math.min(scrollDepth / 90, 1) * 30;
-    const dwellW = Math.min(dwellTime / 60, 1) * 25;
+    const dwellW = Math.min(dwellTime / 10, 1) * 25;
     const focusW = Math.min(focusEvents / 10, 1) * 20;
     const wordsW = Math.min(wordsViewed / WORD_COUNT, 1) * 25;
     setAttentionScore(Math.round(scrollW + dwellW + focusW + wordsW));
@@ -202,7 +202,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
         )}
         {!canGenerate && !proofGenerated && (
           <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
-            <AlertTriangle size={12} style={{ verticalAlign: "middle" }} /> Scroll through and read the document to reach 50% attention score.
+            <AlertTriangle size={12} style={{ verticalAlign: "middle" }} /> Scroll through and read the document to reach 50% attention score. Takes ~10 seconds.
           </p>
         )}
       </div>

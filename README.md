@@ -17,7 +17,6 @@ Paste any suspicious SMS, WhatsApp message, link, UPI ID, or phone number. Get a
 | Image / video | Deepfake detection (AI-powered) |
 | Voice clip | AI voice clone detection |
 | QR code | Decode + destination safety check |
-| Aadhaar number | Format validation only — never stored |
 
 **12 Indian languages:** English, Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Urdu
 

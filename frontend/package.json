@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "edge:receipt": "python3 scripts/edge_truth_receipt.py --repo-root .. --surface-id chetana-public-edge --product Chetana --domain chetana.activemirror.ai --origin https://chetana.activemirror.ai --kind fastapi_spa --builder vite_and_fastapi --served-path /version.json --served-path /.well-known/edge-truth.json --watch-path backend/app/main.py --watch-path frontend/index.html --watch-path frontend/package.json --watch-path frontend/public --watch-path frontend/src --exclude-name version.json --exclude-name edge-truth.json --output frontend/public/version.json --output frontend/public/.well-known/edge-truth.json --note \"Frontend assets are served by the FastAPI edge.\"",
+    "build": "npm run edge:receipt && tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -28,6 +28,13 @@ const CountUp: React.FC<CountUpProps> = ({
   const elRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
+    // Reset when end value changes so it re-animates
+    hasStarted.current = false;
+    startTimeRef.current = null;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+
+    if (end === 0) { setValue(0); return; }
+
     // Use IntersectionObserver to start counting when visible
     const el = elRef.current;
     if (!el) return;

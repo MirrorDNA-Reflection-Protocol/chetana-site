@@ -87,10 +87,29 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://chetana.activemirror.ai",
+        "https://activemirror.ai",
+        "http://localhost:8093",
+        "http://localhost:5173",
+        "http://localhost:8099",
+    ],
     allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["Content-Type"],
 )
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # Serve the built frontend at root (must be AFTER all API routes are defined,
 # so we mount it at startup instead of module level)
@@ -104,7 +123,7 @@ _client: httpx.AsyncClient | None = None
 async def get_client() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(timeout=5.0)
+        _client = httpx.AsyncClient(timeout=30.0)
     return _client
 
 
@@ -447,6 +466,17 @@ async def scan(req: ScanRequest):
                 verdict = "LOW_RISK"
                 action = "inform_only"
 
+            # Map verdict → trust state with reason codes
+            if verdict == "SUSPICIOUS":
+                trust_state = "blocked"
+                reason_codes = [s.lower().replace(" ", "_") for s in signals[:3]] or ["scam_pattern_detected"]
+            elif verdict == "UNCLEAR":
+                trust_state = "inspect"
+                reason_codes = ["assumption_unvalidated", "conflicting_sources"]
+            else:
+                trust_state = "trusted"
+                reason_codes = ["verified_scan"]
+
             result = {
                 "verdict": verdict,
                 "risk_score": score,
@@ -454,6 +484,8 @@ async def scan(req: ScanRequest):
                 "why_flagged": signals[:5] if signals else ["Analysis complete"],
                 "action_eligibility": action,
                 "engine": data.get("engine", "kavach"),
+                "trust_state": trust_state,
+                "reason_codes": reason_codes,
             }
 
             # Translate to user's language via local Sarvam model
@@ -500,7 +532,7 @@ async def scan_full(req: FullScanRequest):
         if is_link:
             resp = await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.text, "lang": "en"})
         else:
-            resp = await client.post(f"{KAVACH_URL}/scan", json={"text": req.text, "lang": "en"})
+            resp = await client.post(f"{KAVACH_URL}/api/scan/full", json={"text": req.text, "lang": "en"})
 
         if resp.status_code == 200:
             data = resp.json()
@@ -518,11 +550,17 @@ async def scan_full(req: FullScanRequest):
                 verdict = "LOW_RISK"
                 action = "inform_only"
 
+            # Pull the rich explanation from Gemini/DeepSeek cascade
+            explanation = data.get("explanation", "")
+            advice = data.get("advice", "")
+
             result = {
                 "verdict": verdict,
                 "risk_score": score,
                 "surface": "link trust" if is_link else "general trust",
-                "why_flagged": signals[:5] if signals else ["Analysis complete"],
+                "why_flagged": signals[:5] if signals else ([explanation[:200]] if explanation else ["Analysis complete"]),
+                "explanation": explanation,
+                "advice": advice,
                 "action_eligibility": action,
                 "engine": data.get("engine", "kavach"),
             }
@@ -1307,17 +1345,56 @@ async def chat(req: ChatRequest):
 # ── Live scam news ticker (proxied from MirrorRadar) ──────────
 @app.get("/api/radar/live")
 async def radar_live():
-    """Live scam/security news from 28 sources. Updates every scan cycle."""
+    """Live scam/security news from MirrorRadar, constrained to fraud-safety headlines."""
     import httpx
+
+    def _normalize_item(item: dict[str, Any]) -> dict[str, str] | None:
+        title = str(item.get("title") or item.get("text") or "").strip()
+        summary = str(item.get("summary") or "").strip()
+        body = f"{title} {summary}".lower()
+        if not title:
+            return None
+
+        allow_keywords = {
+            "scam", "fraud", "phish", "upi", "whatsapp", "telegram", "bank", "kyc",
+            "otp", "arrest", "impersonat", "deepfake", "qr", "payment", "courier",
+            "refund", "loan", "job scam", "lottery", "cyber fraud", "digital arrest",
+        }
+        block_keywords = {
+            "multi-agent", "agent ecosystem", "llm agent", "benchmark", "sleeper agent",
+            "research paper", "arxiv", "dynatrust", "clawworm",
+        }
+
+        if any(keyword in body for keyword in block_keywords):
+            return None
+        if not any(keyword in body for keyword in allow_keywords):
+            return None
+
+        return {
+            "title": title[:140],
+            "summary": summary[:220],
+            "icon": "🔴",
+        }
+
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get("http://127.0.0.1:8789/api/ticker")
             data = resp.json()
             items = data.get("items", data) if isinstance(data, dict) else data
-            # Filter to scam/security relevant items only
-            keywords = {"scam","fraud","phishing","deepfake","cyber","upi","whatsapp","malware","hack","breach","attack","vulnerability","arrest","theft","clone","fake","impersonat"}
-            scam_items = [i for i in items if any(k in (i.get("title","")+i.get("summary","")).lower() for k in keywords)]
-            return {"items": scam_items[:20], "total": len(items), "scam_count": len(scam_items)}
+            filtered = []
+            seen_titles = set()
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                normalized = _normalize_item(item)
+                if not normalized:
+                    continue
+                dedupe_key = normalized["title"].lower()
+                if dedupe_key in seen_titles:
+                    continue
+                seen_titles.add(dedupe_key)
+                filtered.append(normalized)
+            return {"items": filtered[:20], "total": len(items), "scam_count": len(filtered)}
     except Exception:
         return {"items": [], "total": 0, "scam_count": 0, "error": "radar offline"}
 
@@ -1388,14 +1465,30 @@ async def log_event(req: Request):
 
 @app.get("/api/stats/live")
 async def live_stats():
-    if not _ANALYTICS_LOG.exists():
-        return {"total_scans": 0, "scams_caught": 0, "scan_types": 0, "languages": 12}
-    lines = _ANALYTICS_LOG.read_text().strip().splitlines()
-    events = [_json.loads(l) for l in lines if l.strip()]
-    scans = [e for e in events if e.get("event") == "scan"]
-    suspicious = [s for s in scans if s.get("verdict") in ("SUSPICIOUS", "HIGH")]
-    types_used = len(set(s.get("scan_type", "") for s in scans))
-    return {"total_scans": len(scans), "scams_caught": len(suspicious), "scan_types_used": max(types_used, 8), "languages": 12}
+    total_scans = 0
+    scams_caught = 0
+    types_used = 0
+
+    if _ANALYTICS_LOG.exists():
+        lines = _ANALYTICS_LOG.read_text().strip().splitlines()
+        events = [_json.loads(l) for l in lines if l.strip()]
+        scans = [e for e in events if e.get("event") == "scan"]
+        suspicious = [s for s in scans if s.get("verdict") in ("SUSPICIOUS", "HIGH")]
+        types_used = len(set(s.get("scan_type", "") for s in scans))
+        total_scans = len(scans)
+        scams_caught = len(suspicious)
+
+    try:
+        client = await get_client()
+        resp = await client.get(f"{KAVACH_URL}/api/radar/public")
+        if resp.status_code == 200:
+            radar = resp.json()
+            total_scans = max(total_scans, int(radar.get("total", 0) or 0), int(radar.get("scans_today", 0) or 0))
+            scams_caught = max(scams_caught, int(radar.get("scams_week", 0) or 0), int(radar.get("scams_today", 0) or 0))
+    except Exception as e:
+        logger.warning("Kavach live stats fallback failed: %s", e)
+
+    return {"total_scans": total_scans, "scams_caught": scams_caught, "scan_types_used": max(types_used, 8), "languages": 12}
 
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
@@ -1497,6 +1590,122 @@ async def privacy_policy():
 </body>
 </html>"""
     return _HTML(content=html)
+
+
+# ── Proxy endpoints to Kavach ──
+import httpx
+from fastapi import UploadFile, File, Form
+
+@app.post("/api/media/analyze")
+async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en")):
+    """Proxy image/video analysis to Kavach."""
+    content = await file.read()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{KAVACH_URL}/api/media/analyze",
+            files={"file": (file.filename, content, file.content_type)},
+            data={"lang": lang},
+        )
+    return resp.json()
+
+@app.post("/api/voice/analyze")
+async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en")):
+    """Proxy voice/audio analysis to Kavach."""
+    content = await file.read()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{KAVACH_URL}/api/voice/analyze",
+            files={"file": (file.filename, content, file.content_type)},
+            data={"lang": lang},
+        )
+    return resp.json()
+
+@app.post("/api/media/ocr")
+async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
+    """OCR: extract text from screenshot/image, then scan for scams."""
+    content = await file.read()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Step 1: OCR extract text
+        ocr_resp = await client.post(
+            f"{KAVACH_URL}/api/extract-text",
+            files={"file": (file.filename, content, file.content_type)},
+        )
+        ocr_data = ocr_resp.json()
+        extracted = ocr_data.get("text", "").strip()
+        if not extracted:
+            # Fallback to deepfake analysis if no text found
+            df_resp = await client.post(
+                f"{KAVACH_URL}/api/media/analyze",
+                files={"file": (file.filename, content, file.content_type)},
+                data={"lang": lang},
+            )
+            return df_resp.json()
+        # Step 2: Scan extracted text
+        scan_resp = await client.post(
+            f"{KAVACH_URL}/api/scan/full",
+            json={"text": extracted, "lang": lang},
+        )
+        result = scan_resp.json()
+        result["ocr_text"] = extracted[:500]
+        result["ocr_method"] = ocr_data.get("method", "unknown")
+        return result
+
+@app.post("/api/media/card")
+async def proxy_media_card(file: UploadFile = File(...), caption: str = Form(default="")):
+    """Generate a shareable verdict card (SVG) for a scanned image."""
+    content = await file.read()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{KAVACH_URL}/scan_media_card",
+            files={"file": (file.filename, content, file.content_type)},
+            data={"caption": caption},
+        )
+    if resp.headers.get("content-type", "").startswith("image/"):
+        from fastapi.responses import Response
+        return Response(content=resp.content, media_type=resp.headers.get("content-type", "image/svg+xml"))
+    return resp.json()
+
+@app.post("/api/link/check")
+async def proxy_link_check(request: Request):
+    """Proxy link check to Kavach."""
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(f"{KAVACH_URL}/api/link/check", json=body)
+    return resp.json()
+
+@app.post("/api/upi/check")
+async def proxy_upi_check(request: Request):
+    """Proxy UPI check to Kavach."""
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(f"{KAVACH_URL}/api/upi/check", json=body)
+    return resp.json()
+
+@app.post("/api/phone/check")
+async def proxy_phone_check(request: Request):
+    """Proxy phone check to Kavach."""
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(f"{KAVACH_URL}/api/phone/check", json=body)
+    return resp.json()
+
+
+# ── Terms & Privacy ──
+from fastapi.responses import HTMLResponse as _HTML_Response
+_terms_path = Path(__file__).parent / "terms.html"
+_privacy_path = Path(__file__).parent / "privacy.html"
+
+@app.get("/terms", response_class=_HTML_Response)
+async def terms_page():
+    if _terms_path.exists():
+        return _HTML_Response(content=_terms_path.read_text())
+    return _HTML_Response(content="<h1>Terms of Service</h1><p>Coming soon.</p>")
+
+@app.get("/privacy", response_class=_HTML_Response)
+async def privacy_page():
+    if _privacy_path.exists():
+        return _HTML_Response(content=_privacy_path.read_text())
+    return _HTML_Response(content="<h1>Privacy Policy</h1><p>Coming soon.</p>")
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──

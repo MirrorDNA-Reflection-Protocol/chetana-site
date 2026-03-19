@@ -1,29 +1,30 @@
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanBox,
-  StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA,
-  WeatherBoard, Atlas, MirrorGraph, TuiPanel, DashboardGallery,
-  TrustPage, Onboarding, OnboardingFlow, Footer
+  BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
+  StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA, ShareCTA,
+  WeatherBoard, Atlas, TrustPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
-import { threats, weather, graphNodes, graphEdges, tuiLines } from "./data";
-import { RadarAnim, ScanAnim, GlobeAnim } from "./animations";
+import { threats, weather } from "./data";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 
 export default function App() {
-  const [page, setPage] = useState<PageId>("home");
+  const [page, _setPage] = useState<PageId>("home");
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
-
-  const handleQuickAccept = () => {
-    localStorage.setItem("chetana_terms_accepted", new Date().toISOString());
-    setTermsAccepted(true);
+  const setPage = (p: PageId) => {
+    if (!termsAccepted && p !== "proof" && p !== "home") {
+      _setPage("proof");
+    } else {
+      _setPage(p);
+    }
   };
+
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
   return (
     <div className="app-shell">
@@ -34,14 +35,56 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div key={page} {...pageAnim}>
 
-            {/* ── HOME — Scan-centered hero ────────────────────── */}
             {page === "home" && <>
+              {/* Deepfake awareness hero */}
+              <section style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "80px 20px 20px",
+                background: "#060610",
+                textAlign: "center",
+                gap: 6,
+              }}>
+                <video
+                  src="/deepfake_hero.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  style={{
+                    maxWidth: 320,
+                    width: "100%",
+                    borderRadius: 16,
+                    boxShadow: "0 0 60px rgba(0,212,170,0.15)",
+                  }}
+                />
+                <p style={{
+                  color: "#ffffff",
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  margin: 0,
+                  lineHeight: 1.4,
+                }}>
+                  That wasn't real. It took less than 60 seconds to make.
+                </p>
+                <p style={{
+                  color: "#b0b0c0",
+                  fontSize: "1.125rem",
+                  fontWeight: 400,
+                  margin: 0,
+                  maxWidth: 540,
+                  lineHeight: 1.6,
+                }}>
+                  <span style={{ color: "#00d4aa", fontWeight: 600 }}>Chetana</span> detects deepfakes, scam links, and fraud — so you don't have to.
+                </p>
+              </section>
               <Hero onNavigate={setPage as any} />
-              <ScanBox onRequireProof={() => setPage("proof")} />
               <StatsStrip />
               <StoriesSection />
               <TelegramCTA />
-              <hr className="section-glow-divider" />
+              <ShareCTA />
               <ConsumerSection onNavigate={setPage} />
               <hr className="section-glow-divider" />
               <EnterpriseSection onNavigate={setPage} />
@@ -50,143 +93,44 @@ export default function App() {
               <TrustPage />
             </>}
 
-            {/* ── CONSUMER ────────────────────────────────────── */}
             {page === "consumer" && <>
               <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
                 <div>
                   <div className="kicker">Consumer</div>
                   <h1>Check & Protect</h1>
-                  <p>Paste any suspicious SMS, WhatsApp message, link, UPI ID, or phone number. We'll check it for you.</p>
+                  <p>Paste any suspicious SMS, WhatsApp message, link, UPI ID, or phone number.</p>
                 </div>
-                <ScanAnim size={140} />
               </section>
-              <ScanBox onRequireProof={() => setPage("proof")} />
               <WeatherBoard signals={weather.slice(0, 5)} />
               <Atlas threats={threats} />
             </>}
 
-            {/* ── MERCHANT ────────────────────────────────────── */}
-            {page === "merchant" && <>
-              <section className="page-intro">
-                <div className="kicker">Business</div>
-                <h1>Merchant Protection</h1>
-                <p>Check payment proofs, buyer identities, and transaction claims before you hand over goods.</p>
-              </section>
-              <ScanBox onRequireProof={() => setPage("proof")} />
-              <DashboardGallery />
-              <Atlas threats={threats.filter(t => t.surface === "payment trust")} />
-            </>}
-
-            {/* ── NEXUS (Enterprise) ──────────────────────────── */}
-            {page === "nexus" && <>
-              <section className="page-intro">
-                <div className="kicker">Enterprise</div>
-                <h1>Chetana Nexus</h1>
-                <p>Scam detection API and threat intelligence for banks, fintechs, and fraud teams.</p>
-              </section>
-              <div className="two-up">
-                <div className="panel">
-                  <div className="panel-header">
-                    <h2>Action Eligibility</h2>
-                    <p>Inform, warn, verify, escalate, hold.</p>
-                  </div>
-                  <ul className="feature-list">
-                    <li>Evidence ladder per decision</li>
-                    <li>Analyst replay and provenance</li>
-                    <li>Scam campaign clustering</li>
-                    <li>Merchant and payments risk</li>
-                  </ul>
-                </div>
-                <div className="panel">
-                  <div className="panel-header">
-                    <h2>Analyst Replay</h2>
-                    <p>What fired, why, and what action became eligible.</p>
-                  </div>
-                  <ol className="replay-list">
-                    <li>Input normalized</li>
-                    <li>Surface classified</li>
-                    <li>Proof anomalies detected</li>
-                    <li>Campaign graph match</li>
-                    <li>Warn + verify suggested</li>
-                  </ol>
-                </div>
-              </div>
-              <div className="panel">
-                <div className="panel-header">
-                  <h2>MirrorGraph</h2>
-                  <p>Living campaign and trust graph. Click nodes to explore connections.</p>
-                </div>
-                <MirrorGraph nodes={graphNodes} edges={graphEdges} />
-              </div>
-            </>}
-
-            {/* ── WEATHER ─────────────────────────────────────── */}
-            {page === "weather" && <>
-              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
-                <div>
-                  <div className="kicker">Public Intelligence</div>
-                  <h1>Live Scam Weather</h1>
-                  <p>See which scams are rising and falling across India right now.</p>
-                </div>
-                <RadarAnim size={160} />
-              </section>
-              <WeatherBoard signals={weather} />
-            </>}
-
-            {/* ── ATLAS ───────────────────────────────────────── */}
             {page === "atlas" && <>
               <section className="page-intro">
                 <div className="kicker">Threat Wiki</div>
                 <h1>Scam Atlas</h1>
-                <p>Every scam type explained simply. Red flags, what to do, and how to protect yourself.</p>
+                <p>Every scam type explained simply.</p>
               </section>
               <Atlas threats={threats} />
             </>}
 
-            {/* ── TRUST ───────────────────────────────────────── */}
-            {page === "trust" && <>
-              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
-                <div>
-                  <div className="kicker">Governance</div>
-                  <h1>Trust by Design&#8482;</h1>
-                  <p>Trust is architected, not promised.</p>
-                </div>
-                <GlobeAnim size={140} />
-              </section>
-              <TrustPage />
-            </>}
-
-            {/* ── PROOF / TERMS ────────────────────────────────── */}
+            {page === "weather" && <WeatherBoard signals={weather} />}
+            {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("home"); }} />}
-
-            {/* ── VIGILANCE ────────────────────────────────────── */}
             {page === "vigilance" && <VigilancePage />}
-
-            {/* ── CONTROL CENTER ───────────────────────────────── */}
-            {page === "control" && <>
-              <section className="page-intro">
-                <div className="kicker">Command Center</div>
-                <h1>Control Center</h1>
-                <p>TUI, graph, and dashboards together.</p>
-              </section>
-              <div className="two-up">
-                <TuiPanel lines={tuiLines} />
-                <div className="panel">
-                  <div className="panel-header"><h2>MirrorGraph</h2><p>Interactive campaign graph.</p></div>
-                  <MirrorGraph nodes={graphNodes} edges={graphEdges} />
-                </div>
-              </div>
-              <DashboardGallery />
-            </>}
 
           </motion.div>
         </AnimatePresence>
       </main>
       <Footer onNavigate={setPage} />
+
+      {/* Floating scan widget — always visible */}
+      <ScanWidget onRequireProof={() => setPage("proof")} />
+
       {!termsAccepted && (
         <div className="consent-bar">
-          <span>One quick step before your first scan — <a onClick={() => setPage("proof")}>read & agree</a> (takes 1 min).</span>
-          <button onClick={() => setPage("proof")}>Get started</button>
+          <span>Quick step before your first scan — <a onClick={() => setPage("proof")}>read & agree</a></span>
+          <button onClick={() => setPage("proof")}>OK</button>
         </div>
       )}
     </div>

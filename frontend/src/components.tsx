@@ -37,21 +37,19 @@ export function BackgroundMesh() {
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false);
-  const items: { id: PageId; label: string }[] = [
+  const termsAccepted = !!localStorage.getItem("chetana_terms_accepted");
+  const items: { id: PageId; label: string; restricted?: boolean }[] = [
     { id: "home", label: "Home" },
-    { id: "consumer", label: "Consumer" },
-    { id: "merchant", label: "Business" },
-    { id: "nexus", label: "Enterprise" },
-    { id: "weather", label: "Scam Trends" },
-    { id: "atlas", label: "Scam Atlas" },
+    { id: "consumer", label: "Consumer", restricted: true },
+    { id: "weather", label: "Scam Trends", restricted: true },
+    { id: "atlas", label: "Scam Atlas", restricted: true },
     { id: "trust", label: "Trust" },
-    { id: "proof", label: "Terms" },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
     <nav className="nav">
       <div className="brand" onClick={() => navigate("home")}>
-        <div className="brand-glyph"><img src="/chetana-logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
+        <div className="brand-glyph"><img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
         <div>
           <div className="brand-title">Chetana</div>
           <div className="brand-sub">India's free scam checker</div>
@@ -59,11 +57,17 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
       </div>
       <div className={`nav-links${open ? " open" : ""}`}>
         {items.map((item) => (
-          <button key={item.id} className={page === item.id ? "nav-btn active" : "nav-btn"} onClick={() => navigate(item.id)}>{item.label}</button>
+          <button 
+            key={item.id} 
+            className={page === item.id ? "nav-btn active" : "nav-btn"} 
+            onClick={() => navigate(item.id)}
+          >
+            {item.label}
+            {!termsAccepted && item.restricted && <Lock size={10} style={{ marginLeft: 4, opacity: 0.5 }} />}
+          </button>
         ))}
       </div>
       <div className="nav-right">
-        <div className="india-badge">🇮🇳 India</div>
         <div className="not-govt-badge" title="Chetana is a private AI tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Not a govt service</div>
         <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
@@ -130,23 +134,41 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
   );
 }
 
-/* ── Ticker Banner ────────────────────────────────────────────── */
-const TICKER_ITEMS = [
-  { icon: "🔴", text: "Voice deepfake scams up 22% this week" },
-  { icon: "⚡", text: "1 Indian gets scammed every 3 seconds" },
-  { icon: "🟠", text: "Digital arrest calls up 18% — CBI never calls like this" },
-  { icon: "🔴", text: "UPI payment fraud pressure: 86/100" },
-  { icon: "⚡", text: "Rs 1.2 lakh crore lost to scams in India annually" },
-  { icon: "🟡", text: "Task & investment scams up 15% — fake jobs are rising" },
-  { icon: "🟠", text: "KYC update fraud pressure: 68/100 — don't share OTPs" },
-  { icon: "🔴", text: "Bank impersonation up 8% — verify before you share anything" },
-  { icon: "⚡", text: "Courier phishing up 4% — fake delivery alerts are a trap" },
-  { icon: "🟡", text: "QR traps rising — never scan a QR from an unknown sender" },
-  { icon: "🔴", text: "Eid gift card scams surging — verify offers before sharing payment details" },
-  { icon: "⚡", text: "Festival season = scam season — fake deals, lottery, and gift frauds spike during holidays" },
+/* ── Ticker Banner (Live from MirrorRadar) ───────────────────── */
+const FALLBACK_TICKER = [
+  { icon: "🔴", text: "Rs 22,495 crore lost to cyber fraud in India (2025) — I4C data" },
+  { icon: "⚡", text: "24 lakh+ fraud complaints filed in 2025 — NCRP" },
+  { icon: "🟠", text: "1 in 5 UPI users affected by fraud in last 3 years — NPCI survey" },
+  { icon: "🔴", text: "51% of scam victims never report — you can help change that" },
+  { icon: "⚡", text: "Cyber incidents grew 120% in 2 years — CERT-IN" },
 ];
 
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
+  const [items, setItems] = useState(FALLBACK_TICKER);
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`${API}/api/radar/live`)
+      .then(r => r.json())
+      .then(data => {
+        const live = (data.items || [])
+          .slice(0, 12)
+          .map((item: any) => ({
+            icon: item.icon || "🔴",
+            text: (item.title || item.text || "").replace(/<[^>]+>/g, "").trim().slice(0, 140),
+          }))
+          .filter((item: any) => item.text.length > 18);
+
+        if (!cancelled && live.length >= 3) {
+          setItems(live);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <div className="ticker-banner">
       <div className="ticker-label">
@@ -155,7 +177,7 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
       </div>
       <div className="ticker-track-wrap">
         <div className="ticker-track">
-          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+          {[...items, ...items].map((item, i) => (
             <span key={i} className="ticker-item" onClick={() => onNavigate("weather")}>
               <span className="ticker-icon">{item.icon}</span>
               {item.text}
@@ -168,51 +190,39 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
   );
 }
 
-/* ── Hero (Scan-centered) ────────────────────────────────────── */
+/* ── Hero ────────────────────────────────────────────────────── */
 export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
+  const openScanner = () => {
+    // Trigger the scan widget to open
+    document.querySelector<HTMLButtonElement>('.sw-fab')?.click();
+  };
   return (
     <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
-      {/* Full-bleed video background */}
       <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/AI_Scam_Detection_Video_Generation.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
-
-      {/* Content */}
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
-        <motion.div {...fadeInDelay(0.1)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 24, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 24 }}>
-          <Shield size={12} /> Free scam checker for India
-        </motion.div>
-
-        <motion.h1 {...fadeInDelay(0.2)} style={{ fontSize: 'clamp(2.2rem, 7vw, 4rem)', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 16 }}>
-          <AnimatedGradientText>Check karo.</AnimatedGradientText>
-          <br />
-          <AnimatedGradientText>Safe raho.</AnimatedGradientText>
+        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(3.5rem, 13vw, 8.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.0, marginBottom: 24 }}>
+          <AnimatedGradientText>Check karo.</AnimatedGradientText><br /><AnimatedGradientText>Safe raho.</AnimatedGradientText>
         </motion.h1>
-
-        <motion.p {...fadeInDelay(0.3)} style={{ fontSize: 'clamp(0.9rem, 2.5vw, 1.1rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.55)', maxWidth: 480, margin: '0 auto' }}>
-          Suspicious message, link, QR, or payment? Chetana helps you verify before you trust.
+        <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>
+          Got a suspicious message? Paste it here.<br />We'll tell you if it's a scam. In seconds. For free.
         </motion.p>
 
-        <motion.div {...fadeInDelay(0.35)} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 20 }}>
-          {['Messages', 'Links', 'Photos & videos', 'UPI & payments', 'QR codes', 'Voice & deepfakes', 'Social media ads'].map(t => (
-            <span key={t} style={{ padding: '5px 14px', borderRadius: 24, background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t}</span>
-          ))}
+        {/* Main CTA — opens the scanner */}
+        <motion.div {...fadeInDelay(0.35)} className="hero-cta-wrap" onClick={openScanner}>
+          <span className="hero-cta-glow-border" />
+          <button className="hero-scan-cta">
+            <Shield size={18} />
+            <span>Check a message</span>
+            <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.85em' }}>— it's free</span>
+          </button>
         </motion.div>
 
-        <motion.div {...fadeInDelay(0.4)} style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
-          <button onClick={() => document.querySelector('.scan-chat')?.scrollIntoView({ behavior: 'smooth' })} style={{ padding: '14px 28px', borderRadius: 50, background: '#3b82f6', color: '#fff', fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer' }}>Check now →</button>
-          <button onClick={() => document.querySelector('.stats-strip')?.scrollIntoView({ behavior: 'smooth' })} style={{ padding: '14px 28px', borderRadius: 50, background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 500, fontSize: 14, border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}>See how it works ↓</button>
+        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
+          <span className="hero-trust-pill">No login</span>
+          <span className="hero-trust-pill">12 languages</span>
+          <span className="hero-trust-pill">SMS · Links · UPI · Voice</span>
         </motion.div>
-
-        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 20, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Free. No login. No app needed.</span>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.15)' }}>|</span>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Globe size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            <div id="google_translate_element" style={{ display: 'inline-block' }} />
-            <button onClick={() => { const f = document.querySelector('.goog-te-combo') as HTMLSelectElement; if (f) { f.value = 'en'; f.dispatchEvent(new Event('change')); } }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>English</button>
-          </div>
-        </motion.div>
-
       </div>
     </section>
   );
@@ -220,25 +230,69 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
 
 /* ── Stats Strip ─────────────────────────────────────────────── */
 export function StatsStrip() {
-  const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0 });
+  const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
+
   useEffect(() => {
-    fetch("/api/stats/live").then(r => r.json()).then(setStats).catch(() => {});
-    const iv = setInterval(() => { fetch("/api/stats/live").then(r => r.json()).then(setStats).catch(() => {}); }, 30000);
-    return () => clearInterval(iv);
+    let cancelled = false;
+
+    const loadStats = async () => {
+      try {
+        const [radarResp, statsResp, languagesResp] = await Promise.all([
+          fetch(`${API}/api/radar/public`),
+          fetch(`${API}/api/stats/live`),
+          fetch(`${API}/api/languages`),
+        ]);
+
+        const radar = radarResp.ok ? await radarResp.json() : {};
+        const liveStats = statsResp.ok ? await statsResp.json() : {};
+        const languages = languagesResp.ok ? await languagesResp.json() : {};
+
+        const totalScans = Math.max(
+          Number(radar.total ?? 0),
+          Number(radar.scans_today ?? 0),
+          Number(liveStats.total_scans ?? 0),
+        );
+        const scamsCaught = Math.max(
+          Number(radar.scams_week ?? 0),
+          Number(radar.scams_today ?? 0),
+          Number(liveStats.scams_caught ?? 0),
+        );
+        const liveCount = Math.max(Number(languages.live_count ?? 0), Number(liveStats.languages ?? 0), 12);
+
+        if (!cancelled) {
+          setStats({
+            total_scans: totalScans,
+            scams_caught: scamsCaught,
+            languages: liveCount,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setStats(prev => ({ ...prev, languages: prev.languages || 12 }));
+        }
+      }
+    };
+
+    loadStats();
+    const iv = setInterval(loadStats, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
   }, []);
   return (
     <ScrollReveal>
     <motion.div className="stats-strip" {...fadeInDelay(0.3)}>
       <div className="stat-item" translate="no">
-        <div className="stat-value stat-value-glow"><CountUp end={stats.total_scans} suffix="" /></div>
+        <div className="stat-value stat-value-glow">{stats.total_scans.toLocaleString()}</div>
         <div className="stat-label">Scans run</div>
       </div>
       <div className="stat-item" translate="no">
-        <div className="stat-value stat-value-glow"><CountUp end={stats.scams_caught} suffix="" /></div>
+        <div className="stat-value stat-value-glow">{stats.scams_caught.toLocaleString()}</div>
         <div className="stat-label">Threats caught</div>
       </div>
       <div className="stat-item" translate="no">
-        <div className="stat-value stat-value-glow"><CountUp end={12} suffix="" /></div>
+        <div className="stat-value stat-value-glow">{stats.languages.toLocaleString()}</div>
         <div className="stat-label">Languages</div>
       </div>
     </motion.div>
@@ -247,34 +301,48 @@ export function StatsStrip() {
 }
 
 /* ── ScanBox / ScanChat — AI-powered chat scanner ─────────────── */
-type ScanMode = "message" | "link" | "upi" | "phone" | "media" | "voice" | "qr" | "aadhaar";
+type ScanMode = "message" | "link" | "upi" | "phone" | "media" | "voice" | "qr";
 
 interface ChatMsg {
   id: number;
   role: "user" | "bot";
   text: string;
-  scanResult?: { verdict: string; score: number; signals: string[]; action: string };
+  scanResult?: { verdict: string; score: number; signals: string[]; action: string; trust_state?: string; reason_codes?: string[] };
   file?: string;
   suggestions?: string[];
 }
 
-function getScanModes(): { id: ScanMode; label: string; icon: React.ReactNode; placeholder: string; isFile?: boolean; accept?: string; desc: string }[] {
-  return [
-    { id: "message", label: "Message", icon: <MessageCircle size={14} />, placeholder: "Paste a suspicious message...", desc: "SMS, WhatsApp, email" },
-    { id: "link",    label: "Link",    icon: <Link2 size={14} />,          placeholder: "Paste a suspicious link...", desc: "URLs, websites" },
-    { id: "upi",     label: "UPI",     icon: <CreditCard size={14} />,     placeholder: "e.g. name@ybl or name@paytm", desc: "UPI IDs, payment" },
-    { id: "phone",   label: "Phone",   icon: <Phone size={14} />,          placeholder: "10-digit mobile number", desc: "Numbers, callers" },
-    { id: "media",   label: "Image/Video", icon: <ImageIcon size={14} />, placeholder: "", isFile: true, accept: "image/*,video/*", desc: "Deepfake, screenshots" },
-    { id: "voice",   label: "Voice",   icon: <Mic size={14} />,            placeholder: "", isFile: true, accept: "audio/*", desc: "AI voice clone detection" },
-    { id: "qr",      label: "QR Code", icon: <QrCode size={14} />,        placeholder: "", isFile: true, accept: "image/*", desc: "QR code safety check" },
-    { id: "aadhaar", label: "Aadhaar", icon: <FileText size={14} />,      placeholder: "Aadhaar validation", desc: "Aadhaar validation" },
-  ];
+/* Auto-detect what the user pasted */
+function detectInputType(text: string): ScanMode {
+  const t = text.trim();
+  // URL
+  if (/^https?:\/\//i.test(t) || /^www\./i.test(t) || /\.[a-z]{2,}\//i.test(t)) return "link";
+  // UPI ID
+  if (/^[a-zA-Z0-9._-]+@[a-zA-Z]{2,}$/i.test(t)) return "upi";
+  // Phone number (Indian)
+  if (/^(\+91|91|0)?[6-9]\d{9}$/.test(t.replace(/[\s-]/g, ""))) return "phone";
+  // Default: message scan
+  return "message";
 }
 
-function verdictClass(v: string) {
-  if (v === "SUSPICIOUS" || v === "HIGH") return "verdict-suspicious";
-  if (v === "UNCLEAR" || v === "MEDIUM") return "verdict-unclear";
+function detectFileType(file: File): ScanMode {
+  if (file.type.startsWith("audio/")) return "voice";
+  if (file.type.startsWith("image/") || file.type.startsWith("video/") || file.type === "application/pdf") return "media";
+  return "media";
+}
+
+function verdictClass(v: string, trustState?: string) {
+  if (trustState === "blocked" || v === "SUSPICIOUS" || v === "HIGH") return "verdict-suspicious";
+  if (trustState === "inspect" || v === "UNCLEAR" || v === "MEDIUM") return "verdict-unclear";
   return "verdict-low-risk";
+}
+
+function trustLabel(trustState?: string): string {
+  if (trustState === "blocked") return "Blocked";
+  if (trustState === "inspect") return "Inspect";
+  if (trustState === "unverified") return "Unverified";
+  if (trustState === "trusted") return "Trusted";
+  return "";
 }
 
 function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: string; scanResult: ChatMsg["scanResult"]; suggestions: string[] } {
@@ -284,37 +352,46 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const action = data.action_eligibility || data.recommended_action || "";
   const explanation = data.explanation || data.analysis || "";
 
-  const label = fileName ? `"${fileName}"` : "that";
   let text = "";
 
   if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
-    text = `⚠️ **High scam risk. Avoid action.** (${score}/100)\n\n`;
+    text = `**High scam risk** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else if (signals.length) text += `Signals found:\n• ${signals.slice(0, 4).join("\n• ")}\n\n`;
-    text += action ? `**What to do:** ${action.replace(/_/g, " ")}` : "**What to do:** Do not click, pay, share OTPs, or continue until verified elsewhere.";
-    text += "\n\n_Check karo. Safe raho._";
+    text += "**Red flags:**\n";
+    if (signals.length) text += signals.slice(0, 5).map(s => `• ${s}`).join("\n");
+    else text += "• Matches known scam patterns\n• Urgency or pressure tactics detected";
+    text += "\n\n**What to do now:**\n• Do not click, pay, or share OTPs\n• Block the sender\n• Report to cybercrime.gov.in or call 1930";
+    text += "\n\n**How to avoid this in the future:**\n• Never share OTPs, PINs, or passwords with anyone\n• Verify unknown contacts by calling back on an official number\n• If it feels urgent, it's probably a scam — real banks don't rush you";
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
-    text = `🔶 **Something feels off.** (${score}/100)\n\n`;
+    text = `**Needs caution** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else text += "Suspicious patterns detected but not certain. ";
-    text += "Review carefully before clicking, paying, or replying.";
-    if (score >= 40 && score <= 60) text += "\n\n**Not sure?** Forward this to someone you trust, or call your bank directly to verify.";
-    text += "\n\n_Check karo. Safe raho._";
+    text += "**What looks off:**\n";
+    if (signals.length) text += signals.slice(0, 4).map(s => `• ${s}`).join("\n");
+    else text += "• Some suspicious patterns detected — not certain";
+    text += "\n\n**What to do now:**\n• Don't act immediately — pause and verify\n• Call the sender on a known number to confirm\n• Forward to a trusted person for a second opinion";
+    text += "\n\n**How to stay safe:**\n• Always verify payment requests through a separate channel\n• Check URLs carefully — one wrong letter = fake site\n• When in doubt, don't click";
   } else {
-    text = `✅ **Looks safe.** (${score}/100)\n\n`;
+    text = `**Looks safe** (${score}/100)\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else text += `No obvious scam signals found in ${label}. `;
-    text += "\n\n_Check karo. Safe raho._";
+    else text += "No obvious scam signals found.\n\n";
+    text += "**Stay safe anyway:**\n• Never share OTPs or passwords, even if asked by \"your bank\"\n• Bookmark your bank's real website — don't click links in messages\n• Check back here anytime something feels off";
   }
 
-  const suggestions =
-    verdict === "SUSPICIOUS" || verdict === "HIGH"
-      ? ["What should I do now?", "How do I report this?", "How do I get my money back?"]
-      : verdict === "UNCLEAR" || verdict === "MEDIUM"
-      ? ["How do I verify this is real?", "What are the red flags?", "Is this a known scam?"]
-      : ["What scams should I watch for?", "Check another message", "How does Chetana work?"];
+  // Context-aware follow-ups based on scan type + verdict
+  let suggestions: string[];
+  if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
+    const typeQ = mode === "link" ? "Is this a phishing site?" : mode === "upi" ? "Should I block this UPI ID?" : mode === "phone" ? "Should I block this number?" : mode === "media" || mode === "voice" ? "Could this be a deepfake?" : "How do I report this?";
+    suggestions = [typeQ, "What if I already paid?", "Share this result", "Check something else"];
+  } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
+    const typeQ = mode === "link" ? "How to spot a fake website?" : mode === "upi" ? "How to verify a UPI ID?" : mode === "phone" ? "How to check a phone number?" : "What are common scam signs?";
+    suggestions = ["How do I verify this?", typeQ, "Share this result", "Check something else"];
+  } else {
+    suggestions = ["What scams are trending?", "My scan history", "Share this result", "Check something else"];
+  }
 
-  return { text, scanResult: { verdict, score, signals, action }, suggestions };
+  const trust_state = data.trust_state || (verdict === "SUSPICIOUS" ? "blocked" : verdict === "UNCLEAR" ? "inspect" : "trusted");
+  const reason_codes: string[] = data.reason_codes || [];
+  return { text, scanResult: { verdict, score, signals, action, trust_state, reason_codes }, suggestions };
 }
 
 const LANGUAGES = [
@@ -354,24 +431,17 @@ function detectBrowserLang(): string {
   return "en";
 }
 
-export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}) {
-  const [mode, setMode] = useState<ScanMode>("message");
+export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () => void; onNavigate?: (p: PageId) => void } = {}) {
   const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const scanCount = parseInt(localStorage.getItem("chetana_scan_count") || "0");
   const isReturning = scanCount > 0;
-  const welcomeText = isReturning
-    ? `Welcome back. You've run ${scanCount} scan${scanCount > 1 ? "s" : ""} so far. Drop anything suspicious — I'll check it.\n\n_Check karo. Safe raho._`
-    : "Paste, upload, or drop anything suspicious — messages, links, QR codes, payment screenshots, phone numbers, or voice clips. I'll check it.\n\n_Check karo. Safe raho._";
-  const [messages, setMessages] = useState<ChatMsg[]>([{
-    id: 0, role: "bot",
-    text: welcomeText,
-    suggestions: isReturning ? ["Check a message", "Check a link", "Upload a screenshot", "My scan history"] : ["Got a suspicious message", "Check a link", "Check a UPI ID", "Detect a deepfake"],
-  }]);
-  const [showModes, setShowModes] = useState(false);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [listening, setListening] = useState(false);
+  const canSend = (input.trim().length > 0 || !!file) && !loading;
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -401,8 +471,6 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     setListening(true);
   };
 
-  const activeMode = getScanModes().find(m => m.id === mode)!;
-
   const speakText = (text: string) => {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -426,7 +494,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
     if (lower.includes("history") || lower.includes("scan history")) {
       const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
       if (history.length === 0) {
-        addMsg({ role: "bot", text: "No scans yet. Drop a suspicious message, link, or screenshot to get started." });
+        addMsg({ role: "bot", text: "No scans yet. Paste something suspicious above to get started." });
       } else {
         const summary = history.slice(0, 10).map((h: any) => {
           const d = new Date(h.ts);
@@ -436,12 +504,7 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
       }
       return;
     }
-    if (lower.includes("message") || lower.includes("screenshot")) { setMode("message"); setInput(""); }
-    else if (lower.includes("link")) { setMode("link"); setInput(""); }
-    else if (lower.includes("upi")) { setMode("upi"); setInput(""); }
-    else if (lower.includes("deepfake") || lower.includes("photo") || lower.includes("image")) { setMode("media"); }
-    else if (lower.includes("voice")) { setMode("voice"); }
-    else { sendChat(s); return; }
+    sendChat(s);
   };
 
   const sendChat = async (text: string) => {
@@ -459,228 +522,260 @@ export function ScanBox({ onRequireProof }: { onRequireProof?: () => void } = {}
   const handleSend = async () => {
     if (!localStorage.getItem("chetana_terms_accepted")) { if (onRequireProof) onRequireProof(); return; }
 
-    const currentMode = activeMode;
-    if (currentMode.isFile && !file) return;
-    if (!currentMode.isFile && !input.trim()) return;
+    // File upload path
+    if (file) {
+      const fileMode = detectFileType(file);
+      const isImage = file.type.startsWith("image/");
+      addMsg({ role: "user", text: `Check this file: ${file.name}`, file: file.name });
+      const currentFile = file;
+      setFile(null); setLoading(true);
+      try {
+        const fd = new FormData(); fd.append("file", currentFile); fd.append("lang", lang);
+        const endpoint = fileMode === "voice" ? "/api/voice/analyze" : isImage ? "/api/media/ocr" : "/api/media/analyze";
+        const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
+        if (!resp.ok) throw new Error(`Server error (${resp.status})`);
+        const data = await resp.json();
+        const ocrNote = data.ocr_text ? `\n\n**Text found in image:**\n_"${data.ocr_text.slice(0, 200)}${data.ocr_text.length > 200 ? "..." : ""}"_` : "";
+        const mode = data.ocr_text ? detectInputType(data.ocr_text) as ScanMode : fileMode;
+        const { text, scanResult, suggestions } = buildBotReply(mode, data, currentFile.name);
+        addMsg({ role: "bot", text: text + ocrNote, scanResult, suggestions });
+        if (scanResult) recordScan(mode, scanResult);
+      } catch (e: any) {
+        addMsg({ role: "bot", text: `I couldn't complete that check right now. ${e.message || "Please try again."}`, suggestions: ["Try again"] });
+      } finally { setLoading(false); }
+      return;
+    }
 
-    const userText = currentMode.isFile ? `Check this ${currentMode.label.toLowerCase()}: ${file!.name}` : input.trim();
-    addMsg({ role: "user", text: userText, file: file?.name });
-    setInput(""); setFile(null); setLoading(true);
+    if (!input.trim()) return;
+
+    const userText = input.trim();
+    addMsg({ role: "user", text: userText });
+    setInput(""); setLoading(true);
 
     // Detect if it's a question rather than a scan
-    const isQuestion = !currentMode.isFile && /^(what|how|why|who|is |does|can|tell|explain|help|when|where|i already|what should)/i.test(input.trim()) && input.length < 120;
+    const isQuestion = /^(what|how|why|who|is |does|can|tell|explain|help|when|where|i already|what should)/i.test(userText) && userText.length < 120;
     if (isQuestion) { await sendChat(userText); setLoading(false); return; }
+
+    // Auto-detect input type
+    const mode = detectInputType(userText);
 
     try {
       let resp: Response;
-      if (currentMode.id === "upi") {
-        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: input.trim(), lang }) });
-      } else if (currentMode.id === "phone") {
-        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: input.trim(), lang }) });
-      } else if (currentMode.id === "aadhaar") {
-        resp = await fetch(`${API}/api/aadhaar/validate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aadhaar: input.trim(), lang }) });
-      } else if (currentMode.isFile && file) {
-        const fd = new FormData(); fd.append("file", file); fd.append("lang", lang);
-        const endpoint = currentMode.id === "voice" ? "/api/voice/analyze" : currentMode.id === "qr" ? "/api/extract-text" : "/api/media/analyze";
-        resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
-      } else if (currentMode.id === "link") {
-        resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: input.trim(), lang }) });
+      if (mode === "upi") {
+        resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: userText, lang }) });
+      } else if (mode === "phone") {
+        resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: userText, lang }) });
+      } else if (mode === "link") {
+        resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: userText, lang }) });
       } else {
-        resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input.trim(), lang }) });
+        resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: userText, lang }) });
       }
 
       if (!resp.ok) throw new Error(`Server error (${resp.status})`);
       const data = await resp.json();
-      const { text, scanResult, suggestions } = buildBotReply(currentMode.id, data, file?.name);
+      const { text, scanResult, suggestions } = buildBotReply(mode, data);
       addMsg({ role: "bot", text, scanResult, suggestions });
-      if (scanResult) {
-        trackVigilance("scan", `${currentMode.id}: ${scanResult.verdict} (${scanResult.score}/100)`);
-        try { new Audio("/ting.wav").play(); } catch {}
-        // Haptic feedback — distinct patterns per verdict
-        try {
-          const v = scanResult.verdict;
-          if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100, 50, 100, 50, 100]); // danger: 3 sharp
-          else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80, 60, 80]); // caution: 2 pulses
-          else navigator.vibrate(50); // safe: single soft
-        } catch {}
-        // Analytics
-        fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ event: "scan", scan_type: currentMode.id, verdict: scanResult.verdict, score: scanResult.score }) }).catch(() => {});
-        // Zero-login trust: save scan to local history
-        try {
-          const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
-          history.unshift({ verdict: scanResult.verdict, score: scanResult.score, type: currentMode.id, ts: Date.now() });
-          if (history.length > 100) history.length = 100;
-          localStorage.setItem("chetana_history", JSON.stringify(history));
-          localStorage.setItem("chetana_scan_count", String((parseInt(localStorage.getItem("chetana_scan_count") || "0")) + 1));
-        } catch {}
-      }
+      if (scanResult) recordScan(mode, scanResult);
     } catch (e: any) {
-      addMsg({ role: "bot", text: `I couldn't complete that check right now. ${e.message || "Please try again."}`, suggestions: ["Try again", "Check a different message"] });
+      addMsg({ role: "bot", text: `I couldn't complete that check right now. ${e.message || "Please try again."}`, suggestions: ["Try again"] });
     } finally { setLoading(false); }
   };
 
-  return (
-    <motion.section className="scan-panel scan-chat scan-panel-glow notranslate" translate="no" {...fadeInDelay(0.25)} style={{ position: "relative" }}>
-      <BorderBeam size={250} duration={10} color="#3b82f6" colorTo="#8b5cf6" />
-      {/* Mode selector + language picker */}
-      <div className="scan-mode-bar">
-        <div className="scan-modes">
-          {getScanModes().map(m => (
-            <button key={m.id} className={`scan-mode-btn ${mode === m.id ? "active" : ""}`} onClick={() => { setMode(m.id); setFile(null); }} title={m.desc}>
-              {m.icon} <span>{m.label}</span>
-              {(m.id === "media" || m.id === "voice") && <span className="mode-badge">AI</span>}
-            </button>
-          ))}
-        </div>
-        <select className="lang-picker" value={lang} onChange={e => { setLang(e.target.value); localStorage.setItem("chetana_lang", e.target.value); }} title="Response language">
-          {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label} {l.name}</option>)}
-        </select>
-      </div>
-      {mode === "aadhaar" && (
-        <div className="scan-mode-notice">
-          <Lock size={11} /> Format validation only — Aadhaar numbers are never stored or transmitted beyond analysis.
-        </div>
-      )}
+  const recordScan = (mode: ScanMode, scanResult: NonNullable<ChatMsg["scanResult"]>) => {
+    trackVigilance("scan", `${mode}: ${scanResult.verdict} (${scanResult.score}/100)`);
+    try { new Audio("/ting.wav").play(); } catch {}
+    try {
+      const v = scanResult.verdict;
+      if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100, 50, 100, 50, 100]);
+      else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80, 60, 80]);
+      else navigator.vibrate(50);
+    } catch {}
+    fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ event: "scan", scan_type: mode, verdict: scanResult.verdict, score: scanResult.score }) }).catch(() => {});
+    try {
+      const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
+      history.unshift({ verdict: scanResult.verdict, score: scanResult.score, type: mode, ts: Date.now() });
+      if (history.length > 100) history.length = 100;
+      localStorage.setItem("chetana_history", JSON.stringify(history));
+      localStorage.setItem("chetana_scan_count", String((parseInt(localStorage.getItem("chetana_scan_count") || "0")) + 1));
+    } catch {}
+  };
 
-      {/* Chat messages */}
-      <div className="scan-chat-messages" ref={scrollRef}>
-        {messages.map(msg => (
-          <div key={msg.id} className={`chat-bubble-row ${msg.role}`}>
-            {msg.role === "bot" && (
-              <div className="chat-avatar"><Shield size={14} /></div>
-            )}
-            <div className={`chat-bubble ${msg.role}`}>
+  // Detected type indicator
+  const detectedType = input.trim() ? detectInputType(input.trim()) : null;
+  const typeLabels: Partial<Record<ScanMode, string>> = { message: "Message scan", link: "Link check", upi: "UPI check", phone: "Phone lookup", media: "Image/video", voice: "Voice check", qr: "QR scan" };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) setFile(f);
+  };
+
+  const hasResults = messages.length > 0;
+  const lastResult = [...messages].reverse().find(m => m.role === "bot" && m.scanResult);
+
+  return (
+    <div
+      className="tool"
+      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+    >
+      {/* Header */}
+      <header className="tool-header">
+        <div className="tool-brand">
+          <img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 8 }} />
+          <div>
+            <div className="tool-brand-name">Chetana</div>
+            <div className="tool-brand-tag">India's free scam checker</div>
+          </div>
+        </div>
+        <div className="tool-header-right">
+          <select className="tool-lang" value={lang} onChange={e => { setLang(e.target.value); localStorage.setItem("chetana_lang", e.target.value); }}>
+            {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label} {l.name}</option>)}
+          </select>
+          {onNavigate && <button className="tool-link" onClick={() => onNavigate("atlas")}>Learn</button>}
+          {onNavigate && <button className="tool-link" onClick={() => onNavigate("trust")}>About</button>}
+        </div>
+      </header>
+
+      <div className="tool-main">
+        {/* Left panel — identity + input */}
+        <div className={`tool-input-panel${dragging ? " tool-dragging" : ""}`}>
+          <div className="tool-hero">
+            <h1 className="tool-tagline">Check karo.<br />Safe raho.</h1>
+            <p className="tool-desc">
+              Got a suspicious SMS, WhatsApp message, link, or payment request?
+              Paste it below — Chetana will tell you if it's a scam.
+            </p>
+            <p className="tool-desc-hi">
+              Koi bhi suspicious message ya link paste karo — hum check karenge.
+            </p>
+          </div>
+
+          {file && (
+            <div className="tool-file"><Paperclip size={13} /><span className="tool-file-name">{file.name}</span><span className="tool-file-size">{(file.size / 1024).toFixed(0)} KB</span><button onClick={() => setFile(null)}><X size={13} /></button></div>
+          )}
+          <textarea
+            className="tool-textarea"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder={file ? "Add a note (optional) or just hit Check..." : "Paste the suspicious message or link here..."}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
+          <div className="tool-input-bottom">
+            <div className="tool-input-actions">
+              <input ref={fileRef} type="file" accept="image/*,video/*,audio/*,application/pdf" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0] || null; setFile(f); e.target.value = ""; }} />
+              <button className="tool-action" onClick={() => fileRef.current?.click()} title="Upload screenshot, photo, PDF, or audio"><Upload size={16} /></button>
+              {SpeechRecClass && <button className={`tool-action${listening ? " tool-listening" : ""}`} onClick={toggleMic} title="Voice input"><Mic size={16} /></button>}
+              {detectedType && detectedType !== "message" && (
+                <span className="tool-detect">{typeLabels[detectedType]}</span>
+              )}
+              {file && !input.trim() && <span className="tool-detect" style={{ background: 'var(--safe-light, rgba(34,197,94,0.1))', color: 'var(--safe, #22c55e)' }}>File ready to check</span>}
+            </div>
+            <button className={`tool-check${canSend ? " tool-check-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
+              {loading ? "Checking..." : "Check →"}
+            </button>
+          </div>
+          <div className="tool-trust-line">
+            <ShieldCheck size={13} />
+            <span>Free. No login. No data stored. Works in 12 Indian languages.</span>
+          </div>
+        </div>
+
+        {/* Result panel */}
+        <div className="tool-result-panel" ref={scrollRef}>
+          {!hasResults && !loading && (
+            <div className="tool-empty">
+              <ShieldCheck size={36} style={{ opacity: 0.2, marginBottom: 8 }} />
+              <p className="tool-empty-title">Your result will appear here</p>
+              <div className="tool-catches">
+                <p className="tool-catches-label">Chetana catches:</p>
+                <div className="tool-catches-list">
+                  <span>Fake KYC messages</span>
+                  <span>UPI payment fraud</span>
+                  <span>Phishing links</span>
+                  <span>Digital arrest scams</span>
+                  <span>Voice deepfakes</span>
+                  <span>QR code traps</span>
+                  <span>Job & lottery scams</span>
+                  <span>Bank impersonation</span>
+                </div>
+              </div>
+              <p className="tool-stat">Rs 22,495 crore lost to scams in India last year. Don't be next.</p>
+            </div>
+          )}
+          {loading && (
+            <div className="tool-checking">
+              <div className="tool-dots"><span /><span /><span /></div>
+              <span>Checking...</span>
+            </div>
+          )}
+          {hasResults && [...messages].reverse().filter(m => m.role === "bot").map(msg => (
+            <motion.div
+              key={msg.id}
+              className={`tool-card ${msg.scanResult ? verdictClass(msg.scanResult.verdict, msg.scanResult.trust_state) : ""}`}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
               {msg.scanResult && (
-                <div className="scan-verdict-row">
-                  <div className={`scan-verdict-chip ${verdictClass(msg.scanResult.verdict)}`}>
-                    {msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
-                      ? <ShieldAlert size={14} /> : msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
-                      ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
-                    <span>{msg.scanResult.verdict.replace(/_/g, " ")}</span>
-                    <span className="verdict-chip-score">{msg.scanResult.score}/100</span>
+                <div className="tool-verdict-bar">
+                  <div className={`tool-verdict ${verdictClass(msg.scanResult.verdict, msg.scanResult.trust_state)}`}>
+                    {msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
+                      ? <ShieldAlert size={20} /> : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
+                      ? <AlertTriangle size={20} /> : <ShieldCheck size={20} />}
+                    <span>{
+                      msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" ? "High Risk"
+                      : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM" ? "Needs Caution"
+                      : "Looks Safe"
+                    }</span>
+                    <span className="tool-score">{msg.scanResult.score}/100</span>
+                    {msg.scanResult.trust_state && <span className={`tool-trust-badge trust-${msg.scanResult.trust_state}`}>{trustLabel(msg.scanResult.trust_state)}</span>}
                   </div>
-                  {/* Risk gauge */}
-                  <div className="risk-gauge" title={`Risk: ${msg.scanResult.score}/100`}>
-                    <div className="risk-gauge-fill" style={{ width: `${msg.scanResult.score}%`, background: msg.scanResult.score >= 70 ? '#ef4444' : msg.scanResult.score >= 40 ? '#f59e0b' : '#10b981' }} />
+                  <div className="tool-card-share">
+                    <button onClick={() => speakText(msg.text)} title="Read aloud"><Volume2 size={14} /></button>
+                    <button onClick={() => {
+                      const t = encodeURIComponent(`Chetana: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\nhttps://chetana.activemirror.ai`);
+                      window.open(`https://wa.me/?text=${t}`, '_blank');
+                    }} title="Share on WhatsApp"><Smartphone size={14} /></button>
+                    <button onClick={() => {
+                      const text = `Chetana: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\nhttps://chetana.activemirror.ai`;
+                      if (navigator.share) navigator.share({ title: "Chetana", text }).catch(() => {});
+                      else { navigator.clipboard.writeText(text); }
+                    }} title="Share"><Share2 size={14} /></button>
                   </div>
-                  <button className="report-verdict-btn" title="Report an incorrect result" onClick={() => {
-                    fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ event: "feedback", feedback: "wrong_verdict", verdict: msg.scanResult!.verdict, score: msg.scanResult!.score }) }).catch(() => {});
-                    handleSuggestion("This result seems wrong — help me understand");
-                  }}>
-                    <Flag size={10} /> Wrong?
-                  </button>
-                  <button className="report-verdict-btn" title="Share this result" onClick={() => {
-                    const shareText = `Check karo. Safe raho.\nChetana verdict: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\n\nVerify before you trust: https://chetana.activemirror.ai`;
-                    if (navigator.share) { navigator.share({ title: "Chetana Scam Check", text: shareText }).catch(() => {}); }
-                    else { navigator.clipboard.writeText(shareText).then(() => alert("Result copied! Share it with friends & family.")); }
-                  }}>
-                    <Share2 size={10} /> Share
-                  </button>
-                  <button className="report-verdict-btn" title="Share on WhatsApp" onClick={() => {
-                    const text = encodeURIComponent(`Chetana scam check: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\n\nCheck karo. Safe raho.\nhttps://chetana.activemirror.ai`);
-                    window.open(`https://wa.me/?text=${text}`, '_blank');
-                  }}>
-                    <Smartphone size={10} /> WhatsApp
-                  </button>
                 </div>
               )}
-              {msg.file && <div className="chat-file-badge"><Paperclip size={12} /> {msg.file}</div>}
-              <div className="chat-bubble-text">{msg.text.split("\n").map((line, i) => {
+              <div className="tool-card-body">{msg.text.split("\n").map((line, i) => {
+                if (!line.trim()) return null;
                 const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
-                return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
+                const isBullet = line.trim().startsWith("•");
+                return <p key={i} className={isBullet ? "tool-bullet" : ""} dangerouslySetInnerHTML={{ __html: isBullet ? bold.replace("•", "") : bold }} />;
               })}</div>
-              {msg.role === "bot" && msg.text && (
-                <button className="speak-btn" onClick={() => speakText(msg.text)} title="Read aloud">
-                  <Volume2 size={13} />
-                </button>
-              )}
               {msg.suggestions && (
-                <div className="chat-suggestions">
+                <div className="tool-suggestions">
                   {msg.suggestions.map((s, i) => (
-                    <button key={i} className="chat-suggestion-btn" onClick={() => handleSuggestion(s)}>{s}</button>
+                    <button key={i} onClick={() => handleSuggestion(s)}>{s}</button>
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div className="chat-bubble-row bot">
-            <div className="chat-avatar"><Shield size={14} /></div>
-            <div className="chat-bubble bot chat-thinking">
-              <span /><span /><span />
-            </div>
-          </div>
-        )}
+            </motion.div>
+          ))}
+        </div>
       </div>
 
-      {/* Input area */}
-      <div className="scan-chat-input">
-        {activeMode.isFile ? (
-          <div className="scan-file-area" onClick={() => fileRef.current?.click()}>
-            <input ref={fileRef} type="file" accept={activeMode.accept} style={{ display: "none" }} onChange={e => setFile(e.target.files?.[0] || null)} />
-            {file ? (
-              <div className="scan-file-selected">
-                <Paperclip size={16} />
-                <span>{file.name}</span>
-                <button onClick={e => { e.stopPropagation(); setFile(null); }}><X size={14} /></button>
-              </div>
-            ) : (
-              <div className="scan-file-prompt">
-                <Upload size={18} />
-                <span>"Tap to upload" {activeMode.label.toLowerCase()}</span>
-                <small>{activeMode.desc}</small>
-              </div>
-            )}
-          </div>
-        ) : (
-          <textarea
-            className="scan-chat-textarea"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder={activeMode.placeholder}
-            rows={2}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          />
-        )}
-        {SpeechRecClass && !activeMode.isFile && (
-          <button
-            className={`mic-btn${listening ? " listening" : ""}`}
-            onClick={toggleMic}
-            title={listening ? "Stop listening" : "Voice input"}
-            type="button"
-          >
-            <Mic size={18} />
-          </button>
-        )}
-        <button
-          className="primary scan-send-btn"
-          onClick={handleSend}
-          disabled={loading || (activeMode.isFile ? !file : !input.trim())}
-        >
-          {loading ? <Zap size={18} /> : <Send size={18} />}
-        </button>
-      </div>
-
-      <div className="scan-chat-footer">
-        <Bot size={12} /> "Advisory only — not a government service" · "Verdicts are automated, not legal determinations"
-        <span style={{ margin: '0 4px' }}>·</span>
-        <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => {
-          setMode("message");
-          setInput("");
-          addMsg({ role: "bot", text: "Want to report a scam? Paste the scam message, link, or phone number and I'll flag it in our database. You're helping protect others.\n\n_Check karo. Safe raho._", suggestions: ["Paste a scam message", "Report a scam link", "Report a scam phone number"] });
-        }}>Report a scam</button>
-        <span style={{ margin: '0 4px' }}>·</span>
-        <span>Emergency: 1930</span>
-      </div>
-    </motion.section>
+      {/* Footer — one line */}
+      <footer className="tool-footer">
+        Advisory only — not a government service · Emergency: 1930 · <a href="https://activemirror.ai" target="_blank" rel="noopener">activemirror.ai</a>
+      </footer>
+    </div>
   );
 }
 
 /* ── Stories — Cinematic Visual Section ─────────────────────── */
 const STORIES = [
   { img: "/01-hero-grandmother.png", alt: "Elderly Indian woman checking phone", caption: "Amma got a suspicious KYC message. Chetana told her it was a scam — before she shared her OTP." },
-  { img: "/02-student-train.png", alt: "Student on Mumbai train checking phone", caption: "Raj checked a WhatsApp forward on his commute. Chetana flagged it as a known phishing link in 2 seconds." },
+  { img: "/02-student-train.png", alt: "Student on Mumbai train checking phone", caption: "Raj checked a WhatsApp forward on his commute. Chetana flagged it as a known phishing link — instantly." },
   { img: "/03-family-kitchen.png", alt: "Indian family gathered around kitchen table", caption: "The Sharma family now checks every suspicious message together. Zero scams in 6 months." },
   { img: "/04-safe-hands.png", alt: "Elderly hands holding phone with safety shield", caption: "When you see the green shield, you know you're safe. That's the Chetana promise." },
   { img: "/05-street-scene.png", alt: "Indian marketplace with people on phones", caption: "From Mumbai to Madurai — 1.4 billion Indians deserve a free scam checker that speaks their language." },
@@ -970,6 +1065,20 @@ export function TrustPage() {
         </div>
         <ChevronRight size={18} className="proof-banner-arrow" />
       </a>
+
+      {/* Builder */}
+      <div className="builder-section">
+        <h3>Built by Paul Desai</h3>
+        <p>Chetana is built and maintained by <a href="https://activemirror.ai" target="_blank" rel="noopener">Active Mirror</a> — an AI research lab focused on trust, safety, and sovereign intelligence for India.</p>
+        <div className="builder-socials">
+          <a href="https://youtube.com/@ActiveMirror-1" target="_blank" rel="noopener">YouTube</a>
+          <a href="https://github.com/MirrorDNA-Reflection-Protocol" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://t.me/chetnaShieldBot" target="_blank" rel="noopener">Telegram</a>
+          <a href="https://x.com/ActiveMirror_" target="_blank" rel="noopener">X</a>
+          <a href="https://linkedin.com/company/activemirror" target="_blank" rel="noopener">LinkedIn</a>
+          <a href="https://activemirror.ai" target="_blank" rel="noopener">activemirror.ai</a>
+        </div>
+      </div>
     </motion.section>
   );
 }
@@ -987,6 +1096,384 @@ export function TelegramCTA() {
       </div>
       <ChevronRight size={18} className="proof-banner-arrow" />
     </motion.div>
+  );
+}
+
+/* ── Share Chetana ──────────────────────────────────────────── */
+export function ShareCTA() {
+  const url = "https://chetana.activemirror.ai";
+  const msg = "Check karo. Safe raho. — Free AI scam checker for India. Check suspicious messages, links, UPI IDs, and phone numbers instantly.";
+  const [copied, setCopied] = useState(false);
+  const share = (platform: string) => {
+    const links: Record<string, string> = {
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(msg + "\n" + url)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(msg)}`,
+      x: `https://x.com/intent/tweet?text=${encodeURIComponent(msg)}&url=${encodeURIComponent(url)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+    };
+    if (platform === "copy") { navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); return; }
+    if (platform === "native" && navigator.share) { navigator.share({ title: "Chetana", text: msg, url }).catch(() => {}); return; }
+    window.open(links[platform], "_blank", "noopener,width=600,height=400");
+  };
+  return (
+    <ScrollReveal>
+    <motion.div className="share-strip" {...fadeIn}>
+      <div className="share-strip-inner">
+        <div className="share-strip-left">
+          <Shield size={18} style={{ color: "var(--primary-bright)", flexShrink: 0 }} />
+          <span>Share with your family — scams hit elders hardest</span>
+        </div>
+        <div className="share-strip-buttons">
+          <button onClick={() => share("whatsapp")} className="share-pill share-wa">WhatsApp</button>
+          <button onClick={() => share("telegram")} className="share-pill share-tg">Telegram</button>
+          <button onClick={() => share("x")} className="share-pill share-x">X</button>
+          <button onClick={() => share("facebook")} className="share-pill share-fb">Facebook</button>
+          <button onClick={() => share("linkedin")} className="share-pill share-li">LinkedIn</button>
+          <button onClick={() => share("copy")} className="share-pill share-cp">{copied ? "Copied!" : "Copy link"}</button>
+          {typeof navigator !== "undefined" && "share" in navigator && (
+            <button onClick={() => share("native")} className="share-pill share-native"><Share2 size={13} /></button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+    </ScrollReveal>
+  );
+}
+
+/* ── Floating Scan Widget (WhatsApp-style) ───────────────────── */
+export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [agreed, setAgreed] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
+  const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
+  const [input, setInput] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMsg[]>([{
+    id: 0, role: "bot",
+    text: "Paste any suspicious message, link, UPI ID, or phone number. I'll check it for you.\n\n_Check karo. Safe raho._",
+    suggestions: ["Check a message", "Check a link", "Check a UPI ID"],
+  }]);
+  const [listening, setListening] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const msgId = useRef(1);
+  const canSend = (input.trim().length > 0 || !!file) && !loading;
+  const SpeechRecClass = useMemo(() => getSpeechRecognition(), []);
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) setFile(f);
+  };
+
+  const toggleMic = () => {
+    if (listening && recognitionRef.current) { recognitionRef.current.stop(); setListening(false); return; }
+    if (!SpeechRecClass) return;
+    const recognition = new SpeechRecClass();
+    recognition.lang = LANG_TO_BCP47[lang] || "en-IN";
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => { setInput(prev => prev ? prev + " " + event.results[0][0].transcript : event.results[0][0].transcript); };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
+
+  const addMsg = (msg: Omit<ChatMsg, "id">) => {
+    setMessages(prev => [...prev, { ...msg, id: msgId.current++ }]);
+  };
+
+  const speakText = (text: string) => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ""));
+      u.lang = LANG_TO_BCP47[lang] || "en-IN"; u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    }
+  };
+
+  const shareResult = (sr: ChatMsg["scanResult"]) => {
+    const text = `Chetana scam check: ${sr!.verdict} (${sr!.score}/100)\n${sr!.signals.slice(0, 2).join(", ")}\n\nCheck yours free: https://chetana.activemirror.ai`;
+    if (navigator.share) navigator.share({ title: "Chetana Scam Check", text }).catch(() => {});
+    else { navigator.clipboard.writeText(text); addMsg({ role: "bot", text: "Result copied to clipboard. Share it with your family!" }); }
+  };
+
+  const shareWhatsApp = (sr: ChatMsg["scanResult"]) => {
+    const t = encodeURIComponent(`Chetana: ${sr!.verdict} (${sr!.score}/100)\nCheck yours free: https://chetana.activemirror.ai`);
+    window.open(`https://wa.me/?text=${t}`, '_blank');
+  };
+
+  const handleSuggestion = (s: string) => {
+    const lower = s.toLowerCase();
+    if (lower === "share this result") {
+      const last = [...messages].reverse().find(m => m.scanResult);
+      if (last?.scanResult) shareResult(last.scanResult);
+      return;
+    }
+    if (lower.includes("history") || lower === "my scan history") {
+      const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
+      if (history.length === 0) {
+        addMsg({ role: "bot", text: "No scans yet. Paste something suspicious to get started." });
+      } else {
+        const safe = history.filter((h: any) => h.verdict === "LOW_RISK" || h.verdict === "LOW").length;
+        const risky = history.filter((h: any) => h.verdict === "SUSPICIOUS" || h.verdict === "HIGH").length;
+        const caution = history.length - safe - risky;
+        const recent = history.slice(0, 5).map((h: any) => {
+          const d = new Date(h.ts);
+          const icon = h.verdict === "SUSPICIOUS" || h.verdict === "HIGH" ? "🔴" : h.verdict === "UNCLEAR" || h.verdict === "MEDIUM" ? "🟡" : "🟢";
+          return `${icon} ${h.verdict} (${h.score}/100) — ${h.type} — ${d.toLocaleDateString()}`;
+        }).join("\n");
+        addMsg({ role: "bot", text: `**Your Safety Dashboard**\n\n**${history.length}** total scans · **${safe}** safe · **${caution}** caution · **${risky}** high risk\n\n**Recent:**\n${recent}\n\n_Keep checking. Stay safe._`, suggestions: ["What scams are trending?", "Check something else"] });
+      }
+      return;
+    }
+    sendChat(s);
+  };
+
+  const sendChat = async (text: string) => {
+    addMsg({ role: "user", text });
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, lang }) });
+      const data = resp.ok ? await resp.json() : null;
+      addMsg({ role: "bot", text: data?.reply || "Ask me anything about scams.", suggestions: data?.suggestions });
+    } catch {
+      addMsg({ role: "bot", text: "Couldn't reach the server. Try again." });
+    } finally { setLoading(false); }
+  };
+
+  const acceptTerms = () => {
+    localStorage.setItem("chetana_terms_accepted", new Date().toISOString());
+    setAgreed(true);
+  };
+
+  const handleSend = async () => {
+    if (!agreed) return;
+
+    if (file) {
+      const fileMode = detectFileType(file);
+      const isImage = file.type.startsWith("image/");
+      addMsg({ role: "user", text: `Check: ${file.name}`, file: file.name });
+      const f = file; setFile(null); setLoading(true);
+      try {
+        const fd = new FormData(); fd.append("file", f); fd.append("lang", lang);
+        // Images: try OCR first (screenshots of scam messages), fall back to deepfake analysis
+        const endpoint = fileMode === "voice" ? "/api/voice/analyze" : isImage ? "/api/media/ocr" : "/api/media/analyze";
+        const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
+        if (!resp.ok) throw new Error("Server error");
+        const data = await resp.json();
+        // If OCR extracted text, show it
+        const ocrNote = data.ocr_text ? `\n\n**Text found in image:**\n_"${data.ocr_text.slice(0, 200)}${data.ocr_text.length > 200 ? "..." : ""}"_` : "";
+        const mode = data.ocr_text ? detectInputType(data.ocr_text) as ScanMode : fileMode;
+        const { text, scanResult, suggestions } = buildBotReply(mode, data, f.name);
+        addMsg({ role: "bot", text: text + ocrNote, scanResult, suggestions });
+        if (scanResult) recordScan(mode, scanResult);
+      } catch { addMsg({ role: "bot", text: "Couldn't check that file. Try again." }); }
+      finally { setLoading(false); }
+      return;
+    }
+
+    if (!input.trim()) return;
+    const userText = input.trim();
+    addMsg({ role: "user", text: userText });
+    setInput(""); setLoading(true);
+
+    const isQuestion = /^(what|how|why|who|is |does|can|tell|explain|help)/i.test(userText) && userText.length < 120;
+    if (isQuestion) { await sendChat(userText); setLoading(false); return; }
+
+    const mode = detectInputType(userText);
+    try {
+      let resp: Response;
+      if (mode === "upi") resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: userText, lang }) });
+      else if (mode === "phone") resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: userText, lang }) });
+      else if (mode === "link") resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: userText, lang }) });
+      else resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: userText, lang }) });
+      if (!resp.ok) throw new Error("Server error");
+      const data = await resp.json();
+      const { text, scanResult, suggestions } = buildBotReply(mode, data);
+      addMsg({ role: "bot", text, scanResult, suggestions });
+      if (scanResult) recordScan(mode, scanResult);
+    } catch { addMsg({ role: "bot", text: "Couldn't complete the check. Try again." }); }
+    finally { setLoading(false); }
+  };
+
+  const recordScan = (mode: ScanMode, sr: NonNullable<ChatMsg["scanResult"]>) => {
+    trackVigilance("scan", `${mode}: ${sr.verdict} (${sr.score}/100)`);
+    try { new Audio("/ting.wav").play(); } catch {}
+    try { const v = sr.verdict; if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100,50,100,50,100]); else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80,60,80]); else navigator.vibrate(50); } catch {}
+    fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ event: "scan", scan_type: mode, verdict: sr.verdict, score: sr.score }) }).catch(() => {});
+    try {
+      const h = JSON.parse(localStorage.getItem("chetana_history") || "[]");
+      h.unshift({ verdict: sr.verdict, score: sr.score, type: mode, ts: Date.now() });
+      if (h.length > 100) h.length = 100;
+      localStorage.setItem("chetana_history", JSON.stringify(h));
+      localStorage.setItem("chetana_scan_count", String((parseInt(localStorage.getItem("chetana_scan_count") || "0")) + 1));
+    } catch {}
+  };
+
+  return (
+    <>
+      {/* FAB button */}
+      {!open && (
+        <button className="sw-fab" onClick={() => setOpen(true)}>
+          <Shield size={24} />
+          <span className="sw-fab-label">Scan</span>
+        </button>
+      )}
+
+      {/* Chat window */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className={`sw-window${dragging ? " sw-dragging" : ""}`}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleFileDrop}
+          >
+            {/* Header */}
+            <div className="sw-header">
+              <div className="sw-header-left">
+                <div className="sw-avatar"><Shield size={16} /></div>
+                <div>
+                  <div className="sw-title">Chetana</div>
+                  <div className="sw-subtitle">Scam checker · Always online</div>
+                </div>
+              </div>
+              <div className="sw-header-right">
+                <select className="sw-lang" value={lang} onChange={e => { setLang(e.target.value); localStorage.setItem("chetana_lang", e.target.value); }}>
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+                <button className="sw-close" onClick={() => setOpen(false)}><X size={18} /></button>
+              </div>
+            </div>
+
+            {/* Inline consent — shown once before first scan */}
+            {!agreed && (
+              <div className="sw-consent">
+                <ShieldCheck size={20} style={{ color: 'var(--safe)', marginBottom: 8 }} />
+                <p className="sw-consent-text">
+                  Chetana checks your message and forgets it. Nothing is stored, sold, or shared.
+                  Results are advisory — not legal determinations.
+                </p>
+                <button className="sw-consent-btn" onClick={acceptTerms}>
+                  I understand — let me scan
+                </button>
+                <p className="sw-consent-fine">
+                  By continuing you agree to our <a href="#" onClick={e => { e.preventDefault(); if (onRequireProof) onRequireProof(); }}>terms</a>. Emergency: call 1930.
+                </p>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="sw-messages" ref={scrollRef} style={{ display: agreed ? undefined : 'none' }}>
+              {messages.map(msg => (
+                <div key={msg.id} className={`sw-msg ${msg.role}`}>
+                  <div className={`sw-bubble ${msg.role}`}>
+                    {msg.scanResult && (
+                      <>
+                        <div className={`sw-verdict ${verdictClass(msg.scanResult.verdict, msg.scanResult.trust_state)}`}>
+                          {msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
+                            ? <ShieldAlert size={14} /> : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
+                            ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
+                          <span>{msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" ? "High Risk" : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM" ? "Caution" : "Safe"}</span>
+                          <span className="sw-score">{msg.scanResult.score}/100</span>
+                          {msg.scanResult.trust_state && <span className={`sw-trust-badge trust-${msg.scanResult.trust_state}`}>{trustLabel(msg.scanResult.trust_state)}</span>}
+                        </div>
+                        <div className="sw-result-actions">
+                          <button onClick={() => speakText(msg.text)} title="Read aloud"><Volume2 size={13} /></button>
+                          <button onClick={() => shareWhatsApp(msg.scanResult)} title="Share on WhatsApp"><Smartphone size={13} /></button>
+                          <button onClick={() => shareResult(msg.scanResult)} title="Share"><Share2 size={13} /></button>
+                        </div>
+                      </>
+                    )}
+                    {msg.file && <div className="sw-file-badge"><Paperclip size={11} /> {msg.file}</div>}
+                    <div className="sw-text">{msg.text.split("\n").map((line, i) => {
+                      if (!line.trim()) return null;
+                      const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
+                      return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
+                    })}</div>
+                    {msg.suggestions && (
+                      <div className="sw-chips">
+                        {msg.suggestions.map((s, i) => (
+                          <button key={i} onClick={() => handleSuggestion(s)}>{s}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="sw-msg bot">
+                  <div className="sw-bubble bot sw-typing"><span /><span /><span /></div>
+                </div>
+              )}
+            </div>
+
+            {/* Drag overlay */}
+            {dragging && (
+              <div className="sw-drop-overlay">
+                <Upload size={32} />
+                <span>Drop file to check</span>
+              </div>
+            )}
+
+            {/* File attachment bar */}
+            {file && (
+              <div className="sw-file-bar">
+                <Paperclip size={13} />
+                <span className="sw-file-name">{file.name}</span>
+                <span className="sw-file-size">{(file.size / 1024).toFixed(0)} KB</span>
+                <button className="sw-file-remove" onClick={() => setFile(null)}><X size={13} /></button>
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="sw-input-bar">
+              <input ref={fileRef} type="file" accept="image/*,video/*,audio/*,application/pdf" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0] || null; setFile(f); if (f) setTimeout(() => inputRef.current?.focus(), 0); e.target.value = ""; }} />
+              <button className="sw-action sw-upload-btn" onClick={() => fileRef.current?.click()} title="Upload screenshot, photo, PDF, or audio"><Upload size={16} /></button>
+              {SpeechRecClass && <button className={`sw-action${listening ? " sw-listening" : ""}`} onClick={toggleMic}><Mic size={16} /></button>}
+              <textarea
+                ref={inputRef}
+                className="sw-text-input"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder={file ? "Add a note (optional) or just hit send..." : "Paste suspicious message or screenshot..."}
+                rows={1}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 100) + 'px'; }}
+                onPaste={e => {
+                  const items = e.clipboardData?.items;
+                  if (!items) return;
+                  for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.startsWith("image/")) {
+                      const blob = items[i].getAsFile();
+                      if (blob) { setFile(new File([blob], `screenshot-${Date.now()}.png`, { type: blob.type })); e.preventDefault(); }
+                      break;
+                    }
+                  }
+                }}
+              />
+              <button className={`sw-send${canSend ? " sw-send-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
+                <Send size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 

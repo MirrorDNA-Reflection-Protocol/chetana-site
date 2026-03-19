@@ -1,0 +1,56 @@
+{
+  "schema_version": "edge-truth.v1",
+  "generated_at": "2026-03-19T07:59:50.357121+00:00",
+  "surface": {
+    "id": "chetana-public-edge",
+    "product": "Chetana",
+    "domain": "chetana.activemirror.ai",
+    "origin": "https://chetana.activemirror.ai",
+    "kind": "fastapi_spa",
+    "builder": "vite_and_fastapi",
+    "served_paths": [
+      "/version.json",
+      "/.well-known/edge-truth.json"
+    ]
+  },
+  "source": {
+    "repo": "chetana-site",
+    "branch": "ui-overhaul",
+    "commit": "fac1133307d08ad284960273eabd71cf6dd4ad12",
+    "committed_at": "2026-03-16T09:51:56+05:30",
+    "remote": "https://github.com/MirrorDNA-Reflection-Protocol/chetana-site.git",
+    "dirty": true,
+    "dirty_file_count": 51,
+    "dirty_files_sample": [
+      "README.md",
+      "backend/app/main.py",
+      "backend/frontend_dist/index.html",
+      "frontend/index.html",
+      "frontend/package.json",
+      "frontend/public/hero-chetana-grandma.png",
+      "frontend/public/hero-chetana-phone.png",
+      "frontend/public/hero-safe-grandmother.png",
+      "frontend/public/sitemap.xml",
+      "frontend/src/App.tsx",
+      "frontend/src/ProofPage.tsx",
+      "frontend/src/animations/CountUp.tsx"
+    ]
+  },
+  "content": {
+    "watch_roots": [
+      "backend/app/main.py",
+      "frontend/index.html",
+      "frontend/package.json",
+      "frontend/public",
+      "frontend/src"
+    ],
+    "watch_file_count": 45,
+    "missing_paths": [],
+    "watch_fingerprint": "733a12c81169036667748910d44150dce2b9de126709b6143a6aef00d9b82260",
+    "newest_path": "frontend/package.json",
+    "newest_mtime": "2026-03-19T07:59:38.256273+00:00"
+  },
+  "notes": [
+    "Frontend assets are served by the FastAPI edge."
+  ]
+}

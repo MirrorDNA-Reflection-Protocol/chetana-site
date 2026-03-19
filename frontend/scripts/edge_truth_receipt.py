@@ -14,8 +14,10 @@ DEFAULT_EXCLUDE_NAMES = {
     ".venv",
     "__pycache__",
     "dist",
+    "frontend_dist",
     "node_modules",
     "venv",
+    "CLAUDE.md",
 }
 
 
@@ -79,7 +81,8 @@ def git_status(repo_root: Path, exclude_names: set[str]) -> tuple[bool, list[str
         text = line[3:].strip() if len(line) > 3 else line.strip()
         if "->" in text:
             text = text.split("->", 1)[1].strip()
-        if text and Path(text).name not in exclude_names:
+        path = Path(text)
+        if text and not any(part in exclude_names for part in path.parts):
             items.append(text)
     return bool(items), items
 

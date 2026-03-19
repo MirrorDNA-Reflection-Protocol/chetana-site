@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from pathlib import Path
 
 # Load shared Chetana soul, gates, prompt from canonical location
@@ -832,7 +832,7 @@ async def radar_rss():
     """RSS feed of live scam weather — for news aggregators and RSS readers."""
     try:
         client = await get_client()
-        resp = await client.get(f"http://127.0.0.1:8093/api/weather")
+        resp = await client.get(f"{KAVACH_URL}/api/weather")
         signals = resp.json().get("signals", []) if resp.status_code == 200 else []
     except Exception:
         signals = []
@@ -1732,39 +1732,8 @@ async def proxy_link_check(request: Request):
         resp = await client.post(f"{KAVACH_URL}/api/link/check", json=body)
     return resp.json()
 
-@app.post("/api/upi/check")
-async def proxy_upi_check(request: Request):
-    """Proxy UPI check to Kavach."""
-    body = await request.json()
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(f"{KAVACH_URL}/api/upi/check", json=body)
-    return resp.json()
-
-@app.post("/api/phone/check")
-async def proxy_phone_check(request: Request):
-    """Proxy phone check to Kavach."""
-    body = await request.json()
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(f"{KAVACH_URL}/api/phone/check", json=body)
-    return resp.json()
-
-
-# ── Terms & Privacy ──
-from fastapi.responses import HTMLResponse as _HTML_Response
-_terms_path = Path(__file__).parent / "terms.html"
-_privacy_path = Path(__file__).parent / "privacy.html"
-
-@app.get("/terms", response_class=_HTML_Response)
-async def terms_page():
-    if _terms_path.exists():
-        return _HTML_Response(content=_terms_path.read_text())
-    return _HTML_Response(content="<h1>Terms of Service</h1><p>Coming soon.</p>")
-
-@app.get("/privacy", response_class=_HTML_Response)
-async def privacy_page():
-    if _privacy_path.exists():
-        return _HTML_Response(content=_privacy_path.read_text())
-    return _HTML_Response(content="<h1>Privacy Policy</h1><p>Coming soon.</p>")
+## Duplicate /api/upi/check, /api/phone/check, /terms, /privacy routes removed.
+## Canonical versions are defined earlier in this file (lines ~731-754 and ~1586).
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──

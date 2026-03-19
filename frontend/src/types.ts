@@ -6,7 +6,6 @@ export type PageId =
   | "weather"
   | "atlas"
   | "trust"
-  | "control"
   | "proof"
   | "vigilance"
   | "story";

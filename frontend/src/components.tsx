@@ -14,7 +14,7 @@ import {
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
-import { AuroraBackground, SpotlightCard, BorderBeam, AnimatedGradientText, TextReveal, GridPattern, ScrollReveal, Meteors } from "./effects";
+import { AuroraBackground, SpotlightCard, AnimatedGradientText, GridPattern, ScrollReveal, Meteors } from "./effects";
 // i18n handled by Google Translate widget (index.html)
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
@@ -199,7 +199,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   };
   return (
     <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
-      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/deepfake_hero.mp4" />
+      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/chetana_clip2.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
         <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 24 }}>

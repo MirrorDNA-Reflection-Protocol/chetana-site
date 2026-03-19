@@ -71,6 +71,30 @@ export default function App() {
               <Atlas threats={threats} />
             </>}
 
+            {page === "merchant" && <>
+              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <div>
+                  <div className="kicker">Merchant</div>
+                  <h1>Protect Your Business</h1>
+                  <p>Defend against fake payment screenshots, impersonation attacks, and UPI fraud targeting your business.</p>
+                </div>
+              </section>
+              <WeatherBoard signals={weather.slice(0, 5)} />
+              <Atlas threats={threats} />
+            </>}
+
+            {page === "nexus" && <>
+              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+                <div>
+                  <div className="kicker">Nexus API</div>
+                  <h1>Fraud Detection API</h1>
+                  <p>Add Chetana's scam detection to your app, website, or payment flow. One API call — instant fraud verdict.</p>
+                </div>
+              </section>
+              <WeatherBoard signals={weather.slice(0, 5)} />
+              <Atlas threats={threats} />
+            </>}
+
             {page === "weather" && <WeatherBoard signals={weather} />}
             {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("home"); }} />}

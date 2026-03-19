@@ -1,7 +1,9 @@
 node_modules/
 dist/
+backend/frontend_dist/
 *.tsbuildinfo
 __pycache__/
 *.pyc
 .env
 nohup.out
+CLAUDE.md

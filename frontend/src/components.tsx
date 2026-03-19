@@ -198,7 +198,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   };
   return (
     <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
-      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/AI_Scam_Detection_Video_Generation.mp4" />
+      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/deepfake_hero.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
         <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(3.5rem, 13vw, 8.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.0, marginBottom: 24 }}>

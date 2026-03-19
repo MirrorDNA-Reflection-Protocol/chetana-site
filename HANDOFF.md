@@ -22,6 +22,8 @@ backend/app/
 └── soul.md          — Symlink → ~/.mirrordna/chetana/soul.md (DO NOT MODIFY)
 ```
 
+`backend/frontend_dist/` is legacy cargo. Live serving comes from `frontend/dist/` via FastAPI and the legacy mirror should stay ignored.
+
 ## DO NOT TOUCH
 - `backend/app/gates.py` — symlinked, shared across services
 - `backend/app/soul.md` — symlinked, shared across services

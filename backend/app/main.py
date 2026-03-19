@@ -1343,14 +1343,45 @@ async def chat(req: ChatRequest):
 
 
 # ── Live scam news ticker (proxied from MirrorRadar) ──────────
+RADAR_FALLBACK_ITEMS = [
+    {
+        "title": "Never share OTPs or UPI PINs over calls, chats, or screen share",
+        "summary": "Banks, police, courier agents, and support desks do not need your OTP or PIN to verify you.",
+        "icon": "🔴",
+    },
+    {
+        "title": "Pause on urgent KYC, courier, refund, and digital arrest messages",
+        "summary": "Pressure, countdowns, and threats are common scam tactics designed to stop you from verifying first.",
+        "icon": "⚡",
+    },
+    {
+        "title": "If money was sent to a scammer, call 1930 immediately",
+        "summary": "India's cybercrime helpline gives you the best recovery chance in the first hour after payment.",
+        "icon": "🟠",
+    },
+    {
+        "title": "Check suspicious links, APKs, QR codes, and collect requests before tapping",
+        "summary": "Short links and fake payment screens are still among the most common consumer fraud entry points.",
+        "icon": "🔴",
+    },
+    {
+        "title": "Government and bank verifications should happen on official apps and sites",
+        "summary": "Never complete KYC or account recovery from a random WhatsApp chat, Telegram message, or unknown call.",
+        "icon": "⚡",
+    },
+]
+
+
 @app.get("/api/radar/live")
 async def radar_live():
     """Live scam/security news from MirrorRadar, constrained to fraud-safety headlines."""
     import httpx
+    import re
 
     def _normalize_item(item: dict[str, Any]) -> dict[str, str] | None:
-        title = str(item.get("title") or item.get("text") or "").strip()
-        summary = str(item.get("summary") or "").strip()
+        title = re.sub(r"<[^>]+>", "", str(item.get("title") or item.get("text") or "")).strip()
+        summary = re.sub(r"<[^>]+>", "", str(item.get("summary") or "")).strip()
+        source = str(item.get("source") or "").strip().lower()
         body = f"{title} {summary}".lower()
         if not title:
             return None
@@ -1359,12 +1390,15 @@ async def radar_live():
             "scam", "fraud", "phish", "upi", "whatsapp", "telegram", "bank", "kyc",
             "otp", "arrest", "impersonat", "deepfake", "qr", "payment", "courier",
             "refund", "loan", "job scam", "lottery", "cyber fraud", "digital arrest",
+            "cybercrime", "social engineering", "romance scam", "investment scam",
         }
         block_keywords = {
             "multi-agent", "agent ecosystem", "llm agent", "benchmark", "sleeper agent",
             "research paper", "arxiv", "dynatrust", "clawworm",
         }
 
+        if source == "arxiv":
+            return None
         if any(keyword in body for keyword in block_keywords):
             return None
         if not any(keyword in body for keyword in allow_keywords):
@@ -1394,9 +1428,34 @@ async def radar_live():
                     continue
                 seen_titles.add(dedupe_key)
                 filtered.append(normalized)
-            return {"items": filtered[:20], "total": len(items), "scam_count": len(filtered)}
+
+            served = filtered[:20]
+            fallback_used = False
+            if len(served) < 3:
+                fallback_used = True
+                served = filtered[:6]
+                seen_titles = {item["title"].lower() for item in served}
+                for item in RADAR_FALLBACK_ITEMS:
+                    if item["title"].lower() in seen_titles:
+                        continue
+                    served.append(item)
+                    if len(served) >= 6:
+                        break
+
+            return {
+                "items": served,
+                "total": len(items),
+                "scam_count": len(filtered),
+                "fallback_used": fallback_used,
+            }
     except Exception:
-        return {"items": [], "total": 0, "scam_count": 0, "error": "radar offline"}
+        return {
+            "items": RADAR_FALLBACK_ITEMS,
+            "total": 0,
+            "scam_count": 0,
+            "fallback_used": True,
+            "error": "radar offline",
+        }
 
 # ── Batch UI translation via Sarvam ───────────────────────────
 _TRANSLATE_CACHE: dict[str, dict[str, str]] = {}  # {lang: {en_text: translated}}
@@ -1721,4 +1780,3 @@ if frontend_dist.exists():
             headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in str(file) else {"Cache-Control": "no-cache, no-store, must-revalidate"}
             return FileResponse(file, headers=headers)
         return FileResponse(frontend_dist / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-

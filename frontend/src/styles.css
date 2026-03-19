@@ -961,6 +961,12 @@ select { appearance: none; cursor: pointer; }
 .footer-col button { background: none; border: none; color: var(--muted); font-size: 14px; cursor: pointer; text-align: left; padding: 0; transition: color .2s; }
 .footer-col button:hover { color: var(--text-bright); }
 .footer-static { font-size: 13px; color: rgba(0,0,0,0.15); }
+.builder-section { padding: 32px 24px; text-align: center; border-top: 1px solid var(--line); margin-top: 32px; }
+.builder-section h3 { font-size: 16px; font-weight: 700; color: var(--heading); margin: 0 0 8px; }
+.builder-section p { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 48ch; margin: 0 auto 16px; }
+.builder-socials { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.builder-socials a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color .2s; }
+.builder-socials a:hover { color: var(--text-bright); }
 .footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .footer-powered { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .powered-brand {

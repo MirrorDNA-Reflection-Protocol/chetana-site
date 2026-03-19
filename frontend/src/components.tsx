@@ -44,6 +44,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
     { id: "weather", label: "Scam Trends", restricted: true },
     { id: "atlas", label: "Scam Atlas", restricted: true },
     { id: "trust", label: "Trust" },
+    { id: "story", label: "Story" },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
@@ -201,7 +202,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
       <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/deepfake_hero.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
-        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(3.5rem, 13vw, 8.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.0, marginBottom: 24 }}>
+        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 24 }}>
           <AnimatedGradientText>Check karo.</AnimatedGradientText><br /><AnimatedGradientText>Safe raho.</AnimatedGradientText>
         </motion.h1>
         <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>

@@ -8,6 +8,7 @@ import {
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
+import StoryPage from "./StoryPage";
 import { threats, weather } from "./data";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
@@ -36,50 +37,6 @@ export default function App() {
           <motion.div key={page} {...pageAnim}>
 
             {page === "home" && <>
-              {/* Deepfake awareness hero */}
-              <section style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "80px 20px 20px",
-                background: "#060610",
-                textAlign: "center",
-                gap: 6,
-              }}>
-                <video
-                  src="/deepfake_hero.mp4"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  style={{
-                    maxWidth: 320,
-                    width: "100%",
-                    borderRadius: 16,
-                    boxShadow: "0 0 60px rgba(0,212,170,0.15)",
-                  }}
-                />
-                <p style={{
-                  color: "#ffffff",
-                  fontSize: "1.5rem",
-                  fontWeight: 700,
-                  margin: 0,
-                  lineHeight: 1.4,
-                }}>
-                  That wasn't real. It took less than 60 seconds to make.
-                </p>
-                <p style={{
-                  color: "#b0b0c0",
-                  fontSize: "1.125rem",
-                  fontWeight: 400,
-                  margin: 0,
-                  maxWidth: 540,
-                  lineHeight: 1.6,
-                }}>
-                  <span style={{ color: "#00d4aa", fontWeight: 600 }}>Chetana</span> detects deepfakes, scam links, and fraud — so you don't have to.
-                </p>
-              </section>
               <Hero onNavigate={setPage as any} />
               <StatsStrip />
               <StoriesSection />
@@ -118,6 +75,7 @@ export default function App() {
             {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("home"); }} />}
             {page === "vigilance" && <VigilancePage />}
+            {page === "story" && <StoryPage />}
 
           </motion.div>
         </AnimatePresence>

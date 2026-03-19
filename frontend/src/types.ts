@@ -8,7 +8,8 @@ export type PageId =
   | "trust"
   | "control"
   | "proof"
-  | "vigilance";
+  | "vigilance"
+  | "story";
 
 export interface ThreatEntry {
   id: string;

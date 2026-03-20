@@ -134,6 +134,345 @@ async def _close_client():
         await _client.aclose()
 
 
+# ── Google Cloud Translation API ──────────────────────────────────────
+
+def _load_google_api_key() -> str:
+    """Load GOOGLE_API_KEY from env or macOS Keychain."""
+    import os, subprocess
+    key = os.environ.get("GOOGLE_API_KEY", "")
+    if key:
+        return key
+    try:
+        result = subprocess.run(
+            ["security", "find-generic-password", "-a", "mirrordna", "-s", "GOOGLE_API_KEY", "-w"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+_GOOGLE_API_KEY = _load_google_api_key()
+_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2"
+
+
+# ── Scam Council: multi-model consensus scoring ─────────────────────
+
+_COUNCIL_PROMPT_TEMPLATE = (
+    'You are a scam detection expert. Analyze this message and respond with ONLY a JSON object:\n'
+    '{"score": <0-100>, "verdict": "<SCAM|SUSPICIOUS|SAFE>", "reason": "<one sentence>"}\n\n'
+    'Score guide: 0-30 = safe, 31-60 = suspicious, 61-100 = scam.\n\n'
+    'Message to analyze:\n'
+)
+
+
+def _council_prompt(text: str) -> str:
+    return _COUNCIL_PROMPT_TEMPLATE + text[:1000]
+
+
+def _load_council_keys() -> dict:
+    """Load API keys for council members from macOS Keychain + env."""
+    import os, subprocess
+    keys = {}
+    # Try macOS Keychain first
+    for key_name in ["DEEPSEEK_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY"]:
+        # Check env first
+        if os.environ.get(key_name):
+            keys[key_name] = os.environ[key_name]
+            continue
+        # Fall back to Keychain
+        try:
+            result = subprocess.run(
+                ["security", "find-generic-password", "-a", "mirrordna", "-s", key_name, "-w"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                keys[key_name] = result.stdout.strip()
+        except Exception:
+            pass
+    loaded = [k for k in keys if keys[k]]
+    logger.info("Council keys loaded: %s", ", ".join(loaded) if loaded else "none")
+    return keys
+
+_COUNCIL_KEYS = _load_council_keys()
+
+
+async def _vote_deepseek(text: str) -> dict | None:
+    """DeepSeek (China) council vote."""
+    key = _COUNCIL_KEYS.get("DEEPSEEK_API_KEY")
+    if not key:
+        return None
+    try:
+        client = await get_client()
+        resp = await client.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            return _parse_vote(raw, "DeepSeek", "China")
+    except Exception as e:
+        logger.debug("DeepSeek vote failed: %s", e)
+    return None
+
+
+async def _vote_mistral(text: str) -> dict | None:
+    """Mistral (France/EU) council vote."""
+    key = _COUNCIL_KEYS.get("MISTRAL_API_KEY")
+    if not key:
+        return None
+    try:
+        client = await get_client()
+        resp = await client.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            return _parse_vote(raw, "Mistral", "EU")
+    except Exception as e:
+        logger.debug("Mistral vote failed: %s", e)
+    return None
+
+
+async def _vote_groq(text: str) -> dict | None:
+    """Groq/Llama (US) council vote — ultra-fast inference."""
+    key = _COUNCIL_KEYS.get("GROQ_API_KEY")
+    if not key:
+        return None
+    try:
+        client = await get_client()
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
+            timeout=8.0,
+        )
+        if resp.status_code == 200:
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            return _parse_vote(raw, "Llama-70B", "US")
+    except Exception as e:
+        logger.debug("Groq vote failed: %s", e)
+    return None
+
+
+async def _vote_sarvam(text: str) -> dict | None:
+    """Sarvam (India) council vote — local Ollama model."""
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": "chetana-guard-fast", "prompt": _council_prompt(text), "stream": False, "format": "json"},
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            raw = resp.json().get("response", "").strip()
+            return _parse_vote(raw, "Sarvam", "India")
+    except Exception as e:
+        logger.debug("Sarvam vote failed: %s", e)
+    return None
+
+
+def _parse_vote(raw: str, model_name: str, region: str) -> dict | None:
+    """Parse a council vote from raw model output."""
+    import json as _json
+    try:
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start >= 0 and end > start:
+            vote = _json.loads(raw[start:end])
+            vote["model"] = model_name
+            vote["region"] = region
+            vote["score"] = max(0, min(100, int(vote.get("score", 50))))
+            return vote
+    except Exception:
+        pass
+    return None
+
+
+async def scam_council(text: str) -> dict:
+    """International Scam Council: 4 models from 4 countries vote independently.
+    DeepSeek (China) + Mistral (EU) + Groq/Llama (US) + Sarvam (India).
+    Returns {council_score, council_verdict, council_votes, agreement}."""
+    import asyncio
+    tasks = [
+        _vote_deepseek(text),
+        _vote_mistral(text),
+        _vote_groq(text),
+        _vote_sarvam(text),
+    ]
+    results = await asyncio.gather(*tasks)
+    votes = [v for v in results if v is not None]
+
+    if not votes:
+        return {"council_score": None, "council_verdict": None, "council_votes": [], "agreement": 0, "models_voted": 0}
+
+    scores = [v["score"] for v in votes]
+    avg_score = sum(scores) / len(scores)
+    max_diff = max(scores) - min(scores) if len(scores) > 1 else 0
+    agreement = max(0, 100 - max_diff)
+
+    if avg_score >= 65:
+        verdict = "SUSPICIOUS"
+    elif avg_score >= 35:
+        verdict = "UNCLEAR"
+    else:
+        verdict = "LOW_RISK"
+
+    # Strong disagreement → fail safe, use higher score
+    if max_diff > 40:
+        verdict = "UNCLEAR"
+
+    return {
+        "council_score": round(avg_score),
+        "council_verdict": verdict,
+        "council_votes": votes,
+        "agreement": round(agreement),
+        "models_voted": len(votes),
+    }
+
+# ── Cost guard: hard cap on translation usage ────────────────────────
+# Free tier: 500K chars/month. We cap at 400K to stay safe.
+_TRANSLATE_CHAR_LIMIT = 400_000  # monthly cap (chars)
+_translate_chars_used = 0
+_translate_month = datetime.now(timezone.utc).month
+
+
+def _check_translate_budget(text_len: int) -> bool:
+    """Returns True if we have budget for this translation."""
+    global _translate_chars_used, _translate_month
+    now_month = datetime.now(timezone.utc).month
+    if now_month != _translate_month:
+        _translate_chars_used = 0
+        _translate_month = now_month
+    return (_translate_chars_used + text_len) <= _TRANSLATE_CHAR_LIMIT
+
+
+def _record_translate_usage(text_len: int):
+    global _translate_chars_used
+    _translate_chars_used += text_len
+
+
+_SARVAM_LANGS = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "or", "as", "ur"}
+
+
+async def _sarvam_translate(text: str, source: str, target: str) -> str | None:
+    """Translate via local Sarvam model (Ollama). Free, offline, good for Indian languages + dialects."""
+    src_name = LANG_NAMES.get(source, source)
+    tgt_name = LANG_NAMES.get(target, target)
+    prompt = f"Translate the following {src_name} text to {tgt_name}. Output ONLY the translation, nothing else.\n\n{text[:2000]}"
+    try:
+        client = await get_client()
+        resp = await client.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": SARVAM_MODEL, "prompt": prompt, "stream": False},
+            timeout=15.0,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("response", "").strip()
+    except Exception as e:
+        logger.debug("Sarvam translate failed: %s", e)
+    return None
+
+
+async def google_translate(text: str, target: str = "en", source: str | None = None) -> tuple[str, str]:
+    """Translate text. Strategy:
+    1. Indian regional languages → try Sarvam (free, local) first
+    2. Fallback or international → Google Cloud Translation API
+    3. Budget-capped at 400K chars/month to stay in free tier
+    Returns (translated_text, detected_source_language)."""
+    if not text or len(text.strip()) < 3:
+        return text, source or "en"
+
+    # For Indian languages, try Sarvam first (free, no budget cost)
+    if source in _SARVAM_LANGS or target in _SARVAM_LANGS:
+        sarvam_result = await _sarvam_translate(text, source or "auto", target)
+        if sarvam_result and len(sarvam_result) > 3:
+            return sarvam_result, source or "en"
+
+    # Fallback to Google Translate API
+    if not _GOOGLE_API_KEY:
+        return text, source or "en"
+    if not _check_translate_budget(len(text)):
+        logger.warning("Translation budget exhausted (%d/%d chars). Skipping.",
+                       _translate_chars_used, _TRANSLATE_CHAR_LIMIT)
+        return text, source or "en"
+    try:
+        client = await get_client()
+        trimmed = text[:5000]
+        payload: dict = {"q": trimmed, "target": target, "key": _GOOGLE_API_KEY}
+        if source:
+            payload["source"] = source
+        resp = await client.post(_TRANSLATE_URL, json=payload, timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            t = data["data"]["translations"][0]
+            _record_translate_usage(len(trimmed))
+            return t["translatedText"], t.get("detectedSourceLanguage", source or "en")
+    except Exception as e:
+        logger.debug("Google Translate failed: %s", e)
+    return text, source or "en"
+
+
+@app.get("/api/translate/budget")
+async def translate_budget():
+    """Check translation API budget usage."""
+    return {
+        "chars_used": _translate_chars_used,
+        "chars_limit": _TRANSLATE_CHAR_LIMIT,
+        "chars_remaining": max(0, _TRANSLATE_CHAR_LIMIT - _translate_chars_used),
+        "percent_used": round(_translate_chars_used / _TRANSLATE_CHAR_LIMIT * 100, 1),
+        "month": _translate_month,
+        "sarvam_available": True,
+        "google_available": bool(_GOOGLE_API_KEY),
+    }
+
+
+async def translate_scan_result(result: dict, target_lang: str) -> dict:
+    """Translate scan result fields back to user's language."""
+    if target_lang == "en" or not _GOOGLE_API_KEY:
+        return result
+    # Translate explanation and signals
+    for field in ["explanation", "analysis"]:
+        if result.get(field):
+            translated, _ = await google_translate(result[field], target=target_lang)
+            result[field] = translated
+    if result.get("why_flagged"):
+        translated_flags = []
+        for flag in result["why_flagged"][:5]:
+            t, _ = await google_translate(flag, target=target_lang)
+            translated_flags.append(t)
+        result["why_flagged"] = translated_flags
+    return result
+
+
+# ── Health endpoint ───────────────────────────────────────────────────
+
+@app.get("/health")
+async def health_check():
+    """Check Chetana + Kavach connectivity."""
+    kavach_ok = False
+    try:
+        client = await get_client()
+        # Kavach serves HTML at root, so check root returns 200
+        resp = await client.get(f"{KAVACH_URL}/", timeout=3.0)
+        kavach_ok = resp.status_code == 200
+    except Exception:
+        pass
+    status = "healthy" if kavach_ok else "degraded"
+    return {
+        "status": status,
+        "chetana": "up",
+        "kavach": "up" if kavach_ok else "down",
+        "port": 8093,
+    }
+
+
 # ── Sarvam Translate (local Ollama, free) ─────────────────────────────
 
 SARVAM_MODEL = "hf.co/mradermacher/sarvam-translate-i1-GGUF:Q4_K_M"
@@ -524,65 +863,93 @@ async def scan(req: ScanRequest):
 
 @app.post("/api/scan/full")
 async def scan_full(req: FullScanRequest):
-    """Full scan with Sarvam translation — the endpoint the frontend actually calls."""
-    # Auto-detect language from input text (overrides browser lang if user typed in a script)
+    """Full scan with Google Translate for multilingual input — scans in any language."""
+    # Auto-detect language from input text
     detected = detect_script_lang(req.text)
     lang = detected if detected else req.lang
 
+    # Translate non-English input to English for Kavach scanning
+    scan_text = req.text
+    source_lang = lang
+    if lang != "en":
+        scan_text, source_lang = await google_translate(req.text, target="en")
+        if source_lang != "en":
+            lang = source_lang  # Use detected language for response translation
+
+    import asyncio
+
     try:
         client = await get_client()
-        # Detect if text looks like a URL
         is_link = req.text.startswith("http://") or req.text.startswith("https://")
-        if is_link:
-            resp = await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.text, "lang": "en"})
-        else:
-            resp = await client.post(f"{KAVACH_URL}/api/scan/full", json={"text": req.text, "lang": "en"})
+
+        # Run Kavach + Council in parallel
+        async def kavach_scan():
+            if is_link:
+                return await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.text, "lang": "en"})
+            return await client.post(f"{KAVACH_URL}/api/scan/full", json={"text": scan_text, "lang": "en"})
+
+        kavach_task = asyncio.create_task(kavach_scan())
+        council_task = asyncio.create_task(scam_council(scan_text))
+
+        resp = await kavach_task
+        council = await council_task
 
         if resp.status_code == 200:
             data = resp.json()
-            score = data.get("score", data.get("threat_score", 0))
-            risk = data.get("risk_level", "UNKNOWN")
+            kavach_score = data.get("score", data.get("threat_score", 0))
             signals = data.get("signals", [])
 
-            if score >= 70:
+            # Ensemble: weighted average — Kavach (primary) 60%, Council 40%
+            council_score = council.get("council_score") or kavach_score
+            final_score = round(kavach_score * 0.6 + council_score * 0.4)
+
+            # Confidence gate: if Kavach and Council disagree by >30, use the HIGHER score (fail safe)
+            if abs(kavach_score - council_score) > 30:
+                final_score = max(kavach_score, council_score)
+
+            if final_score >= 70:
                 verdict = "SUSPICIOUS"
                 action = "warn_and_verify"
-            elif score >= 40:
+            elif final_score >= 40:
                 verdict = "UNCLEAR"
                 action = "inform_and_suggest"
             else:
                 verdict = "LOW_RISK"
                 action = "inform_only"
 
-            # Pull the rich explanation from Gemini/DeepSeek cascade
             explanation = data.get("explanation", "")
             advice = data.get("advice", "")
 
             result = {
                 "verdict": verdict,
-                "risk_score": score,
+                "risk_score": final_score,
+                "score": final_score,
                 "surface": "link trust" if is_link else "general trust",
                 "why_flagged": signals[:5] if signals else ([explanation[:200]] if explanation else ["Analysis complete"]),
                 "explanation": explanation,
                 "advice": advice,
                 "action_eligibility": action,
                 "engine": data.get("engine", "kavach"),
+                "kavach_score": kavach_score,
+                "council_score": council_score,
+                "council_agreement": council.get("agreement"),
+                "council_models": council.get("models_voted", 0),
+                "council_votes": council.get("council_votes", []),
             }
 
-            # Translate to user's language via local Sarvam model
+            # Translate to user's language
             result = await translate_scan_result(result, lang)
-            result["lang"] = lang  # tell frontend which language was used
+            result["lang"] = lang
 
             # Push high-risk alerts to Telegram
-            if score >= 70:
+            if final_score >= 70:
                 snippet = req.text[:120].replace("*", "").replace("`", "")
                 alert = (
-                    f"🚨 *HIGH RISK scan on site*\n"
-                    f"Score: {score}/100 | Surface: {result['surface']}\n"
-                    f"Signals: {', '.join(signals[:3]) if signals else 'n/a'}\n"
+                    f"🚨 *HIGH RISK scan*\n"
+                    f"Kavach: {kavach_score} | Council: {council_score} | Final: {final_score}\n"
+                    f"Agreement: {council.get('agreement', '?')}%\n"
                     f"Content: `{snippet}`"
                 )
-                import asyncio
                 asyncio.ensure_future(_notify_telegram(alert))
 
             return result
@@ -1777,18 +2144,88 @@ async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en
 
 @app.post("/api/voice/analyze")
 async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en")):
-    """Proxy voice/audio analysis to Kavach — gated by Decode Firewall."""
+    """Voice/audio analysis: Whisper transcription + scam pattern matching + Kavach proxy."""
     content = await file.read()
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{KAVACH_URL}/api/voice/analyze",
-            files={"file": (file.filename, content, file.content_type)},
-            data={"lang": lang},
-        )
-    return resp.json()
+
+    transcript = ""
+    whisper_signals: list[str] = []
+    whisper_score = 0
+
+    # Step 1: Local Whisper transcription on M4
+    try:
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            import mlx_whisper
+            result = mlx_whisper.transcribe(tmp_path, language=lang if lang != "en" else None)
+            transcript = result.get("text", "").strip()
+        except Exception:
+            import whisper as openai_whisper
+            model = openai_whisper.load_model("tiny")
+            result = model.transcribe(tmp_path, language=lang if lang != "en" else None)
+            transcript = result.get("text", "").strip()
+        os.unlink(tmp_path)
+    except Exception as e:
+        logger.warning("Whisper transcription failed: %s", e)
+
+    # Step 2: Pattern match against known scam call scripts
+    if transcript and len(transcript) > 10:
+        transcript_lower = transcript.lower()
+        CALL_SCRIPTS = [
+            (r"(cbi|police|customs|narcotics).{0,30}(warrant|arrest|case|summon)", "Matches known digital arrest call script", 30),
+            (r"(your.{0,15}account|aapka.{0,15}account).{0,30}(block|suspend|freez|band)", "Account freeze threat pattern", 25),
+            (r"(share|send|batao|bhej).{0,15}(otp|pin|password|mpin)", "OTP/credential harvesting in call", 30),
+            (r"(transfer|send|bhej).{0,20}(money|paisa|amount|payment).{0,20}(now|immediately|turant|abhi)", "Urgent money demand in call", 25),
+            (r"(do not|mat).{0,15}(tell|inform|batao|bolo).{0,15}(anyone|family|police|kisi)", "Caller demanding secrecy", 20),
+            (r"(fine|penalty|challan|fee).{0,20}(pay|deposit|transfer)", "Fake fine/penalty demand", 20),
+            (r"(parcel|courier|package).{0,30}(drug|illegal|seize|confiscat)", "Customs parcel scam script", 25),
+            (r"(insurance|policy|lic).{0,20}(matured|bonus|lapsed).{0,20}(pay|fee|charge)", "Fake insurance call", 20),
+            (r"(lottery|prize|winner|jeet).{0,20}(won|mila|congratulat)", "Lottery/prize call", 25),
+            (r"(install|download).{0,15}(anydesk|teamviewer|quicksupport)", "Remote access app install request", 30),
+        ]
+        import re as _re
+        for pattern, signal, weight in CALL_SCRIPTS:
+            if _re.search(pattern, transcript_lower):
+                whisper_signals.append(signal)
+                whisper_score += weight
+        whisper_score = min(whisper_score, 100)
+
+    # Step 3: Also proxy to Kavach for its analysis
+    kavach_result = {}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{KAVACH_URL}/api/voice/analyze",
+                files={"file": (file.filename, content, file.content_type)},
+                data={"lang": lang},
+            )
+            kavach_result = resp.json()
+    except Exception:
+        pass
+
+    # Step 4: Merge results — take the higher risk
+    kavach_score = kavach_result.get("risk_score", kavach_result.get("score", 0))
+    final_score = max(whisper_score, kavach_score)
+    final_verdict = "SUSPICIOUS" if final_score >= 70 else "UNCLEAR" if final_score >= 40 else "LOW_RISK"
+    all_signals = whisper_signals + (kavach_result.get("signals", []) or kavach_result.get("red_flags", []) or [])
+
+    return {
+        "verdict": final_verdict,
+        "risk_score": final_score,
+        "score": final_score,
+        "signals": all_signals,
+        "transcript": transcript[:2000] if transcript else None,
+        "transcript_length": len(transcript),
+        "whisper_score": whisper_score,
+        "kavach_score": kavach_score,
+        "explanation": f"Audio transcribed ({len(transcript)} chars) and checked against known scam call patterns." if transcript else "Could not transcribe audio.",
+        "action_eligibility": "report" if final_score >= 70 else "caution" if final_score >= 40 else "monitor",
+    }
 
 @app.post("/api/media/ocr")
 async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):

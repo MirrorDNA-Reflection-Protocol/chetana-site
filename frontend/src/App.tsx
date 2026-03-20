@@ -4,7 +4,7 @@ import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
   StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA, ShareCTA,
-  WeatherBoard, Atlas, TrustPage, Footer
+  WeatherBoard, Atlas, TrustPage, PanicPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -18,7 +18,7 @@ export default function App() {
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
 
   const setPage = (p: PageId) => {
-    if (!termsAccepted && p !== "proof" && p !== "home") {
+    if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic") {
       _setPage("proof");
     } else {
       _setPage(p);
@@ -98,6 +98,7 @@ export default function App() {
             {page === "weather" && <WeatherBoard signals={weather} />}
             {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("home"); }} />}
+            {page === "panic" && <PanicPage />}
             {page === "vigilance" && <VigilancePage />}
             {page === "story" && <StoryPage />}
 

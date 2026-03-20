@@ -15,6 +15,7 @@ import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } 
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
 import { AuroraBackground, SpotlightCard, AnimatedGradientText, GridPattern, ScrollReveal, Meteors } from "./effects";
+import { localScreenshotScan, localPatternScan } from "./localScanner";
 // i18n handled by Google Translate widget (index.html)
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
@@ -38,8 +39,9 @@ export function BackgroundMesh() {
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false);
   const termsAccepted = !!localStorage.getItem("chetana_terms_accepted");
-  const items: { id: PageId; label: string; restricted?: boolean }[] = [
+  const items: { id: PageId; label: string; restricted?: boolean; urgent?: boolean }[] = [
     { id: "home", label: "Home" },
+    { id: "panic", label: "Already Paid?", urgent: true },
     { id: "consumer", label: "Consumer", restricted: true },
     { id: "weather", label: "Scam Trends", restricted: true },
     { id: "atlas", label: "Scam Atlas", restricted: true },
@@ -58,9 +60,9 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
       </div>
       <div className={`nav-links${open ? " open" : ""}`}>
         {items.map((item) => (
-          <button 
-            key={item.id} 
-            className={page === item.id ? "nav-btn active" : "nav-btn"} 
+          <button
+            key={item.id}
+            className={`nav-btn${page === item.id ? " active" : ""}${item.urgent ? " nav-urgent" : ""}`}
             onClick={() => navigate(item.id)}
           >
             {item.label}
@@ -137,11 +139,11 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
 
 /* ── Ticker Banner (Live from MirrorRadar) ───────────────────── */
 const FALLBACK_TICKER = [
-  { icon: "🔴", text: "Rs 22,495 crore lost to cyber fraud in India (2025) — I4C data" },
-  { icon: "⚡", text: "24 lakh+ fraud complaints filed in 2025 — NCRP" },
-  { icon: "🟠", text: "1 in 5 UPI users affected by fraud in last 3 years — NPCI survey" },
-  { icon: "🔴", text: "51% of scam victims never report — you can help change that" },
-  { icon: "⚡", text: "Cyber incidents grew 120% in 2 years — CERT-IN" },
+  { icon: "🔴", text: "Rs 22,495 crore lost to cyber fraud in India (2025) — I4C/NCRP data" },
+  { icon: "⚡", text: "24 lakh+ fraud complaints filed in 2025 — I4C/NCRP data" },
+  { icon: "🟠", text: "1 in 5 UPI users affected by fraud in last 3 years — LocalCircles/NPCI survey" },
+  { icon: "🔴", text: "51% of scam victims never report — I4C survey. Screenshot suspicious messages before they disappear" },
+  { icon: "⚡", text: "Got a suspicious message? Screenshot it and check on Chetana — free, instant, 12 languages" },
 ];
 
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
@@ -206,23 +208,27 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
           <AnimatedGradientText>Check karo.</AnimatedGradientText><br /><AnimatedGradientText>Safe raho.</AnimatedGradientText>
         </motion.h1>
         <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>
-          Got a suspicious message? Paste it here.<br />We'll tell you if it's a scam. In seconds. For free.
+          Got a suspicious message? Screenshot it. Drop it here.<br />We'll tell you if it's a scam — in seconds, for free.
         </motion.p>
 
         {/* Main CTA — opens the scanner */}
         <motion.div {...fadeInDelay(0.35)} className="hero-cta-wrap" onClick={openScanner}>
           <span className="hero-cta-glow-border" />
           <button className="hero-scan-cta">
-            <Shield size={18} />
-            <span>Check a message</span>
+            <Upload size={18} />
+            <span>Upload screenshot</span>
             <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.85em' }}>— it's free</span>
           </button>
         </motion.div>
 
-        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-          <span className="hero-trust-pill">No login</span>
+        <motion.div {...fadeInDelay(0.4)} style={{ textAlign: 'center', marginTop: 12, color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>
+          or paste any message, link, UPI ID, or phone number
+        </motion.div>
+
+        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          <span className="hero-trust-pill">Screenshots stay on your device</span>
           <span className="hero-trust-pill">12 languages</span>
-          <span className="hero-trust-pill">SMS · Links · UPI · Voice</span>
+          <span className="hero-trust-pill">Screenshots · SMS · Links · UPI · Voice</span>
         </motion.div>
       </div>
     </section>
@@ -304,11 +310,18 @@ export function StatsStrip() {
 /* ── ScanBox / ScanChat — AI-powered chat scanner ─────────────── */
 type ScanMode = "message" | "link" | "upi" | "phone" | "media" | "voice" | "qr";
 
+interface CouncilVote {
+  model: string;
+  score: number;
+  verdict: string;
+  reason: string;
+}
+
 interface ChatMsg {
   id: number;
   role: "user" | "bot";
   text: string;
-  scanResult?: { verdict: string; score: number; signals: string[]; action: string; trust_state?: string; reason_codes?: string[] };
+  scanResult?: { verdict: string; score: number; signals: string[]; action: string; trust_state?: string; reason_codes?: string[]; kavach_score?: number; council_score?: number; council_agreement?: number; council_votes?: CouncilVote[] };
   file?: string;
   suggestions?: string[];
 }
@@ -392,7 +405,11 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
 
   const trust_state = data.trust_state || (verdict === "SUSPICIOUS" ? "blocked" : verdict === "UNCLEAR" ? "inspect" : "trusted");
   const reason_codes: string[] = data.reason_codes || [];
-  return { text, scanResult: { verdict, score, signals, action, trust_state, reason_codes }, suggestions };
+  const kavach_score = data.kavach_score;
+  const council_score = data.council_score;
+  const council_agreement = data.council_agreement;
+  const council_votes: CouncilVote[] = data.council_votes || [];
+  return { text, scanResult: { verdict, score, signals, action, trust_state, reason_codes, kavach_score, council_score, council_agreement, council_votes }, suggestions };
 }
 
 const LANGUAGES = [
@@ -645,11 +662,11 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           <div className="tool-hero">
             <h1 className="tool-tagline">Check karo.<br />Safe raho.</h1>
             <p className="tool-desc">
-              Got a suspicious SMS, WhatsApp message, link, or payment request?
-              Paste it below — Chetana will tell you if it's a scam.
+              Got a suspicious message? Screenshot it and upload here.
+              Or paste any text, link, UPI ID, or phone number.
             </p>
             <p className="tool-desc-hi">
-              Koi bhi suspicious message ya link paste karo — hum check karenge.
+              Suspicious message ka screenshot lo aur yahan upload karo.
             </p>
           </div>
 
@@ -660,7 +677,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
             className="tool-textarea"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={file ? "Add a note (optional) or just hit Check..." : "Paste the suspicious message or link here..."}
+            placeholder={file ? "Add a note (optional) or just hit Check..." : "Paste a suspicious message or link here, or upload a screenshot..."}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
           <div className="tool-input-bottom">
@@ -747,9 +764,57 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   </div>
                 </div>
               )}
+              {/* Council Deliberation Panel — Trust by Design */}
+              {msg.scanResult && msg.scanResult.council_votes && msg.scanResult.council_votes.length > 0 && (
+                <motion.div
+                  className="council-panel"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  transition={{ duration: 0.4, delay: 0.3 }}
+                >
+                  <div className="council-header">
+                    <Eye size={12} />
+                    <span>Council Deliberation</span>
+                    <span className="council-agreement">{msg.scanResult.council_agreement}% agreement</span>
+                  </div>
+                  <div className="council-votes">
+                    {msg.scanResult.council_votes.map((vote, vi) => (
+                      <motion.div
+                        key={vote.model}
+                        className="council-vote"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: 0.5 + vi * 0.4 }}
+                      >
+                        <div className="council-vote-header">
+                          <span className="council-model">{vote.model.replace(/:latest$/, '')}</span>
+                          <span className={`council-score ${vote.score >= 65 ? "council-high" : vote.score >= 35 ? "council-med" : "council-low"}`}>
+                            {vote.score}
+                          </span>
+                        </div>
+                        <div className="council-reason">{vote.reason}</div>
+                        <div className="council-bar">
+                          <motion.div
+                            className="council-bar-fill"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${vote.score}%` }}
+                            transition={{ duration: 0.6, delay: 0.7 + vi * 0.4 }}
+                            style={{ background: vote.score >= 65 ? "var(--danger)" : vote.score >= 35 ? "var(--amber)" : "var(--safe, #22c55e)" }}
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                  <div className="council-footer">
+                    Kavach: {msg.scanResult.kavach_score} · Council: {msg.scanResult.council_score} · Final: {msg.scanResult.score}
+                  </div>
+                </motion.div>
+              )}
               <div className="tool-card-body">{msg.text.split("\n").map((line, i) => {
                 if (!line.trim()) return null;
-                const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
+                // Sanitize: strip all HTML tags first, then apply safe bold markdown
+                const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
                 const isBullet = line.trim().startsWith("•");
                 return <p key={i} className={isBullet ? "tool-bullet" : ""} dangerouslySetInnerHTML={{ __html: isBullet ? bold.replace("•", "") : bold }} />;
               })}</div>
@@ -775,11 +840,11 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
 
 /* ── Stories — Cinematic Visual Section ─────────────────────── */
 const STORIES = [
-  { img: "/01-hero-grandmother.png", alt: "Elderly Indian woman checking phone", caption: "Amma got a suspicious KYC message. Chetana told her it was a scam — before she shared her OTP." },
-  { img: "/02-student-train.png", alt: "Student on Mumbai train checking phone", caption: "Raj checked a WhatsApp forward on his commute. Chetana flagged it as a known phishing link — instantly." },
-  { img: "/03-family-kitchen.png", alt: "Indian family gathered around kitchen table", caption: "The Sharma family now checks every suspicious message together. Zero scams in 6 months." },
-  { img: "/04-safe-hands.png", alt: "Elderly hands holding phone with safety shield", caption: "When you see the green shield, you know you're safe. That's the Chetana promise." },
-  { img: "/05-street-scene.png", alt: "Indian marketplace with people on phones", caption: "From Mumbai to Madurai — 1.4 billion Indians deserve a free scam checker that speaks their language." },
+  { img: "/01-hero-grandmother.png", alt: "Illustration: elderly Indian woman checking phone", caption: "A grandmother receives a suspicious KYC message. Chetana flags it as a scam — before she shares her OTP." },
+  { img: "/02-student-train.png", alt: "Illustration: student on Mumbai train checking phone", caption: "A student checks a WhatsApp forward on his commute. Chetana flags it as a known phishing link — instantly." },
+  { img: "/03-family-kitchen.png", alt: "Illustration: Indian family gathered around kitchen table", caption: "Families check every suspicious message together. Screenshot, upload, know in seconds." },
+  { img: "/04-safe-hands.png", alt: "Illustration: elderly hands holding phone with safety shield", caption: "When something looks suspicious, check it before you act. That's the Chetana habit." },
+  { img: "/05-street-scene.png", alt: "Illustration: Indian marketplace with people on phones", caption: "From Mumbai to Madurai — a free scam checker that works in 12 Indian languages." },
 ];
 
 export function StoriesSection() {
@@ -792,8 +857,9 @@ export function StoriesSection() {
     <ScrollReveal>
     <motion.section className="stories-section" {...fadeIn}>
       <div className="stories-header">
-        <h2>Real people. Real protection.</h2>
-        <p>Chetana guards India — one message at a time</p>
+        <h2>How Chetana works</h2>
+        <p>Screenshot it. Upload it. Know in seconds.</p>
+        <p style={{ fontSize: '0.75rem', opacity: 0.4, marginTop: 4 }}>Illustrations — not real users</p>
       </div>
       <div className="stories-carousel">
         <AnimatePresence mode="wait">
@@ -1150,10 +1216,11 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
   const [input, setInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingForOther, setCheckingForOther] = useState(false);
+  const [sessionScans, setSessionScans] = useState(0);
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
-    text: "Paste any suspicious message, link, UPI ID, or phone number. I'll check it for you.\n\n_Check karo. Safe raho._",
-    suggestions: ["Check a message", "Check a link", "Check a UPI ID"],
+    text: "**Screenshot or paste** any suspicious message.\n\nWhatsApp, SMS, link, UPI ID — just drop it here.\nScreenshots are scanned on your device. Nothing leaves your phone.\n\n_Check karo. Safe raho._",
   }]);
   const [listening, setListening] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -1266,18 +1333,63 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
       addMsg({ role: "user", text: `Check: ${file.name}`, file: file.name });
       const f = file; setFile(null); setLoading(true);
       try {
-        const fd = new FormData(); fd.append("file", f); fd.append("lang", lang);
-        // Images: try OCR first (screenshots of scam messages), fall back to deepfake analysis
-        const endpoint = fileMode === "voice" ? "/api/voice/analyze" : isImage ? "/api/media/ocr" : "/api/media/analyze";
-        const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
-        if (!resp.ok) throw new Error("Server error");
-        const data = await resp.json();
-        // If OCR extracted text, show it
-        const ocrNote = data.ocr_text ? `\n\n**Text found in image:**\n_"${data.ocr_text.slice(0, 200)}${data.ocr_text.length > 200 ? "..." : ""}"_` : "";
-        const mode = data.ocr_text ? detectInputType(data.ocr_text) as ScanMode : fileMode;
-        const { text, scanResult, suggestions } = buildBotReply(mode, data, f.name);
-        addMsg({ role: "bot", text: text + ocrNote, scanResult, suggestions });
-        if (scanResult) recordScan(mode, scanResult);
+        // LOCAL-FIRST: For images, try browser-side OCR + pattern matching first
+        if (isImage) {
+          addMsg({ role: "bot", text: "_Scanning screenshot on your device..._" });
+          const localResult = await localScreenshotScan(f);
+          const ocrNote = localResult.extractedText
+            ? `\n\n**Text found in image:**\n_"${localResult.extractedText.slice(0, 200)}${(localResult.extractedText.length > 200 ? "..." : "")}"_`
+            : "";
+
+          if (localResult.score >= 70 && localResult.signals.length >= 2) {
+            // High confidence locally — show instant result, still verify with server in background
+            const { text, scanResult, suggestions } = buildBotReply("message", {
+              risk_score: localResult.score,
+              verdict: localResult.verdict,
+              why_flagged: localResult.signals,
+              explanation: "Scanned on your device — your screenshot never left your phone.",
+            }, f.name);
+            addMsg({ role: "bot", text: text + ocrNote, scanResult, suggestions });
+            if (scanResult) recordScan("media", scanResult);
+            // Background server verification (non-blocking)
+            if (localResult.extractedText) {
+              fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: localResult.extractedText, lang }) }).catch(() => {});
+            }
+          } else if (localResult.extractedText && localResult.extractedText.length > 10) {
+            // Got text but not confident — send to server for deep scan
+            addMsg({ role: "bot", text: `_Text extracted locally. Running deep scan..._${ocrNote}` });
+            const mode = detectInputType(localResult.extractedText) as ScanMode;
+            let resp: Response;
+            if (mode === "upi") resp = await fetch(`${API}/api/upi/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ upi_id: localResult.extractedText, lang }) });
+            else if (mode === "phone") resp = await fetch(`${API}/api/phone/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: localResult.extractedText, lang }) });
+            else if (mode === "link") resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: localResult.extractedText, lang }) });
+            else resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: localResult.extractedText, lang }) });
+            if (!resp.ok) throw new Error("Server error");
+            const data = await resp.json();
+            const { text, scanResult, suggestions } = buildBotReply(mode, data, f.name);
+            addMsg({ role: "bot", text, scanResult, suggestions });
+            if (scanResult) recordScan(mode, scanResult);
+          } else {
+            // No text found — send image to server for visual analysis (deepfake etc.)
+            const fd = new FormData(); fd.append("file", f); fd.append("lang", lang);
+            const resp = await fetch(`${API}/api/media/analyze`, { method: "POST", body: fd });
+            if (!resp.ok) throw new Error("Server error");
+            const data = await resp.json();
+            const { text, scanResult, suggestions } = buildBotReply("media", data, f.name);
+            addMsg({ role: "bot", text: text + "\n\n_No text found — analyzed image for manipulation._", scanResult, suggestions });
+            if (scanResult) recordScan("media", scanResult);
+          }
+        } else {
+          // Non-image files: send to server directly
+          const fd = new FormData(); fd.append("file", f); fd.append("lang", lang);
+          const endpoint = fileMode === "voice" ? "/api/voice/analyze" : "/api/media/analyze";
+          const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
+          if (!resp.ok) throw new Error("Server error");
+          const data = await resp.json();
+          const { text, scanResult, suggestions } = buildBotReply(fileMode, data, f.name);
+          addMsg({ role: "bot", text, scanResult, suggestions });
+          if (scanResult) recordScan(fileMode, scanResult);
+        }
       } catch { addMsg({ role: "bot", text: "Couldn't check that file. Try again." }); }
       finally { setLoading(false); }
       return;
@@ -1290,6 +1402,23 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
 
     const isQuestion = /^(what|how|why|who|is |does|can|tell|explain|help)/i.test(userText) && userText.length < 120;
     if (isQuestion) { await sendChat(userText); setLoading(false); return; }
+
+    // LOCAL-FIRST: instant pattern match for obvious scams
+    const localCheck = localPatternScan(userText);
+    if (localCheck.score >= 70 && localCheck.signals.length >= 2) {
+      const { text, scanResult, suggestions } = buildBotReply("message", {
+        risk_score: localCheck.score,
+        verdict: localCheck.verdict,
+        why_flagged: localCheck.signals,
+        explanation: "Instant local scan — your message never left your device.",
+      });
+      addMsg({ role: "bot", text, scanResult, suggestions });
+      if (scanResult) recordScan("message", scanResult);
+      // Still send to server for full analysis in background
+      fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: userText, lang }) }).catch(() => {});
+      setLoading(false);
+      return;
+    }
 
     const mode = detectInputType(userText);
     try {
@@ -1334,6 +1463,8 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
       {/* Chat window */}
       <AnimatePresence>
         {open && (
+          <>
+          <div className="sw-backdrop" onClick={() => setOpen(false)} />
           <motion.div
             className={`sw-window${dragging ? " sw-dragging" : ""}`}
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -1472,9 +1603,63 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
               </button>
             </div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/* ── Panic Mode — "I Already Paid" ───────────────────────────── */
+export function PanicPage() {
+  return (
+    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto" }}>
+      <div className="panel-header" style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}><AlertTriangle size={48} style={{ color: "var(--danger)" }} /></div>
+        <h2 style={{ color: "var(--danger)" }}>Already paid or shared information?</h2>
+        <p>Don't panic. Follow these steps right now.</p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "0 8px" }}>
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--danger)" }}>
+          <h3>1. Call 1930 immediately</h3>
+          <p>This is the national cybercrime helpline. They can freeze the transaction if you call within the golden hour (first 1-2 hours).</p>
+          <a href="tel:1930" style={{ display: "inline-block", marginTop: 8, padding: "8px 20px", background: "var(--danger)", color: "#fff", borderRadius: 8, fontWeight: 600, textDecoration: "none" }}>Call 1930 now</a>
+        </div>
+
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--amber)" }}>
+          <h3>2. Call your bank</h3>
+          <p>Ask them to freeze your account and block the UPI ID / card used. Use the number on the back of your card — not any number the scammer gave you.</p>
+        </div>
+
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
+          <h3>3. Screenshot everything</h3>
+          <p>Before the scammer deletes messages: screenshot every chat, transaction, call log, and SMS. These are your evidence.</p>
+        </div>
+
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
+          <h3>4. File a complaint online</h3>
+          <p>Go to <a href="https://cybercrime.gov.in" target="_blank" rel="noopener" style={{ color: "var(--primary-bright)" }}>cybercrime.gov.in</a> and file a formal complaint with your screenshots attached. You'll get a complaint number — save it.</p>
+        </div>
+
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
+          <h3>5. Change your passwords</h3>
+          <p>If you shared any passwords, PINs, or OTPs: change them now. All banking apps, email, and UPI apps.</p>
+        </div>
+
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--safe, #22c55e)" }}>
+          <h3>6. Tell someone you trust</h3>
+          <p>Don't feel ashamed — scammers are professionals. Tell a family member or friend. They can help you stay calm and follow up.</p>
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 32, padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12 }}>
+        <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+          Chetana is not a government service. For emergencies, contact local police or call 112.<br />
+          Women helpline: 181 · Senior citizens: 14567
+        </p>
+      </div>
+    </motion.section>
   );
 }
 

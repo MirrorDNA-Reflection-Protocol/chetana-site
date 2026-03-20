@@ -157,6 +157,8 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 }
 .nav-btn.active { color: var(--primary-bright); background: var(--primary-light); font-weight: 600; }
 .nav-btn:hover:not(.active) { color: var(--text-bright); background: rgba(0,0,0,0.04); }
+.nav-btn.nav-urgent { color: var(--danger, #ef4444); font-weight: 600; }
+.nav-btn.nav-urgent:hover { background: rgba(239,68,68,0.1); }
 .india-badge {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 14px; font-size: 11px; font-weight: 700;
@@ -1859,6 +1861,53 @@ select { appearance: none; cursor: pointer; }
 }
 .tool-card-share button:hover { border-color: var(--line-bright); color: var(--text-bright); }
 
+/* Council Deliberation Panel — Trust by Design */
+.council-panel {
+  background: rgba(0,0,0,0.4); border-radius: 10px; padding: 12px;
+  margin: 8px 0; border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px); overflow: hidden;
+}
+.council-header {
+  display: flex; align-items: center; gap: 6px; font-size: 11px;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 10px; font-weight: 600;
+}
+.council-agreement {
+  margin-left: auto; font-size: 11px; color: var(--primary-bright);
+  font-weight: 700; letter-spacing: 0;
+}
+.council-votes { display: flex; flex-direction: column; gap: 8px; }
+.council-vote {
+  background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px 10px;
+}
+.council-vote-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.council-model {
+  font-size: 11px; font-weight: 600; color: var(--text-bright);
+  font-family: monospace;
+}
+.council-score {
+  font-size: 13px; font-weight: 800; padding: 2px 8px; border-radius: 6px;
+}
+.council-high { color: var(--danger); background: rgba(239,68,68,0.15); }
+.council-med { color: var(--amber, #f59e0b); background: rgba(245,158,11,0.15); }
+.council-low { color: var(--safe, #22c55e); background: rgba(34,197,94,0.15); }
+.council-reason {
+  font-size: 12px; color: var(--muted); line-height: 1.4; margin-bottom: 6px;
+}
+.council-bar {
+  height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px;
+  overflow: hidden;
+}
+.council-bar-fill { height: 100%; border-radius: 2px; }
+.council-footer {
+  font-size: 10px; color: var(--muted); text-align: center;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);
+  font-family: monospace;
+}
+
 .tool-card-body { font-size: 14px; line-height: 1.75; color: var(--text); }
 .tool-card-body p { margin: 0 0 4px; }
 .tool-card-body strong { color: var(--heading); font-weight: 700; }
@@ -1982,10 +2031,12 @@ select { appearance: none; cursor: pointer; }
 }
 .sw-close {
   background: none; border: none; color: var(--muted);
-  cursor: pointer; padding: 4px; border-radius: 8px;
-  transition: all 0.15s;
+  cursor: pointer; padding: 12px; border-radius: 8px;
+  transition: all 0.15s; min-width: 44px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
 }
 .sw-close:hover { color: var(--text-bright); background: rgba(255,255,255,0.06); }
+.sw-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9998; }
 
 /* Messages */
 .sw-messages {

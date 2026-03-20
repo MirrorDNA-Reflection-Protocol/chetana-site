@@ -32,8 +32,11 @@
     <meta name="twitter:description" content="Verify suspicious links, messages, QR codes, and payment requests before you click or pay." />
     <meta name="twitter:image" content="https://chetana.activemirror.ai/og-image.png" />
 
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
     <!-- Theme -->
-    <meta name="theme-color" content="#07111b" />
+    <meta name="theme-color" content="#3b82f6" />
     <meta name="color-scheme" content="dark" />
 
     <!-- Canonical + hreflang -->
@@ -53,6 +56,14 @@
   <body>
     <div id="root"></div>
     <noscript><h1>Chetana — India's Free AI Scam Checker</h1><p>Check any suspicious SMS, WhatsApp message, link, UPI ID, or phone number. Free. Instant. 12 Indian languages.</p><p>Emergency: Cybercrime Helpline 1930 | cybercrime.gov.in | Women helpline 181</p></noscript>
+    <script>
+      // Register Service Worker for offline support
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Google Translate — full page translation, 100+ languages -->
     <script>

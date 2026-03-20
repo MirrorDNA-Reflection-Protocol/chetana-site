@@ -261,20 +261,28 @@ async def _vote_groq(text: str) -> dict | None:
     return None
 
 
-async def _vote_sarvam(text: str) -> dict | None:
-    """Sarvam (India) council vote — local Ollama model."""
+async def _vote_india(text: str) -> dict | None:
+    """India council vote — local Ollama model (vajra-shield or whatever is loaded)."""
     try:
         client = await get_client()
-        resp = await client.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={"model": "chetana-guard-fast", "prompt": _council_prompt(text), "stream": False, "format": "json"},
-            timeout=10.0,
-        )
-        if resp.status_code == 200:
-            raw = resp.json().get("response", "").strip()
-            return _parse_vote(raw, "Sarvam", "India")
+        # Try vajra-shield first (likely loaded), then chetana-guard-fast, then phi4-mini
+        for model in ["vajra-shield", "chetana-guard-fast", "phi4-mini"]:
+            try:
+                resp = await client.post(
+                    f"{OLLAMA_URL}/api/generate",
+                    json={"model": model, "prompt": _council_prompt(text), "stream": False},
+                    timeout=12.0,
+                )
+                if resp.status_code == 200:
+                    raw = resp.json().get("response", "").strip()
+                    if raw and len(raw) > 5:
+                        vote = _parse_vote(raw, model, "India")
+                        if vote:
+                            return vote
+            except Exception:
+                continue
     except Exception as e:
-        logger.debug("Sarvam vote failed: %s", e)
+        logger.debug("India vote failed: %s", e)
     return None
 
 
@@ -304,7 +312,7 @@ async def scam_council(text: str) -> dict:
         _vote_deepseek(text),
         _vote_mistral(text),
         _vote_groq(text),
-        _vote_sarvam(text),
+        _vote_india(text),
     ]
     results = await asyncio.gather(*tasks)
     votes = [v for v in results if v is not None]

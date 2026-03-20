@@ -312,6 +312,7 @@ type ScanMode = "message" | "link" | "upi" | "phone" | "media" | "voice" | "qr";
 
 interface CouncilVote {
   model: string;
+  region: string;
   score: number;
   verdict: string;
   reason: string;
@@ -1531,10 +1532,30 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
                         </div>
                       </>
                     )}
+                    {/* Council Deliberation Panel */}
+                    {msg.scanResult && msg.scanResult.council_votes && msg.scanResult.council_votes.length > 0 && (
+                      <motion.div className="council-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.4, delay: 0.3 }}>
+                        <div className="council-header"><Eye size={12} /><span>Council Deliberation</span><span className="council-agreement">{msg.scanResult.council_agreement}% agreement</span></div>
+                        <div className="council-votes">
+                          {msg.scanResult.council_votes.map((vote, vi) => (
+                            <motion.div key={vote.model} className="council-vote" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: 0.5 + vi * 0.4 }}>
+                              <div className="council-vote-header">
+                                <span className="council-model">{vote.region} · {vote.model}</span>
+                                <span className={`council-score ${vote.score >= 65 ? "council-high" : vote.score >= 35 ? "council-med" : "council-low"}`}>{vote.score}</span>
+                              </div>
+                              <div className="council-reason">{vote.reason}</div>
+                              <div className="council-bar"><motion.div className="council-bar-fill" initial={{ width: 0 }} animate={{ width: `${vote.score}%` }} transition={{ duration: 0.6, delay: 0.7 + vi * 0.4 }} style={{ background: vote.score >= 65 ? "var(--danger)" : vote.score >= 35 ? "var(--amber)" : "var(--safe, #22c55e)" }} /></div>
+                            </motion.div>
+                          ))}
+                        </div>
+                        <div className="council-footer">Kavach: {msg.scanResult.kavach_score} · Council: {msg.scanResult.council_score} · Final: {msg.scanResult.score}</div>
+                      </motion.div>
+                    )}
                     {msg.file && <div className="sw-file-badge"><Paperclip size={11} /> {msg.file}</div>}
                     <div className="sw-text">{msg.text.split("\n").map((line, i) => {
                       if (!line.trim()) return null;
-                      const bold = line.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
+                      const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                      const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
                       return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
                     })}</div>
                     {msg.suggestions && (

@@ -1993,7 +1993,7 @@ select { appearance: none; cursor: pointer; }
 .sw-window {
   position: fixed;
   bottom: 24px; right: 24px;
-  z-index: 100;
+  z-index: 9999;
   width: 380px;
   height: 560px;
   max-height: calc(100vh - 48px);

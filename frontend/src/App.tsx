@@ -110,12 +110,7 @@ export default function App() {
       {/* Floating scan widget — always visible */}
       <ScanWidget onRequireProof={() => setPage("proof")} />
 
-      {!termsAccepted && (
-        <div className="consent-bar">
-          <span>Quick step before your first scan — <a onClick={() => setPage("proof")}>read & agree</a></span>
-          <button onClick={() => setPage("proof")}>OK</button>
-        </div>
-      )}
+      {/* Consent handled inline in ScanWidget — no blocking bar needed */}
     </div>
   );
 }

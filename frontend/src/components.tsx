@@ -1409,14 +1409,6 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate }: { onRequ
 
   return (
     <>
-      {/* FAB button — hidden when inline */}
-      {!inline && !open && (
-        <button className="sw-fab" onClick={() => setOpen(true)}>
-          <Shield size={24} />
-          <span className="sw-fab-label">Scan</span>
-        </button>
-      )}
-
       {/* Chat window */}
       <AnimatePresence>
         {open && (

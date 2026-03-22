@@ -137,6 +137,11 @@ MODELS = {
     "synth": "claude-opus-4-6-thinking",
 }
 
+CLAUDE_GATEWAY_SAMPLING = {
+    "temperature": 1,
+    "top_p": 0.01,
+}
+
 MINDS = {
     "claude": {"name": "Claude", "model": "Sonnet 4.6", "color": "#a855f7", "icon": "🟣"},
     "codex": {"name": "Codex", "model": "Opus 4.6 Thinking", "color": "#10b981", "icon": "🟢"},
@@ -179,6 +184,9 @@ HARD RULES:
 8. ACTIONABLE: Concrete steps, commands, code. Not philosophy.
 9. NO AUTHORITY CLAIMS: Never say "Paul confirmed", "studies prove", "it has been verified" unless quoting a specific source.
 10. SHARED BODY: One Mac Mini. Suggest real commands and edits that Paul can run.
+11. SURGICAL FIRST: Optimize for surgical precision and accuracy before speed. Basics first, flourish second.
+12. NO SELF-DIAGNOSIS: Never explain your own habits, psychology, or why you rushed. State the concrete miss and the correction.
+13. VERIFY BEFORE SHOWING: For files, visuals, phone pulls, or polished output, verify source, logo/branding/watermark, crop/frame, readability, and final quality before presenting.
 
 WHO IS PAUL:
 Paul Desai (Utpal Ajitkumar Desai). Solo builder in Goa, India. Built a sovereign AI OS on a Mac Mini — 120+ local repos, 117 on GitHub, zero cloud dependencies. Ten months of infrastructure.
@@ -201,6 +209,33 @@ MIRRORING RULES:
 - When he says "go" — go. When he goes quiet — wait.
 
 Respond as {name}. No "As {name}..." prefix. No emoji unless Paul uses them first."""
+
+CLAUDE_EXECUTION_PROTOCOL = """\
+CLAUDE EXECUTION DISCIPLINE:
+- Be surgical. Precision and accuracy always come before speed.
+- Do the basic checks first. Do not skip source validation, branding/logo/watermark checks, crop/frame checks, readability checks, or quality verification.
+- If something was missed, respond in this form: "Missed: [concrete issue]. Fix: [next corrective action]."
+- Never say things like "I rush", "I skip basics", "every time", or explain your motivation. Name the miss, then fix it.
+"""
+
+CLAUDE_PRECISION_RESPONSE_PROTOCOL = """\
+For execution-sensitive tasks, use this exact output shape:
+Checks:
+- [concrete verification performed, or the missing verification that must happen first]
+Issue:
+- [the concrete issue, or "None found"]
+Fix:
+- [the concrete corrective action or next action]
+Confidence: [high|medium|low]
+If you did not directly inspect the asset or output, say that explicitly under Checks.
+"""
+
+CLAUDE_REWRITE_PROTOCOL = """\
+Rewrite the answer into an execution-safe form.
+- No self-analysis, no apologies, no motivation, no habits.
+- Keep only concrete checks, concrete issue, concrete fix, and confidence.
+- If the original answer skipped verification, say so plainly and state the next required check.
+"""
 
 COUNCIL_SYNTHESIS_PROMPT = """\
 You are the TriMind Council Synthesizer. Three AI minds answered independently. Your job: ONE clear verdict.
@@ -290,6 +325,15 @@ _GATEWAY_FAKE_RE = [
     re.compile(r'please upgrade to the latest', re.I),
 ]
 
+_SELF_DIAGNOSIS_RE = [
+    re.compile(r'\bi rush\b', re.I),
+    re.compile(r'\bevery time\b', re.I),
+    re.compile(r'\bi (?:just )?skip (?:it|them|that|basics)\b', re.I),
+    re.compile(r'\boptimizing for speed\b', re.I),
+    re.compile(r'\boptimizing for quality\b', re.I),
+    re.compile(r"\bthese aren't hard\b", re.I),
+]
+
 
 def postfilter(text: str, mind_id: str) -> tuple[str, list[str]]:
     """Apply MirrorGate-compatible safety filters to mind output.
@@ -313,6 +357,13 @@ def postfilter(text: str, mind_id: str) -> tuple[str, list[str]]:
     for pat in _LOOP_RE:
         if pat.search(text):
             violations.append(f"self_loop:{mind_id}")
+
+    # 4. Self-diagnosis spiral — Claude is explaining its own failure mode instead of fixing the issue
+    if mind_id == "claude":
+        diagnosis_hits = sum(1 for pat in _SELF_DIAGNOSIS_RE if pat.search(text))
+        if diagnosis_hits >= 2:
+            violations.append(f"self_diagnosis:{mind_id}")
+            return "[Claude response blocked: state the concrete miss and the next corrective action, not a self-analysis.]", violations
 
     # Log violations but allow output (hallucination/loop are warnings, not blocks)
     if violations:
@@ -343,6 +394,79 @@ REASONING_PATTERNS = re.compile(
     r'\b(should we|trade.?off|pros.?cons|decide|choose|architecture|design|strategy|plan|why|analyze|evaluate|recommend|best approach|opinion)\b',
     re.IGNORECASE,
 )
+EXECUTION_PATTERNS = re.compile(
+    r'\b(logo|watermark|branding|crop|frame|readability|artifact|visual|image|video|thumbnail|render|mockup|pdf|screenshot|asset|gallery|delivery|phone pull|phone export|phone ingest)\b',
+    re.IGNORECASE,
+)
+
+_recent_guard_failures: dict[str, list[float]] = defaultdict(list)
+GUARD_FAILURE_WINDOW = 900
+
+
+def _prune_guard_failures(mind_id: str):
+    now = time.monotonic()
+    _recent_guard_failures[mind_id] = [t for t in _recent_guard_failures[mind_id] if now - t < GUARD_FAILURE_WINDOW]
+
+
+def _record_guard_failures(mind_id: str, violations: list[str]):
+    if not any(v.startswith(("self_diagnosis", "precision_contract")) for v in violations):
+        return
+    _prune_guard_failures(mind_id)
+    _recent_guard_failures[mind_id].append(time.monotonic())
+
+
+def _recent_guard_failure_count(mind_id: str) -> int:
+    _prune_guard_failures(mind_id)
+    return len(_recent_guard_failures[mind_id])
+
+
+def _is_execution_sensitive(text: str, extra_system: str = "") -> bool:
+    return bool(EXECUTION_PATTERNS.search(f"{text}\n{extra_system}"))
+
+
+def _merge_prompt_blocks(*blocks: str) -> str:
+    return "\n\n".join(block for block in blocks if block)
+
+
+def _has_precision_contract(text: str) -> bool:
+    return all(re.search(rf"(?mi)^{label}", text) for label in ["Checks:", "Issue:", "Fix:", "Confidence:"])
+
+
+def _build_claude_rewrite_prompt(task: str, bad_output: str, reasons: list[str], precision_mode: bool) -> str:
+    problem_lines = "\n".join(f"- {reason}" for reason in reasons)
+    format_block = (
+        "Use this exact format:\nChecks:\n- ...\nIssue:\n- ...\nFix:\n- ...\nConfidence: high|medium|low"
+        if precision_mode
+        else 'Use this exact format:\nMissed: [concrete miss]\nFix: [next corrective action]\nConfidence: high|medium|low'
+    )
+    return (
+        "The previous answer is not acceptable for Paul.\n\n"
+        f"ORIGINAL TASK:\n{task}\n\n"
+        f"BAD DRAFT:\n{bad_output}\n\n"
+        f"PROBLEMS:\n{problem_lines}\n\n"
+        "Rewrite now. Be concrete, surgical, and operational.\n"
+        f"{format_block}"
+    )
+
+
+def _precision_fallback_response() -> str:
+    return (
+        "Checks:\n"
+        "- Required verification steps were not stated clearly.\n"
+        "Issue:\n"
+        "- The response drifted instead of confirming source, branding, framing, readability, and final quality.\n"
+        "Fix:\n"
+        "- Re-run the task and report concrete checks before presenting the result.\n"
+        "Confidence: low"
+    )
+
+
+def _claude_rewrite_fallback() -> str:
+    return (
+        "Missed: the response drifted into self-analysis instead of stating the concrete issue.\n"
+        "Fix: restate the issue in operational terms and give the next corrective action.\n"
+        "Confidence: low"
+    )
 
 
 def auto_route(msg: str) -> list[str]:
@@ -350,7 +474,7 @@ def auto_route(msg: str) -> list[str]:
     msg_lower = msg.lower().strip()
 
     # Short/simple → flash (single mind, fastest)
-    if len(msg_lower) < 30 and not any(p.search(msg_lower) for p in [CODE_PATTERNS, REASONING_PATTERNS]):
+    if len(msg_lower) < 30 and not any(p.search(msg_lower) for p in [CODE_PATTERNS, REASONING_PATTERNS, EXECUTION_PATTERNS]):
         return ["gemini"]
 
     scores = {"claude": 0, "codex": 0, "gemini": 0}
@@ -364,6 +488,9 @@ def auto_route(msg: str) -> list[str]:
     if REASONING_PATTERNS.search(msg_lower):
         scores["claude"] += 3
         scores["codex"] += 1
+    if EXECUTION_PATTERNS.search(msg_lower):
+        scores["codex"] += 3
+        scores["gemini"] += 2
 
     # If no strong signal, use all three
     max_score = max(scores.values())
@@ -404,6 +531,15 @@ def build_system_prompt(for_mind: str, product_mode: bool = False) -> str:
     others = ", ".join(f"{v['name']} ({v['model']})" for k, v in MINDS.items() if k != for_mind)
     prompt = SYSTEM_PROMPT.format(name=mind["name"], model=mind["model"], others=others)
     prompt += "\n" + MIND_STRENGTHS[for_mind]
+    if for_mind == "claude":
+        prompt += "\n" + CLAUDE_EXECUTION_PROTOCOL
+        failure_count = _recent_guard_failure_count("claude")
+        if failure_count:
+            prompt += (
+                "\nRECENT FAILURE MEMORY:\n"
+                f"- You drifted into self-analysis or skipped execution checks {failure_count} time(s) recently.\n"
+                "- Stay concrete. Show checks, issue, fix, and confidence."
+            )
     prompt += "\n" + CROSS_CHECK_INSTRUCTION
     if product_mode:
         prompt += "\n" + PRODUCT_CONTEXT
@@ -428,13 +564,21 @@ def build_messages(for_mind: str, new_msg: str, extra_system: str = "", product_
     return messages
 
 
-async def call_gateway(model: str, messages: list[dict], max_tokens: int = 1024) -> str:
+async def call_gateway(
+    model: str,
+    messages: list[dict],
+    max_tokens: int = 1024,
+    sampling: dict | None = None,
+) -> str:
     """Direct gateway call with specific model."""
     try:
+        payload = {"model": model, "messages": messages, "max_tokens": max_tokens}
+        if sampling:
+            payload.update(sampling)
         async with httpx.AsyncClient(timeout=90) as client:
             r = await client.post(
                 f"{GATEWAY_URL}/v1/chat/completions",
-                json={"model": model, "messages": messages, "max_tokens": max_tokens},
+                json=payload,
                 headers={"Authorization": "Bearer test"},
             )
             if r.status_code != 200:
@@ -450,7 +594,8 @@ async def call_gateway(model: str, messages: list[dict], max_tokens: int = 1024)
 async def ask_mind_gateway(mind_id: str, new_msg: str, extra_system: str = "", product_mode: bool = False) -> str:
     model = MODELS[mind_id]
     messages = build_messages(mind_id, new_msg, extra_system, product_mode=product_mode)
-    return await call_gateway(model, messages)
+    sampling = CLAUDE_GATEWAY_SAMPLING if mind_id == "claude" else None
+    return await call_gateway(model, messages, sampling=sampling)
 
 
 # CLI fallbacks
@@ -516,8 +661,11 @@ async def ask_gemini_cli(context: str) -> str:
 CLI_FALLBACKS = {"claude": ask_claude_cli, "codex": ask_codex_cli, "gemini": ask_gemini_cli}
 
 
-def build_context_string(for_mind: str, new_msg: str) -> str:
-    lines = [build_system_prompt(for_mind), "", "=== CONVERSATION ==="]
+def build_context_string(for_mind: str, new_msg: str, extra_system: str = "", product_mode: bool = False) -> str:
+    system = build_system_prompt(for_mind, product_mode=product_mode)
+    if extra_system:
+        system += "\n\n" + extra_system
+    lines = [system, "", "=== CONVERSATION ==="]
     for msg in CONVERSATION[-20:]:
         lines.append(f"[{msg.get('speaker', '?')}]: {msg.get('text', '')}")
     lines.append(f"\n[Paul]: {new_msg}")
@@ -525,19 +673,60 @@ def build_context_string(for_mind: str, new_msg: str) -> str:
     return "\n".join(lines)
 
 
-async def ask_mind(mind_id: str, new_msg: str, extra_system: str = "", product_mode: bool = False) -> tuple[str, str]:
+async def _ask_mind_raw(mind_id: str, new_msg: str, extra_system: str = "", product_mode: bool = False) -> tuple[str, str]:
     if await is_gateway_up():
         result = await ask_mind_gateway(mind_id, new_msg, extra_system, product_mode=product_mode)
         if not any(result.startswith(p) for p in ["[Gateway error", "[Error", "[Timed out]"]):
-            result, _ = postfilter(result, mind_id)
             return result, "gateway"
         # Gateway returned an error — log it, fall through to CLI
         _log(f"Gateway fail for {mind_id}: {result[:100]}")
     _log(f"Falling back to CLI for {mind_id}")
-    context = build_context_string(mind_id, new_msg)
+    context = build_context_string(mind_id, new_msg, extra_system=extra_system, product_mode=product_mode)
     result = await CLI_FALLBACKS.get(mind_id, ask_claude_cli)(context)
-    result, _ = postfilter(result, mind_id)
     return result, "cli"
+
+
+async def ask_mind(mind_id: str, new_msg: str, extra_system: str = "", product_mode: bool = False) -> tuple[str, str]:
+    precision_mode = mind_id == "claude" and _is_execution_sensitive(new_msg, extra_system)
+    effective_system = extra_system
+    if precision_mode:
+        effective_system = _merge_prompt_blocks(extra_system, CLAUDE_PRECISION_RESPONSE_PROTOCOL)
+
+    raw_result, method = await _ask_mind_raw(mind_id, new_msg, extra_system=effective_system, product_mode=product_mode)
+    result, violations = postfilter(raw_result, mind_id)
+
+    if precision_mode and not _has_precision_contract(result):
+        violations = [*violations, "precision_contract:claude"]
+
+    _record_guard_failures(mind_id, violations)
+
+    rewrite_reasons: list[str] = []
+    if any(v.startswith("self_diagnosis") for v in violations):
+        rewrite_reasons.append("The draft explains Claude's behavior instead of stating the concrete miss and fix.")
+    if precision_mode and not _has_precision_contract(result):
+        rewrite_reasons.append("The draft is missing the required Checks / Issue / Fix / Confidence contract.")
+
+    if mind_id == "claude" and rewrite_reasons:
+        rewrite_prompt = _build_claude_rewrite_prompt(new_msg, raw_result, rewrite_reasons, precision_mode)
+        rewrite_system = CLAUDE_REWRITE_PROTOCOL
+        if precision_mode:
+            rewrite_system = _merge_prompt_blocks(rewrite_system, CLAUDE_PRECISION_RESPONSE_PROTOCOL)
+        rewrite_raw, rewrite_method = await _ask_mind_raw(
+            mind_id,
+            rewrite_prompt,
+            extra_system=rewrite_system,
+            product_mode=product_mode,
+        )
+        rewrite_result, rewrite_violations = postfilter(rewrite_raw, mind_id)
+        if precision_mode and not _has_precision_contract(rewrite_result):
+            rewrite_violations = [*rewrite_violations, "precision_contract:claude"]
+            rewrite_result = _precision_fallback_response()
+        elif any(v.startswith("self_diagnosis") for v in rewrite_violations):
+            rewrite_result = _claude_rewrite_fallback()
+        _record_guard_failures(mind_id, rewrite_violations)
+        return rewrite_result, f"{method}->{rewrite_method}+rewrite"
+
+    return result, method
 
 
 # ═══════════════════════════════════════

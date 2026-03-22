@@ -196,12 +196,11 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
 /* ── Hero ────────────────────────────────────────────────────── */
 export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
   const openScanner = () => {
-    // Trigger the scan widget to open
-    document.querySelector<HTMLButtonElement>('.sw-fab')?.click();
+    onNavigate("scan" as any);
   };
   return (
     <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
-      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/chetana_clip2.mp4" />
+      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/chetana_short_final.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
         <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 24 }}>
@@ -765,52 +764,6 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   </div>
                 </div>
               )}
-              {/* Council Deliberation Panel — Trust by Design */}
-              {msg.scanResult && msg.scanResult.council_votes && msg.scanResult.council_votes.length > 0 && (
-                <motion.div
-                  className="council-panel"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  transition={{ duration: 0.4, delay: 0.3 }}
-                >
-                  <div className="council-header">
-                    <Eye size={12} />
-                    <span>Council Deliberation</span>
-                    <span className="council-agreement">{msg.scanResult.council_agreement}% agreement</span>
-                  </div>
-                  <div className="council-votes">
-                    {msg.scanResult.council_votes.map((vote, vi) => (
-                      <motion.div
-                        key={vote.model}
-                        className="council-vote"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: 0.5 + vi * 0.4 }}
-                      >
-                        <div className="council-vote-header">
-                          <span className="council-model">{vote.model.replace(/:latest$/, '')}</span>
-                          <span className={`council-score ${vote.score >= 65 ? "council-high" : vote.score >= 35 ? "council-med" : "council-low"}`}>
-                            {vote.score}
-                          </span>
-                        </div>
-                        <div className="council-reason">{vote.reason}</div>
-                        <div className="council-bar">
-                          <motion.div
-                            className="council-bar-fill"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${vote.score}%` }}
-                            transition={{ duration: 0.6, delay: 0.7 + vi * 0.4 }}
-                            style={{ background: vote.score >= 65 ? "var(--danger)" : vote.score >= 35 ? "var(--amber)" : "var(--safe, #22c55e)" }}
-                          />
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                  <div className="council-footer">
-                    Kavach: {msg.scanResult.kavach_score} · Council: {msg.scanResult.council_score} · Final: {msg.scanResult.score}
-                  </div>
-                </motion.div>
-              )}
               <div className="tool-card-body">{msg.text.split("\n").map((line, i) => {
                 if (!line.trim()) return null;
                 // Sanitize: strip all HTML tags first, then apply safe bold markdown
@@ -890,17 +843,17 @@ export function StoriesSection() {
 /* ── Consumer Section ────────────────────────────────────────── */
 export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const features = [
-    { icon: <MessageCircle size={22} />, color: "blue", title: "Check Messages", desc: "Got a weird SMS or WhatsApp forward? Paste it here. We'll tell you if it's a known scam in seconds.", click: "consumer" as PageId },
-    { icon: <Link2 size={22} />, color: "teal", title: "Check Links", desc: "Not sure if a link is safe? Paste it before you click. We check for fake bank sites, phishing, and traps.", click: "consumer" as PageId },
-    { icon: <CreditCard size={22} />, color: "saffron", title: "Check UPI & Payments", desc: "Someone asking you to scan a QR or accept a collect request? Check the UPI ID first. Don't lose money.", click: "consumer" as PageId },
-    { icon: <Users size={22} />, color: "violet", title: "Protect Your Family", desc: "Share simple safety tips with parents and elders. Works in Hindi, Tamil, Telugu, Bengali, and 8 more languages.", click: "atlas" as PageId },
+    { icon: <MessageCircle size={22} />, color: "blue", title: "Screenshot & Upload", desc: "Got a suspicious WhatsApp or SMS? Screenshot it. Upload it here. We scan it instantly.", click: "scan" as PageId },
+    { icon: <Link2 size={22} />, color: "teal", title: "Paste Any Message", desc: "Copy the suspicious text. Paste it in the scanner. 4 AI judges check it from 4 countries.", click: "scan" as PageId },
+    { icon: <CreditCard size={22} />, color: "saffron", title: "Check UPI & Links", desc: "Someone sent a payment link or UPI ID? Check it before you click. Don't lose money.", click: "scan" as PageId },
+    { icon: <Users size={22} />, color: "violet", title: "Teach Your Family", desc: "Show your parents and elders how to screenshot and check. Works in 12 Indian languages.", click: "scan" as PageId },
   ];
   return (
     <>
       <div className="section-header">
-        <motion.div className="kicker" {...fadeIn}><Shield size={14} /> "For you & your family"</motion.div>
-        <motion.h2 {...fadeInDelay(0.05)}>Protect Yourself From Scams</motion.h2>
-        <motion.p {...fadeInDelay(0.1)}>Check any suspicious message, link, or payment before you act. Free and instant.</motion.p>
+        <motion.div className="kicker" {...fadeIn}><Shield size={14} /> For you & your family</motion.div>
+        <motion.h2 {...fadeInDelay(0.05)}>Screenshot It. Check It.</motion.h2>
+        <motion.p {...fadeInDelay(0.1)}>Got a suspicious message? Screenshot it and upload — or just paste it. Free. Instant. 4 AI judges vote on every scan.</motion.p>
       </div>
       <div className="feature-grid">
         {features.map((f, i) => (
@@ -1210,8 +1163,8 @@ export function ShareCTA() {
 }
 
 /* ── Floating Scan Widget (WhatsApp-style) ───────────────────── */
-export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) {
-  const [open, setOpen] = useState(false);
+export function ScanWidget({ onRequireProof, inline, onCouncilUpdate }: { onRequireProof?: () => void; inline?: boolean; onCouncilUpdate?: (data: any) => void }) {
+  const [open, setOpen] = useState(!!inline);
   const [agreed, setAgreed] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
   const [input, setInput] = useState("");
@@ -1438,6 +1391,9 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
   };
 
   const recordScan = (mode: ScanMode, sr: NonNullable<ChatMsg["scanResult"]>) => {
+    if (onCouncilUpdate && sr.council_votes && sr.council_votes.length > 0) {
+      onCouncilUpdate({ votes: sr.council_votes, kavachScore: sr.kavach_score, councilScore: sr.council_score, agreement: sr.council_agreement, score: sr.score, verdict: sr.verdict });
+    }
     trackVigilance("scan", `${mode}: ${sr.verdict} (${sr.score}/100)`);
     try { new Audio("/ting.wav").play(); } catch {}
     try { const v = sr.verdict; if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100,50,100,50,100]); else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80,60,80]); else navigator.vibrate(50); } catch {}
@@ -1453,8 +1409,8 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
 
   return (
     <>
-      {/* FAB button */}
-      {!open && (
+      {/* FAB button — hidden when inline */}
+      {!inline && !open && (
         <button className="sw-fab" onClick={() => setOpen(true)}>
           <Shield size={24} />
           <span className="sw-fab-label">Scan</span>
@@ -1465,12 +1421,12 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
       <AnimatePresence>
         {open && (
           <>
-          <div className="sw-backdrop" onClick={() => setOpen(false)} />
+          {!inline && <div className="sw-backdrop" onClick={() => setOpen(false)} />}
           <motion.div
-            className={`sw-window${dragging ? " sw-dragging" : ""}`}
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            className={`sw-window${dragging ? " sw-dragging" : ""}${inline ? " sw-inline" : ""}`}
+            initial={inline ? { opacity: 1 } : { opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            exit={inline ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -1531,25 +1487,6 @@ export function ScanWidget({ onRequireProof }: { onRequireProof?: () => void }) 
                           <button onClick={() => shareResult(msg.scanResult)} title="Share"><Share2 size={13} /></button>
                         </div>
                       </>
-                    )}
-                    {/* Council Deliberation Panel */}
-                    {msg.scanResult && msg.scanResult.council_votes && msg.scanResult.council_votes.length > 0 && (
-                      <motion.div className="council-panel" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.4, delay: 0.3 }}>
-                        <div className="council-header"><Eye size={12} /><span>Council Deliberation</span><span className="council-agreement">{msg.scanResult.council_agreement}% agreement</span></div>
-                        <div className="council-votes">
-                          {msg.scanResult.council_votes.map((vote, vi) => (
-                            <motion.div key={vote.model} className="council-vote" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: 0.5 + vi * 0.4 }}>
-                              <div className="council-vote-header">
-                                <span className="council-model">{vote.region} · {vote.model}</span>
-                                <span className={`council-score ${vote.score >= 65 ? "council-high" : vote.score >= 35 ? "council-med" : "council-low"}`}>{vote.score}</span>
-                              </div>
-                              <div className="council-reason">{vote.reason}</div>
-                              <div className="council-bar"><motion.div className="council-bar-fill" initial={{ width: 0 }} animate={{ width: `${vote.score}%` }} transition={{ duration: 0.6, delay: 0.7 + vi * 0.4 }} style={{ background: vote.score >= 65 ? "var(--danger)" : vote.score >= 35 ? "var(--amber)" : "var(--safe, #22c55e)" }} /></div>
-                            </motion.div>
-                          ))}
-                        </div>
-                        <div className="council-footer">Kavach: {msg.scanResult.kavach_score} · Council: {msg.scanResult.council_score} · Final: {msg.scanResult.score}</div>
-                      </motion.div>
                     )}
                     {msg.file && <div className="sw-file-badge"><Paperclip size={11} /> {msg.file}</div>}
                     <div className="sw-text">{msg.text.split("\n").map((line, i) => {

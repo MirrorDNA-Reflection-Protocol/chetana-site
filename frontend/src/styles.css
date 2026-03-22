@@ -2006,6 +2006,48 @@ select { appearance: none; cursor: pointer; }
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
 }
+.sw-window.sw-inline {
+  position: static;
+  width: 100%; max-width: none;
+  height: 70vh; max-height: 70vh;
+  margin: 0;
+  border-radius: 16px;
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+@media (max-width: 768px) {
+  .sw-window.sw-inline { height: auto; max-height: 60vh; }
+}
+
+/* ── Scan Page Grid ─────────────────────────────────────────── */
+.scan-page-grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100vh - 120px);
+}
+.scan-page-main {
+  order: 1;
+}
+.scan-page-sidebar {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Desktop: two-column layout, sidebar first visually */
+@media (min-width: 769px) {
+  .scan-page-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex-direction: unset;
+  }
+  .scan-page-sidebar { order: 1; }
+  .scan-page-main { order: 2; }
+}
 
 /* Header */
 .sw-header {

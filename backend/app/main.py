@@ -270,7 +270,7 @@ async def _vote_india(text: str) -> dict | None:
             try:
                 resp = await client.post(
                     f"{OLLAMA_URL}/api/generate",
-                    json={"model": model, "prompt": _council_prompt(text), "stream": False},
+                    json={"model": model, "prompt": _council_prompt(text), "stream": False, "keep_alive": "5m"},
                     timeout=12.0,
                 )
                 if resp.status_code == 200:
@@ -296,7 +296,9 @@ def _parse_vote(raw: str, model_name: str, region: str) -> dict | None:
             vote = _json.loads(raw[start:end])
             vote["model"] = model_name
             vote["region"] = region
-            vote["score"] = max(0, min(100, int(vote.get("score", 50))))
+            vote["score"] = max(0, min(100, int(vote.get("score", vote.get("threat_score", 50)))))
+            if not vote.get("reason") and vote.get("explanation"):
+                vote["reason"] = vote["explanation"]
             return vote
     except Exception:
         pass

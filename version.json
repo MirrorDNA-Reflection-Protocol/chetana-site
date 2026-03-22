@@ -1,0 +1,43 @@
+{
+  "schema_version": "edge-truth.v1",
+  "generated_at": "2026-03-22T05:52:50.437582+00:00",
+  "surface": {
+    "id": "chetana-public-edge",
+    "product": "Chetana",
+    "domain": "chetana.activemirror.ai",
+    "origin": "https://chetana.activemirror.ai",
+    "kind": "fastapi_spa",
+    "builder": "vite_and_fastapi",
+    "served_paths": [
+      "/version.json",
+      "/.well-known/edge-truth.json"
+    ]
+  },
+  "source": {
+    "repo": "chetana-site",
+    "branch": "ui-overhaul",
+    "commit": "508e1b3b25cc3310d70519aa10ae5d1bba02a83d",
+    "committed_at": "2026-03-22T11:22:27+05:30",
+    "remote": "https://github.com/MirrorDNA-Reflection-Protocol/chetana-site.git",
+    "dirty": false,
+    "dirty_file_count": 0,
+    "dirty_files_sample": []
+  },
+  "content": {
+    "watch_roots": [
+      "backend/app/main.py",
+      "frontend/index.html",
+      "frontend/package.json",
+      "frontend/public",
+      "frontend/src"
+    ],
+    "watch_file_count": 53,
+    "missing_paths": [],
+    "watch_fingerprint": "3331250811be3eb0a795a55b4b99fa05ffea9c7f9bec30ab02e9a6704209da80",
+    "newest_path": "frontend/src/components.tsx",
+    "newest_mtime": "2026-03-22T05:50:27.585136+00:00"
+  },
+  "notes": [
+    "Frontend assets are served by the FastAPI edge."
+  ]
+}

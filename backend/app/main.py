@@ -85,6 +85,13 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+# ── P0 Incident Mode router ───────────────────────────────────────────────────
+# Spec: Chetana_Final_Pack_2026-03-23/flows/incident_mode.md
+# Routes: POST /api/incident/start, GET /api/incident/status/{id},
+#         POST /api/incident/action, POST /api/incident/upi/decode
+from app.incident.incident_mode import router as incident_router  # noqa: E402
+app.include_router(incident_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -469,8 +476,8 @@ async def health_check():
     kavach_ok = False
     try:
         client = await get_client()
-        # Kavach serves HTML at root, so check root returns 200
-        resp = await client.get(f"{KAVACH_URL}/", timeout=3.0)
+        # Kavach redirects / to /ui, so check /ui directly
+        resp = await client.get(f"{KAVACH_URL}/ui", timeout=3.0)
         kavach_ok = resp.status_code == 200
     except Exception:
         pass
@@ -1893,11 +1900,23 @@ import json as _json
 _ANALYTICS_LOG = Path.home() / ".mirrordna" / "chetana" / "analytics.jsonl"
 _ANALYTICS_LOG.parent.mkdir(parents=True, exist_ok=True)
 
+_VALID_VERDICTS = {"SUSPICIOUS", "HIGH", "UNCLEAR", "MEDIUM", "LOW_RISK", "LOW", "SERVICE_UNAVAILABLE"}
+
 @app.post("/api/analytics/event")
 async def log_event(req: Request):
     body = await req.json()
     allowed = {"event", "scan_type", "verdict", "score", "language"}
     entry = {k: v for k, v in body.items() if k in allowed}
+    # Normalize invalid verdicts — clients sometimes send ERROR for failed scans
+    v = str(entry.get("verdict", "")).upper()
+    if v not in _VALID_VERDICTS:
+        score = entry.get("score", 0)
+        if isinstance(score, (int, float)) and score >= 70:
+            entry["verdict"] = "SUSPICIOUS"
+        elif isinstance(score, (int, float)) and score >= 40:
+            entry["verdict"] = "UNCLEAR"
+        else:
+            entry["verdict"] = "LOW_RISK"
     entry["ts"] = _time.time()
     with open(_ANALYTICS_LOG, "a") as f:
         f.write(_json.dumps(entry) + "\n")

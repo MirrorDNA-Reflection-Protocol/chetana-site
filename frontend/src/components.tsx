@@ -1969,6 +1969,222 @@ export function PanicPage() {
   );
 }
 
+/* ── Incident Mode Stepper — 5-screen guided flow ────────────── */
+export function IncidentStepper({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  const [incidentId, setIncidentId] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
+  const [screen, setScreen] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const API = window.location.hostname === "localhost" ? "" : "";
+
+  // Start incident on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(`${API}/api/incident/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ risk_level: "red", category: null, score: 85 }),
+        });
+        if (!resp.ok) throw new Error("Failed to start incident");
+        const data = await resp.json();
+        setIncidentId(data.incident_id);
+        setScreen(data.screen);
+        setStep(0);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const doAction = async (action: string, payload?: any) => {
+    if (!incidentId) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API}/api/incident/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ incident_id: incidentId, action, payload }),
+      });
+      if (!resp.ok) throw new Error("Action failed");
+      const data = await resp.json();
+      setScreen(data.screen);
+      setStep(s => s + (action === "next" ? 1 : 0));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stepNames = ["Stabilize", "What this is", "Next actions", "Family", "Follow-up"];
+
+  if (error) return (
+    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
+      <p style={{ color: "var(--danger)" }}>Could not start incident mode: {error}</p>
+      <button className="tool-protect-btn" style={{ marginTop: 16, width: "auto" }} onClick={() => onNavigate("scan")}>Back to scanner</button>
+    </motion.section>
+  );
+
+  if (loading && !screen) return (
+    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto", textAlign: "center", padding: 40 }}>
+      <ShieldAlert size={32} style={{ color: "var(--danger)", marginBottom: 12 }} />
+      <p>Starting incident mode...</p>
+    </motion.section>
+  );
+
+  return (
+    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto" }}>
+      {/* Progress bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
+        {stepNames.map((name, i) => (
+          <div key={name} style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ height: 4, borderRadius: 2, background: i <= step ? "var(--danger)" : "var(--line)", transition: "background 0.3s" }} />
+            <div style={{ fontSize: 10, color: i <= step ? "var(--text-bright)" : "var(--muted)", marginTop: 4 }}>{name}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Screen content */}
+      {screen && (<>
+        {screen.headline && (
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ color: "var(--danger)", fontSize: 22, marginBottom: 8 }}>
+              <ShieldAlert size={22} style={{ verticalAlign: "middle", marginRight: 8 }} />
+              {screen.headline}
+            </h2>
+          </div>
+        )}
+
+        {/* Do-nots (Screen 1) */}
+        {screen.do_nots && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {screen.do_nots.map((d: string, i: number) => (
+              <div key={i} className="trust-card" style={{ borderLeft: "3px solid var(--danger)", padding: "12px 16px" }}>
+                <strong>{d}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Processing disclosure */}
+        {screen.processing_disclosure && (
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>{screen.processing_disclosure}</p>
+        )}
+
+        {/* Category diagnosis (Screen 2) */}
+        {screen.category_label && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "inline-block", padding: "4px 12px", borderRadius: 20, background: "rgba(239,68,68,0.15)", color: "var(--danger)", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              {screen.category_label}
+            </div>
+            <p style={{ marginBottom: 12 }}>{screen.explanation}</p>
+            {screen.known_signals?.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", marginBottom: 4 }}>Confirmed signals</div>
+                {screen.known_signals.map((s: string, i: number) => (
+                  <div key={i} style={{ fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--line)" }}>{s}</div>
+                ))}
+              </div>
+            )}
+            {screen.suspected_signals?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, color: "var(--amber)", textTransform: "uppercase", marginBottom: 4 }}>Suspected</div>
+                {screen.suspected_signals.map((s: string, i: number) => (
+                  <div key={i} style={{ fontSize: 13, padding: "4px 0", color: "var(--muted)" }}>{s}</div>
+                ))}
+              </div>
+            )}
+            {screen.trust_note && <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 12, fontStyle: "italic" }}>{screen.trust_note}</p>}
+          </div>
+        )}
+
+        {/* Actions (Screen 3) */}
+        {screen.actions && !screen.do_nots && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {screen.actions.map((a: string, i: number) => (
+              <div key={i} className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)", padding: "12px 16px" }}>
+                <strong>{i + 1}.</strong> {a}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Family (Screen 4) */}
+        {screen.prompt && screen.options && !screen.question && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ marginBottom: 12 }}>{screen.prompt}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {screen.options.map((o: string) => (
+                <button key={o} className="trust-card" style={{ borderLeft: "3px solid var(--safe)", padding: "12px 16px", cursor: "pointer", textAlign: "left", background: "rgba(34,197,94,0.05)" }}
+                  onClick={() => doAction(o === "share_alert" ? "alert_family" : "next")}>
+                  {o === "share_alert" ? "Share alert with family" : o === "guardian_notified" ? "Guardian already knows" : "I am checking this for my parent"}
+                </button>
+              ))}
+            </div>
+            {screen.consent_note && <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>{screen.consent_note}</p>}
+          </div>
+        )}
+
+        {/* Follow-up (Screen 5) */}
+        {screen.question && (
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ marginBottom: 12 }}>{screen.question}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {screen.options?.map((o: string) => (
+                <button key={o} className="trust-card" style={{ padding: "12px 16px", cursor: "pointer", textAlign: "left" }}
+                  onClick={() => doAction("follow_up_outcome", { outcome: o })}>
+                  {o === "money_sent" ? "I sent money" : o === "account_linked" ? "Account was linked" : o === "reported" ? "I reported it" : o === "no_action" ? "No action taken" : "I need callback guidance"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </>)}
+
+      {/* CTAs */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+        {screen?.ctas?.includes("call_1930") && (
+          <a href="tel:1930" className="tool-protect-btn" style={{ flex: 1, textDecoration: "none", textAlign: "center", minWidth: 140 }}>
+            Call 1930
+          </a>
+        )}
+        {screen?.ctas?.includes("cybercrime_portal") && (
+          <a href="https://cybercrime.gov.in" target="_blank" rel="noopener" style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--line)", color: "var(--text-bright)", textAlign: "center", textDecoration: "none", fontWeight: 600 }}>
+            Cybercrime Portal
+          </a>
+        )}
+        {screen?.ctas?.includes("next") && (
+          <button onClick={() => doAction("next")} disabled={loading} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, background: "var(--primary-bright)", color: "#fff", border: "none", fontWeight: 700, cursor: "pointer", minWidth: 100 }}>
+            {loading ? "..." : "Next"}
+          </button>
+        )}
+        {screen?.ctas?.includes("alert_family") && (
+          <button onClick={() => doAction("alert_family")} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--line)", color: "var(--text-bright)", background: "none", fontWeight: 600, cursor: "pointer", minWidth: 100 }}>
+            Alert Family
+          </button>
+        )}
+        {!screen?.ctas && step < 4 && (
+          <button onClick={() => doAction("next")} disabled={loading} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, background: "var(--primary-bright)", color: "#fff", border: "none", fontWeight: 700, cursor: "pointer" }}>
+            {loading ? "..." : "Next"}
+          </button>
+        )}
+      </div>
+
+      {/* Back to scanner */}
+      <div style={{ textAlign: "center", marginTop: 20 }}>
+        <button onClick={() => onNavigate("scan")} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}>
+          Back to scanner
+        </button>
+      </div>
+    </motion.section>
+  );
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   return (

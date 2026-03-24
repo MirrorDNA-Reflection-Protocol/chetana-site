@@ -10,6 +10,7 @@ export type PageId =
   | "vigilance"
   | "story"
   | "panic"
+  | "incident"
   | "scan";
 
 export interface ThreatEntry {

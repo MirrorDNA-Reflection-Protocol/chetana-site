@@ -4,7 +4,7 @@ import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
   StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA, ShareCTA,
-  WeatherBoard, Atlas, TrustPage, PanicPage, Footer
+  WeatherBoard, Atlas, TrustPage, PanicPage, IncidentStepper, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -37,6 +37,7 @@ export default function App() {
   const [page, _setPage] = useState<PageId>("home");
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [councilData, setCouncilData] = useState<any>(null);
+  const [sharedContent, setSharedContent] = useState<string | null>(null);
   const [vidIdx, setVidIdx] = useState(0);
   const activePreview = previewClips[vidIdx];
   useEffect(() => { const t = setInterval(() => setVidIdx(i => (i + 1) % previewClips.length), 6000); return () => clearInterval(t); }, []);
@@ -48,6 +49,25 @@ export default function App() {
       _setPage(p);
     }
   };
+
+  // Handle share target intake + PWA shortcuts on load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isShare = params.has("share");
+    const sharedText = params.get("shared_text");
+    const isAction = params.get("action") === "scan";
+    const isPwa = params.get("source") === "pwa";
+
+    if (isShare && sharedText) {
+      setSharedContent(decodeURIComponent(sharedText));
+      _setPage("scan");
+      // Clean URL without reload
+      window.history.replaceState({}, "", "/");
+    } else if (isAction || isPwa) {
+      _setPage("scan");
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
@@ -362,7 +382,7 @@ export default function App() {
                 </div>
                 {/* RIGHT — Chat box (primary on mobile, shows first via CSS order) */}
                 <div className="scan-page-main">
-                  <ScanWidget onRequireProof={() => setPage("proof")} inline onCouncilUpdate={setCouncilData} />
+                  <ScanWidget onRequireProof={() => setPage("proof")} inline onCouncilUpdate={setCouncilData} initialInput={sharedContent} />
                 </div>
               </section>
               <StatsStrip />
@@ -372,6 +392,7 @@ export default function App() {
             {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("scan"); }} />}
             {page === "panic" && <PanicPage />}
+            {page === "incident" && <IncidentStepper onNavigate={setPage} />}
             {page === "vigilance" && <VigilancePage />}
             {page === "story" && <StoryPage />}
 

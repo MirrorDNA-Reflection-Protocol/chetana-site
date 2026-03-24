@@ -464,6 +464,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const msgId = useRef(1);
+  const [incidentMode, setIncidentMode] = useState<{ verdict: string; score?: number; signals?: string[]; trust_state?: string } | null>(null);
 
   const SpeechRecClass = useMemo(() => getSpeechRecognition(), []);
 
@@ -509,6 +510,26 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
 
   const handleSuggestion = (s: string) => {
     const lower = s.toLowerCase();
+    if (lower === "call 1930") { window.open("tel:1930"); return; }
+    if (lower === "open cybercrime.gov.in") { window.open("https://cybercrime.gov.in", "_blank"); return; }
+    if (lower === "alert family") {
+      if (navigator.share) {
+        navigator.share({ title: "Chetana Alert", text: "I may have encountered a scam. Check this with me: https://chetana.activemirror.ai" }).catch(() => {});
+      } else {
+        const t = encodeURIComponent("I may have encountered a scam. Check this with me: https://chetana.activemirror.ai");
+        window.open(`https://wa.me/?text=${t}`, "_blank");
+      }
+      addMsg({ role: "bot", text: "Family alert shared. Stay calm — you're doing the right thing." });
+      return;
+    }
+    if (lower === "re-check with more context") {
+      addMsg({ role: "bot", text: "Paste the full conversation, including any earlier messages. More context helps Chetana make a better call." });
+      return;
+    }
+    if (lower === "help me verify safely") {
+      addMsg({ role: "bot", text: "**Safe verification steps:**\n• Contact the sender through a known, official channel (not the number/link they gave you)\n• Search the phone number or UPI ID on Google — scam reports often surface\n• Ask a family member or friend for a second opinion\n• Check cybercrime.gov.in for similar reported patterns\n\nNever click links or call numbers provided in the suspicious message itself." });
+      return;
+    }
     if (lower.includes("history") || lower.includes("scan history")) {
       const history = JSON.parse(localStorage.getItem("chetana_history") || "[]");
       if (history.length === 0) {
@@ -736,7 +757,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
             >
-              {msg.scanResult && (
+              {msg.scanResult && (<>
                 <div className="tool-verdict-bar">
                   <div className={`tool-verdict ${verdictClass(msg.scanResult.verdict, msg.scanResult.trust_state)}`}>
                     {msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
@@ -763,7 +784,33 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                     }} title="Share"><Share2 size={14} /></button>
                   </div>
                 </div>
-              )}
+                {/* Incident mode CTA for high-risk results */}
+                {(msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" || msg.scanResult.trust_state === "blocked") && (
+                  <div className="tool-incident-cta">
+                    <button className="tool-protect-btn" onClick={() => {
+                      setIncidentMode({
+                        verdict: msg.scanResult!.verdict,
+                        score: msg.scanResult!.score,
+                        signals: msg.scanResult!.signals,
+                        trust_state: msg.scanResult!.trust_state,
+                      });
+                    }}>
+                      <ShieldAlert size={14} /> Protect me now
+                    </button>
+                  </div>
+                )}
+                {/* False positive challenge */}
+                {(msg.scanResult.score > 40) && (
+                  <div className="tool-challenge">
+                    <button className="tool-challenge-btn" onClick={() => {
+                      const signals = msg.scanResult!.signals?.slice(0, 5).map((s: string) => `• ${s}`).join("\n") || "• High overall risk score";
+                      addMsg({ role: "bot", text: `**Why this was flagged:**\n${signals}\n\nThese are the signals Chetana detected. If this seems wrong, you can re-check with more context or verify the source independently.\n\nChetana is a tool, not a judge. Your judgment matters.`, suggestions: ["Re-check with more context", "Help me verify safely"] });
+                    }}>
+                      This seems wrong?
+                    </button>
+                  </div>
+                )}
+              </>)}
               <div className="tool-card-body">{msg.text.split("\n").map((line, i) => {
                 if (!line.trim()) return null;
                 // Sanitize: strip all HTML tags first, then apply safe bold markdown
@@ -788,7 +835,244 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
       <footer className="tool-footer">
         Advisory only — not a government service · Emergency: 1930 · <a href="https://activemirror.ai" target="_blank" rel="noopener">activemirror.ai</a>
       </footer>
+
+      {/* Incident Mode overlay */}
+      <AnimatePresence>
+        {incidentMode && (
+          <IncidentMode
+            scanResult={incidentMode}
+            onClose={() => setIncidentMode(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/* ── Incident Mode — 5-screen guided flow ──────────────────── */
+type IncidentScreen = {
+  step: string;
+  headline?: string;
+  do_nots?: string[];
+  ctas?: string[];
+  processing_disclosure?: string;
+  category_label?: string;
+  explanation?: string;
+  known_signals?: string[];
+  suspected_signals?: string[];
+  trust_note?: string;
+  actions?: string[];
+  helpline?: string;
+  portal_url?: string;
+  prompt?: string;
+  options?: string[];
+  consent_note?: string;
+  question?: string;
+  callback_guidance_available?: boolean;
+};
+
+function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string; score?: number; signals?: string[]; trust_state?: string }; onClose: () => void }) {
+  const [incidentId, setIncidentId] = useState<string | null>(null);
+  const [screen, setScreen] = useState<IncidentScreen | null>(null);
+  const [step, setStep] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [completed, setCompleted] = useState(false);
+
+  // Start incident session
+  useEffect(() => {
+    const start = async () => {
+      try {
+        const resp = await fetch(`${API}/api/incident/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            risk_level: "red",
+            category: null,
+            score: scanResult?.score ?? 80,
+            processing_path: "local",
+            raw_signals: scanResult?.signals?.slice(0, 5) || [],
+          }),
+        });
+        if (!resp.ok) throw new Error(`Server error (${resp.status})`);
+        const data = await resp.json();
+        setIncidentId(data.incident_id);
+        setStep(data.step);
+        setScreen(data.screen);
+      } catch (e: any) {
+        setError(e.message || "Could not start incident mode");
+      } finally {
+        setLoading(false);
+      }
+    };
+    start();
+  }, []);
+
+  const doAction = async (action: string, payload?: Record<string, string>) => {
+    if (!incidentId) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API}/api/incident/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ incident_id: incidentId, action, payload }),
+      });
+      if (!resp.ok) throw new Error(`Server error (${resp.status})`);
+      const data = await resp.json();
+      setStep(data.step);
+      setScreen(data.screen);
+      if (action === "follow_up_outcome") setCompleted(true);
+    } catch (e: any) {
+      setError(e.message || "Action failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stepLabels: Record<string, string> = {
+    stabilize: "1", what_this_is: "2", next_actions: "3", family: "4", follow_up: "5",
+  };
+  const stepNames = ["stabilize", "what_this_is", "next_actions", "family", "follow_up"];
+
+  return (
+    <motion.div
+      className="incident-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <div className="incident-modal">
+        {/* Progress bar */}
+        <div className="incident-progress">
+          {stepNames.map((s) => (
+            <div key={s} className={`incident-step-dot ${s === step ? "active" : stepNames.indexOf(s) < stepNames.indexOf(step) ? "done" : ""}`}>
+              {stepLabels[s]}
+            </div>
+          ))}
+          <button className="incident-close" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        {loading && !screen && (
+          <div className="incident-loading"><ShieldAlert size={32} className="incident-pulse" /><p>Activating protection...</p></div>
+        )}
+
+        {error && <div className="incident-error"><p>{error}</p><button onClick={onClose}>Close</button></div>}
+
+        {completed && (
+          <div className="incident-done">
+            <ShieldCheck size={40} />
+            <h3>Incident recorded</h3>
+            <p>Stay vigilant. You did the right thing.</p>
+            <button className="incident-btn-primary" onClick={onClose}>Close</button>
+          </div>
+        )}
+
+        {screen && !completed && !error && (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              className="incident-screen"
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              transition={{ duration: 0.25 }}
+            >
+              {/* Screen 1: Stabilize */}
+              {step === "stabilize" && (<>
+                <div className="incident-icon-row"><ShieldAlert size={28} className="incident-red" /></div>
+                <h3>{screen.headline}</h3>
+                <ul className="incident-donts">
+                  {screen.do_nots?.map((d, i) => <li key={i}><X size={14} className="incident-red" /> {d}</li>)}
+                </ul>
+                <p className="incident-disclosure">{screen.processing_disclosure}</p>
+                <div className="incident-actions">
+                  <button className="incident-btn-primary" onClick={() => doAction("next")} disabled={loading}>Next <ChevronRight size={14} /></button>
+                  <button className="incident-btn-secondary" onClick={() => doAction("alert_family")} disabled={loading}><Users size={14} /> Alert family</button>
+                  <a href="tel:1930" className="incident-btn-urgent" onClick={() => doAction("call_1930")}><Phone size={14} /> Call 1930</a>
+                </div>
+              </>)}
+
+              {/* Screen 2: What This Is */}
+              {step === "what_this_is" && (<>
+                <div className="incident-category-badge">{screen.category_label}</div>
+                <p className="incident-explanation">{screen.explanation}</p>
+                {(screen.known_signals?.length ?? 0) > 0 && (
+                  <div className="incident-signals">
+                    <h4>Confirmed signals</h4>
+                    <ul>{screen.known_signals?.map((s, i) => <li key={i}><AlertTriangle size={12} className="incident-red" /> {s}</li>)}</ul>
+                  </div>
+                )}
+                {(screen.suspected_signals?.length ?? 0) > 0 && (
+                  <div className="incident-signals suspected">
+                    <h4>Suspected</h4>
+                    <ul>{screen.suspected_signals?.map((s, i) => <li key={i}><Eye size={12} className="incident-amber" /> {s}</li>)}</ul>
+                  </div>
+                )}
+                <p className="incident-trust-note">{screen.trust_note}</p>
+                <div className="incident-actions">
+                  <button className="incident-btn-primary" onClick={() => doAction("next")} disabled={loading}>Next <ChevronRight size={14} /></button>
+                </div>
+              </>)}
+
+              {/* Screen 3: Next Actions */}
+              {step === "next_actions" && (<>
+                <h3>What to do now</h3>
+                <ol className="incident-steps-list">
+                  {screen.actions?.map((a, i) => <li key={i}><span className="incident-step-num">{i + 1}</span> {a}</li>)}
+                </ol>
+                <div className="incident-actions">
+                  <a href="tel:1930" className="incident-btn-urgent" onClick={() => doAction("call_1930")}><Phone size={14} /> Call 1930</a>
+                  <a href="https://cybercrime.gov.in" target="_blank" rel="noopener" className="incident-btn-secondary" onClick={() => doAction("cybercrime_portal")}><Globe size={14} /> cybercrime.gov.in</a>
+                  <button className="incident-btn-secondary" onClick={() => doAction("save_evidence")} disabled={loading}><FileText size={14} /> Save evidence</button>
+                </div>
+                <div className="incident-actions" style={{ marginTop: 8 }}>
+                  <button className="incident-btn-primary" onClick={() => doAction("next")} disabled={loading}>Next <ChevronRight size={14} /></button>
+                </div>
+              </>)}
+
+              {/* Screen 4: Family */}
+              {step === "family" && (<>
+                <h3><Users size={20} /> {screen.prompt}</h3>
+                <div className="incident-family-options">
+                  <button className="incident-btn-secondary" onClick={() => {
+                    doAction("alert_family");
+                    if (navigator.share) {
+                      navigator.share({ title: "Chetana Alert", text: "I may have encountered a scam. Please check with me: https://chetana.activemirror.ai" }).catch(() => {});
+                    } else {
+                      window.open(`https://wa.me/?text=${encodeURIComponent("I may have encountered a scam. Please check: https://chetana.activemirror.ai")}`, "_blank");
+                    }
+                  }}><Share2 size={14} /> Share alert with family</button>
+                  <button className="incident-btn-secondary" onClick={() => doAction("next")}>Guardian already knows</button>
+                  <button className="incident-btn-secondary" onClick={() => doAction("next")}>I'm checking for my parent</button>
+                </div>
+                <p className="incident-consent">{screen.consent_note}</p>
+                <div className="incident-actions">
+                  <button className="incident-btn-primary" onClick={() => doAction("next")} disabled={loading}>Next <ChevronRight size={14} /></button>
+                </div>
+              </>)}
+
+              {/* Screen 5: Follow Up */}
+              {step === "follow_up" && (<>
+                <h3>{screen.question}</h3>
+                <div className="incident-outcome-options">
+                  {[
+                    { val: "money_sent", label: "I sent money", icon: <CreditCard size={14} /> },
+                    { val: "account_linked", label: "They got access to my account", icon: <Lock size={14} /> },
+                    { val: "reported", label: "I reported it", icon: <Flag size={14} /> },
+                    { val: "no_action", label: "I stopped — no action taken", icon: <ShieldCheck size={14} /> },
+                    { val: "need_callback", label: "I need more help", icon: <Phone size={14} /> },
+                  ].map(opt => (
+                    <button key={opt.val} className="incident-btn-outcome" onClick={() => doAction("follow_up_outcome", { outcome: opt.val })} disabled={loading}>
+                      {opt.icon} {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>)}
+            </motion.div>
+          </AnimatePresence>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -1087,6 +1371,45 @@ export function TrustPage() {
         <ChevronRight size={18} className="proof-banner-arrow" />
       </a>
 
+      {/* Local vs Cloud — Trust by Design */}
+      <div style={{ marginTop: 32 }}>
+        <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}><Lock size={18} /> Where your data is processed</h3>
+        <div style={{ overflowX: "auto" }}>
+          <table className="trust-matrix">
+            <thead><tr><th>What you check</th><th>On your device</th><th>Remote possible</th><th>Stored</th></tr></thead>
+            <tbody>
+              <tr><td>Message text</td><td style={{ color: "var(--safe)" }}>Yes</td><td>Optional</td><td>No</td></tr>
+              <tr><td>Link / URL</td><td>Partial</td><td>Yes (reputation check)</td><td>No</td></tr>
+              <tr><td>UPI ID</td><td style={{ color: "var(--safe)" }}>Yes</td><td>Optional</td><td>No</td></tr>
+              <tr><td>QR code</td><td style={{ color: "var(--safe)" }}>Yes</td><td>Optional</td><td>No</td></tr>
+              <tr><td>Voice clip</td><td style={{ color: "var(--safe)" }}>Yes</td><td>Optional</td><td>No</td></tr>
+              <tr><td>Image / screenshot</td><td style={{ color: "var(--safe)" }}>Yes</td><td>Optional</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Guardian / Parivar Consent Rules */}
+      <div style={{ marginTop: 32 }}>
+        <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}><Users size={18} /> Family protection rules</h3>
+        <div className="trust-grid" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="trust-card"><p>Family alerts are <strong>opt-in</strong>. Nobody is notified unless you choose to send an alert.</p></div>
+          <div className="trust-card"><p>Guardian roles must be <strong>explicitly set</strong> by the user. There is no default surveillance.</p></div>
+          <div className="trust-card"><p>What gets shared is a <strong>safe summary</strong>, not raw content. Sensitive messages stay on your device.</p></div>
+          <div className="trust-card"><p>Emergency escalation clearly states <strong>what will be shared and with whom</strong> before you confirm.</p></div>
+        </div>
+      </div>
+
+      {/* False Positive — Your Judgment Matters */}
+      <div style={{ marginTop: 32 }}>
+        <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}><AlertTriangle size={18} /> When Chetana gets it wrong</h3>
+        <div className="trust-card" style={{ borderLeft: "3px solid var(--amber)" }}>
+          <p>Every scan result includes a <strong>"This seems wrong?"</strong> button. Tap it to see exactly which signals were flagged and why.</p>
+          <p style={{ marginTop: 8 }}>Chetana preserves the original verdict but gives you tools to <strong>safely re-verify</strong>. We never shame you for questioning the system.</p>
+          <p style={{ marginTop: 8, color: "var(--muted)" }}>Chetana is a tool, not a judge. Your judgment always comes first.</p>
+        </div>
+      </div>
+
       {/* Builder */}
       <div className="builder-section">
         <h3>Built by Paul Desai</h3>
@@ -1163,11 +1486,11 @@ export function ShareCTA() {
 }
 
 /* ── Floating Scan Widget (WhatsApp-style) ───────────────────── */
-export function ScanWidget({ onRequireProof, inline, onCouncilUpdate }: { onRequireProof?: () => void; inline?: boolean; onCouncilUpdate?: (data: any) => void }) {
+export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInput }: { onRequireProof?: () => void; inline?: boolean; onCouncilUpdate?: (data: any) => void; initialInput?: string | null }) {
   const [open, setOpen] = useState(!!inline);
   const [agreed, setAgreed] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialInput || "");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingForOther, setCheckingForOther] = useState(false);
@@ -1210,6 +1533,19 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate }: { onRequ
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
+  // Auto-submit shared content from PWA share target
+  const sharedHandled = useRef(false);
+  useEffect(() => {
+    if (initialInput && !sharedHandled.current && agreed) {
+      sharedHandled.current = true;
+      const timer = setTimeout(() => {
+        const btn = document.querySelector(".tool-check-ready") as HTMLButtonElement;
+        if (btn) btn.click();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [initialInput, agreed]);
+
   const addMsg = (msg: Omit<ChatMsg, "id">) => {
     setMessages(prev => [...prev, { ...msg, id: msgId.current++ }]);
   };
@@ -1236,6 +1572,26 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate }: { onRequ
 
   const handleSuggestion = (s: string) => {
     const lower = s.toLowerCase();
+    if (lower === "call 1930") { window.open("tel:1930"); return; }
+    if (lower === "open cybercrime.gov.in") { window.open("https://cybercrime.gov.in", "_blank"); return; }
+    if (lower === "alert family") {
+      if (navigator.share) {
+        navigator.share({ title: "Chetana Alert", text: "I may have encountered a scam. Check this with me: https://chetana.activemirror.ai" }).catch(() => {});
+      } else {
+        const t = encodeURIComponent("I may have encountered a scam. Check this with me: https://chetana.activemirror.ai");
+        window.open(`https://wa.me/?text=${t}`, "_blank");
+      }
+      addMsg({ role: "bot", text: "Family alert shared. Stay calm — you're doing the right thing." });
+      return;
+    }
+    if (lower === "re-check with more context") {
+      addMsg({ role: "bot", text: "Paste the full conversation, including any earlier messages. More context helps Chetana make a better call." });
+      return;
+    }
+    if (lower === "help me verify safely") {
+      addMsg({ role: "bot", text: "**Safe verification steps:**\n• Contact the sender through a known, official channel (not the number/link they gave you)\n• Search the phone number or UPI ID on Google — scam reports often surface\n• Ask a family member or friend for a second opinion\n• Check cybercrime.gov.in for similar reported patterns\n\nNever click links or call numbers provided in the suspicious message itself." });
+      return;
+    }
     if (lower === "share this result") {
       const last = [...messages].reverse().find(m => m.scanResult);
       if (last?.scanResult) shareResult(last.scanResult);

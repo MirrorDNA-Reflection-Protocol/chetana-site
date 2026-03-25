@@ -65,12 +65,12 @@ export const threats: ThreatEntry[] = [
     id: "arrest-006",
     title: "Digital arrest scam",
     surface: "identity trust",
-    status: "rising",
-    summary: "Video call from 'CBI/police' claiming warrant exists. Demands money to 'clear charges'.",
+    status: "active",
+    summary: "Video call from 'CBI/police/customs' claiming warrant exists. Increasingly uses AI deepfake video overlays and voice cloning to create fake courtrooms. Demands money to 'clear charges'.",
     firstSeen: "2025-06-20",
     lastSeen: "2026-03-09",
     languages: ["Hindi", "English"],
-    redFlags: ["video call from 'officer'", "demand for immediate payment", "threat of arrest"],
+    redFlags: ["video call from 'officer'", "demand for immediate payment", "threat of arrest", "deepfake video of police station or courtroom", "AI-cloned voice of known person"],
     actions: ["police never call to demand money", "hang up immediately", "report at cybercrime.gov.in"]
   },
   {
@@ -360,6 +360,30 @@ export const threats: ThreatEntry[] = [
     languages: ["Hindi", "English"],
     redFlags: ["celebrity endorsing something unusual", "unnatural lip sync", "ad leads to unknown website", "too-good-to-be-true claims"],
     actions: ["verify on celebrity's official social accounts", "screenshot the ad for evidence", "report to platform and cybercrime.gov.in"]
+  },
+  {
+    id: "sextortion-031",
+    title: "Sextortion / morphed photo blackmail",
+    surface: "identity trust",
+    status: "rising",
+    summary: "Scammer befriends victim on social media or dating app, obtains or morphs intimate photos, then demands money threatening to share with contacts. 19% of all cybercrime cases in India.",
+    firstSeen: "2024-01-01",
+    lastSeen: "2026-03-15",
+    languages: ["Hindi", "English", "Bengali", "Tamil"],
+    redFlags: ["stranger pushes for intimate photos early", "video call freezes conveniently", "sudden demand for money", "threats to share with your contact list"],
+    actions: ["do not pay — payment leads to more demands", "screenshot all threats as evidence", "report to cybercrime.gov.in immediately", "block the sender", "inform trusted family member"]
+  },
+  {
+    id: "invest-pig-032",
+    title: "Investment / pig butchering scam",
+    surface: "payment trust",
+    status: "rising",
+    summary: "Contacted via WhatsApp/Telegram/Instagram with stock tips or crypto opportunities. Victims are groomed with small real returns on fake trading apps, then lose everything when withdrawals are blocked. 75% of all cybercrime losses in India.",
+    firstSeen: "2024-06-01",
+    lastSeen: "2026-03-15",
+    languages: ["Hindi", "English", "Gujarati", "Tamil"],
+    redFlags: ["unsolicited contact with investment advice", "added to WhatsApp/Telegram groups without consent", "fake trading app not on Play Store", "guaranteed returns", "cannot withdraw after initial profits"],
+    actions: ["never invest on platforms recommended by strangers", "verify on SEBI/RBI registered lists", "no legitimate investment guarantees returns", "screenshot everything", "report to 1930"]
   }
 ];
 
@@ -369,10 +393,10 @@ export const weather: WeatherSignal[] = [
   { id: "w3", label: "Bank impersonation", pressure: 73, delta: "high", tone: "red" },
   { id: "w4", label: "QR traps", pressure: 58, delta: "moderate", tone: "amber" },
   { id: "w5", label: "Fake news / media panic", pressure: 41, delta: "low", tone: "violet" },
-  { id: "w6", label: "Digital arrest", pressure: 54, delta: "rising", tone: "amber" },
+  { id: "w6", label: "Digital arrest", pressure: 82, delta: "high", tone: "amber" },
   { id: "w7", label: "KYC update fraud", pressure: 68, delta: "high", tone: "red" },
   { id: "w8", label: "Voice deepfake", pressure: 41, delta: "rising", tone: "amber" },
-  { id: "w9", label: "Task / investment scam", pressure: 77, delta: "high", tone: "red" },
+  { id: "w9", label: "Task / investment scam", pressure: 94, delta: "critical", tone: "red" },
   { id: "w10", label: "Fake job / interview fee", pressure: 64, delta: "moderate", tone: "amber" }
 ];
 

@@ -45,6 +45,8 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
     { id: "consumer", label: "Consumer", restricted: true },
     { id: "weather", label: "Scam Trends", restricted: true },
     { id: "atlas", label: "Scam Atlas", restricted: true },
+    { id: "nexus", label: "API" },
+    { id: "family", label: "Family" },
     { id: "trust", label: "Trust" },
     { id: "story", label: "Story" },
   ];
@@ -55,7 +57,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         <div className="brand-glyph"><img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
         <div>
           <div className="brand-title">Chetana</div>
-          <div className="brand-sub">India's free scam checker</div>
+          <div className="brand-sub">Check karo. Safe raho.</div>
         </div>
       </div>
       <div className={`nav-links${open ? " open" : ""}`}>
@@ -203,12 +205,31 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
       <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/chetana_short_final.mp4" />
       <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
-        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 24 }}>
+        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 12 }}>
           <AnimatedGradientText>Check karo.</AnimatedGradientText><br /><AnimatedGradientText>Safe raho.</AnimatedGradientText>
         </motion.h1>
-        <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>
-          Got a suspicious message? Screenshot it. Drop it here.<br />We'll tell you if it's a scam — in seconds, for free.
+        <motion.p {...fadeInDelay(0.2)} style={{ fontSize: 'clamp(0.65rem, 1.8vw, 0.95rem)', color: 'rgba(255,255,255,0.45)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 20 }}>
+          Check before you trust. Act before you lose.
         </motion.p>
+        <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>
+          Got a suspicious message? Screenshot it. Drop it here. We'll tell you if it's a scam — in seconds, for free.
+        </motion.p>
+
+        {/* Intent rail cards — 3 quick-action entry points */}
+        <motion.div {...fadeInDelay(0.3)} className="hero-intent-grid">
+          <button onClick={openScanner} className="hero-intent-card">
+            <CreditCard size={20} style={{ color: '#f97316', flexShrink: 0 }} />
+            <span>Someone wants money</span>
+          </button>
+          <button onClick={openScanner} className="hero-intent-card">
+            <Building2 size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
+            <span>Claims to be police / bank / govt</span>
+          </button>
+          <button onClick={openScanner} className="hero-intent-card">
+            <Link2 size={20} style={{ color: '#8b5cf6', flexShrink: 0 }} />
+            <span>I got a link or QR</span>
+          </button>
+        </motion.div>
 
         {/* Main CTA — opens the scanner */}
         <motion.div {...fadeInDelay(0.35)} className="hero-cta-wrap" onClick={openScanner}>
@@ -226,7 +247,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
 
         <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
           <span className="hero-trust-pill">Screenshots stay on your device</span>
-          <span className="hero-trust-pill">12 languages</span>
+          <span className="hero-trust-pill" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(180,180,255,0.8)' }}>12+ languages</span>
           <span className="hero-trust-pill">Screenshots · SMS · Links · UPI · Voice</span>
         </motion.div>
       </div>
@@ -237,6 +258,9 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
 /* ── Stats Strip ─────────────────────────────────────────────── */
 export function StatsStrip() {
   const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
+  const personalScans = parseInt(localStorage.getItem("chetana_scan_count") || "0");
+  const trustLevel = personalScans >= 50 ? "Sentinel" : personalScans >= 20 ? "Guardian" : personalScans >= 5 ? "Vigilant" : personalScans >= 1 ? "Aware" : "New";
+  const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#3b82f6" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "rgba(255,255,255,0.3)";
 
   useEffect(() => {
     let cancelled = false;
@@ -301,6 +325,15 @@ export function StatsStrip() {
         <div className="stat-value stat-value-glow">{stats.languages.toLocaleString()}</div>
         <div className="stat-label">Languages</div>
       </div>
+      {personalScans > 0 && (
+        <div className="stat-item" translate="no" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)', paddingLeft: 24 }}>
+          <div className="stat-value" style={{ color: trustColor, fontSize: 18 }}>{trustLevel}</div>
+          <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Shield size={10} style={{ color: trustColor }} />
+            {personalScans} scans — you helped protect others
+          </div>
+        </div>
+      )}
     </motion.div>
     </ScrollReveal>
   );
@@ -797,6 +830,25 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                     }}>
                       <ShieldAlert size={14} /> Protect me now
                     </button>
+                  </div>
+                )}
+                {/* Social proof warning for high-risk results */}
+                {msg.scanResult.score >= 70 && (
+                  <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
+                    <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <span>9 out of 10 people who saw this type of message chose not to proceed. Take a moment before acting.</span>
+                  </div>
+                )}
+                {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
+                  <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
+                    <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
+                    <span>7 out of 10 people who checked this chose to verify further before acting.</span>
+                  </div>
+                )}
+                {/* Wait before acting countdown — DANGER only */}
+                {msg.scanResult.score >= 70 && (
+                  <div className="tool-wait-prompt" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(239,68,68,0.06)", marginTop: 4, fontSize: 12, color: "rgba(255,180,180,0.7)", fontStyle: "italic" }}>
+                    <span>Take 5 minutes to think before responding to this message</span>
                   </div>
                 )}
                 {/* False positive challenge */}
@@ -1834,6 +1886,93 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                           <button onClick={() => shareWhatsApp(msg.scanResult)} title="Share on WhatsApp"><Smartphone size={13} /></button>
                           <button onClick={() => shareResult(msg.scanResult)} title="Share"><Share2 size={13} /></button>
                         </div>
+                        {/* Social proof warning */}
+                        {msg.scanResult.score >= 70 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
+                            <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                            <span>9 out of 10 people who saw this type of message chose not to proceed. Take a moment before acting.</span>
+                          </div>
+                        )}
+                        {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
+                            <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+                            <span>7 out of 10 people who checked this chose to verify further before acting.</span>
+                          </div>
+                        )}
+                        {msg.scanResult.score >= 70 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(239,68,68,0.06)", marginTop: 3, fontSize: 11, color: "rgba(255,180,180,0.7)", fontStyle: "italic" }}>
+                            <span>Take 5 minutes to think before responding to this message</span>
+                          </div>
+                        )}
+                        {/* Evidence & Report actions for high-risk results */}
+                        {msg.scanResult.score >= 50 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                            <button
+                              onClick={() => {
+                                const sr = msg.scanResult!;
+                                const hash = Array.from(new Uint8Array(new TextEncoder().encode(msg.text))).reduce((a, b) => ((a << 5) - a + b) | 0, 0).toString(16);
+                                const evidenceText = [
+                                  `CHETANA EVIDENCE CARD`,
+                                  `Generated: ${new Date().toISOString()}`,
+                                  `---`,
+                                  `Verdict: ${sr.verdict}`,
+                                  `Risk Score: ${sr.score}/100`,
+                                  `Trust State: ${sr.trust_state || "unknown"}`,
+                                  `Signals: ${sr.signals.join("; ")}`,
+                                  `Reason Codes: ${(sr.reason_codes || []).join("; ") || "N/A"}`,
+                                  `Content Hash: ${hash}`,
+                                  `---`,
+                                  `Analysis:`,
+                                  msg.text,
+                                  `---`,
+                                  `This evidence was generated by Chetana (chetana.activemirror.ai).`,
+                                  `Advisory tool only. Not a legal determination.`,
+                                ].join("\n");
+                                const blob = new Blob([evidenceText], { type: "text/plain" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `chetana-evidence-${Date.now()}.txt`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, cursor: "pointer" }}
+                              title="Download evidence card"
+                            >
+                              <FileText size={12} /> Save Evidence
+                            </button>
+                            <a
+                              href="tel:1930"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.15)", color: "#ff8a8a", fontSize: 11, textDecoration: "none", fontWeight: 600, cursor: "pointer" }}
+                              title="Call Cyber Crime Helpline"
+                            >
+                              <Phone size={12} /> Call 1930
+                            </a>
+                            <a
+                              href="https://cybercrime.gov.in"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, textDecoration: "none", cursor: "pointer" }}
+                              title="File complaint at cybercrime.gov.in"
+                            >
+                              <Flag size={12} /> Report Online
+                            </a>
+                            <button
+                              onClick={() => {
+                                const text = "I checked this with Chetana and it looks suspicious. Be careful. chetana.activemirror.ai";
+                                if (navigator.share) {
+                                  navigator.share({ text }).catch(() => {});
+                                } else {
+                                  navigator.clipboard?.writeText(text);
+                                }
+                              }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, cursor: "pointer" }}
+                              title="Share warning"
+                            >
+                              <Share2 size={12} /> Share Warning
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
                     {msg.file && <div className="sw-file-badge"><Paperclip size={11} /> {msg.file}</div>}
@@ -1916,53 +2055,216 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   );
 }
 
-/* ── Panic Mode — "I Already Paid" ───────────────────────────── */
+/* ── Panic Mode — "I Already Paid" — Emergency Action Flow ──── */
 export function PanicPage() {
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const shareMessage = "I may have been targeted by a scam. Here's what happened and what I'm doing about it. Chetana (chetana.activemirror.ai) helped me take these steps.";
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ text: shareMessage }); } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(shareMessage);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    }
+  };
+
+  const stepConnector = (
+    <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
+      <div style={{ width: 2, height: 20, background: "rgba(255,255,255,0.08)", borderRadius: 1 }} />
+    </div>
+  );
+
   return (
-    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto" }}>
+    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* Header */}
       <div className="panel-header" style={{ textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}><AlertTriangle size={48} style={{ color: "var(--danger)" }} /></div>
-        <h2 style={{ color: "var(--danger)" }}>Already paid or shared information?</h2>
-        <p>Don't panic. Follow these steps right now.</p>
+        <h2 style={{ color: "var(--danger)", marginBottom: 8 }}>Already paid or shared information?</h2>
+        <p style={{ fontSize: "1rem", lineHeight: 1.6, maxWidth: 540, margin: "0 auto", color: "var(--muted)" }}>
+          This is a sophisticated scam that has affected thousands of people. You are not to blame. Follow these steps right now — speed matters.
+        </p>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "0 8px" }}>
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--danger)" }}>
-          <h3>1. Call 1930 immediately</h3>
-          <p>This is the national cybercrime helpline. They can freeze the transaction if you call within the golden hour (first 1-2 hours).</p>
-          <a href="tel:1930" style={{ display: "inline-block", marginTop: 8, padding: "8px 20px", background: "var(--danger)", color: "#fff", borderRadius: 8, fontWeight: 600, textDecoration: "none" }}>Call 1930 now</a>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 0, padding: "0 8px" }}>
 
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--amber)" }}>
-          <h3>2. Call your bank</h3>
-          <p>Ask them to freeze your account and block the UPI ID / card used. Use the number on the back of your card — not any number the scammer gave you.</p>
-        </div>
+        {/* ── Step 1: Immediate ── */}
+        <motion.div {...fadeInDelay(0.1)}>
+          <div className="trust-card" style={{
+            borderLeft: "4px solid var(--danger)",
+            background: "rgba(239,68,68,0.06)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "var(--danger)", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: 15, flexShrink: 0,
+              }}>1</div>
+              <div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--danger)", fontWeight: 700 }}>Immediate</div>
+                <h3 style={{ margin: 0 }}>Call 1930 NOW</h3>
+              </div>
+            </div>
+            <p>This is India's national cybercrime helpline. They can <strong>freeze the transaction</strong> if you call within the golden hour (first 1-2 hours). Every minute counts.</p>
+            <a href="tel:1930" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              marginTop: 10, padding: "12px 28px",
+              background: "var(--danger)", color: "#fff",
+              borderRadius: 10, fontWeight: 700, fontSize: "1rem",
+              textDecoration: "none", boxShadow: "0 4px 20px rgba(239,68,68,0.35)",
+            }}>
+              <Phone size={18} /> Call 1930 Now
+            </a>
+            <p style={{ marginTop: 12, fontSize: "0.88rem" }}>
+              Then <strong>contact your bank immediately</strong> to freeze the transaction. Use the number on the back of your card — not any number the scammer gave you.
+            </p>
+          </div>
+        </motion.div>
 
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
-          <h3>3. Screenshot everything</h3>
-          <p>Before the scammer deletes messages: screenshot every chat, transaction, call log, and SMS. These are your evidence.</p>
-        </div>
+        {stepConnector}
 
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
-          <h3>4. File a complaint online</h3>
-          <p>Go to <a href="https://cybercrime.gov.in" target="_blank" rel="noopener" style={{ color: "var(--primary-bright)" }}>cybercrime.gov.in</a> and file a formal complaint with your screenshots attached. You'll get a complaint number — save it.</p>
-        </div>
+        {/* ── Step 2: Preserve Evidence ── */}
+        <motion.div {...fadeInDelay(0.2)}>
+          <div className="trust-card" style={{ borderLeft: "4px solid var(--amber)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "var(--amber)", color: "#000",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: 15, flexShrink: 0,
+              }}>2</div>
+              <div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--amber)", fontWeight: 700 }}>Preserve Evidence</div>
+                <h3 style={{ margin: 0 }}>Save everything. Delete nothing.</h3>
+              </div>
+            </div>
+            <p>Screenshot all messages, calls, and transactions — <strong>before the scammer deletes them</strong>. Save WhatsApp chats, SMS, call logs, UPI transaction IDs, and bank statements.</p>
+            <p>Chetana can help you package this evidence for your complaint.</p>
+            <div style={{
+              marginTop: 12, padding: "10px 14px",
+              background: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.2)",
+              borderRadius: 8, fontSize: "0.85rem", lineHeight: 1.5,
+            }}>
+              <strong style={{ color: "var(--amber)" }}>Why now?</strong> Evidence preserved immediately is <strong>3x more useful to police</strong> than evidence gathered later. Scammers delete trails fast.
+            </div>
+          </div>
+        </motion.div>
 
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--primary-bright)" }}>
-          <h3>5. Change your passwords</h3>
-          <p>If you shared any passwords, PINs, or OTPs: change them now. All banking apps, email, and UPI apps.</p>
-        </div>
+        {stepConnector}
 
-        <div className="trust-card" style={{ borderLeft: "3px solid var(--safe, #22c55e)" }}>
-          <h3>6. Tell someone you trust</h3>
-          <p>Don't feel ashamed — scammers are professionals. Tell a family member or friend. They can help you stay calm and follow up.</p>
-        </div>
+        {/* ── Step 3: Report ── */}
+        <motion.div {...fadeInDelay(0.3)}>
+          <div className="trust-card" style={{ borderLeft: "4px solid var(--primary-bright)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "var(--primary-bright)", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: 15, flexShrink: 0,
+              }}>3</div>
+              <div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--primary-bright)", fontWeight: 700 }}>Report</div>
+                <h3 style={{ margin: 0 }}>File a complaint — protect others too</h3>
+              </div>
+            </div>
+            <p>Your report helps law enforcement track and shut down these networks. Every complaint makes it harder for scammers to target the next person.</p>
+            <a href="https://cybercrime.gov.in" target="_blank" rel="noopener" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              marginTop: 8, padding: "10px 22px",
+              background: "var(--primary-bright)", color: "#fff",
+              borderRadius: 10, fontWeight: 600, fontSize: "0.9rem",
+              textDecoration: "none",
+            }}>
+              <Flag size={16} /> File at cybercrime.gov.in
+            </a>
+            <p style={{ marginTop: 10, fontSize: "0.85rem", color: "var(--muted)" }}>
+              Your 1930 call reference number will speed this up. Attach the screenshots you saved in Step 2.
+            </p>
+          </div>
+        </motion.div>
+
+        {stepConnector}
+
+        {/* ── Step 4: Alert Family ── */}
+        <motion.div {...fadeInDelay(0.4)}>
+          <div className="trust-card" style={{ borderLeft: "4px solid var(--safe, #22c55e)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "var(--safe, #22c55e)", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: 15, flexShrink: 0,
+              }}>4</div>
+              <div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--safe, #22c55e)", fontWeight: 700 }}>Alert Family</div>
+                <h3 style={{ margin: 0 }}>You are not alone. This is not your fault.</h3>
+              </div>
+            </div>
+            <p>Share what happened with someone you trust. They can help you stay calm, follow up with the bank, and watch for follow-up scams (scammers often try again pretending to "help recover" your money).</p>
+            <button onClick={handleShare} style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              marginTop: 10, padding: "10px 22px",
+              background: shareCopied ? "var(--safe, #22c55e)" : "rgba(34,197,94,0.12)",
+              color: shareCopied ? "#fff" : "var(--safe, #22c55e)",
+              border: shareCopied ? "none" : "1px solid rgba(34,197,94,0.3)",
+              borderRadius: 10, fontWeight: 600, fontSize: "0.9rem",
+              cursor: "pointer", transition: "all 0.2s ease",
+            }}>
+              <Share2 size={16} />
+              {shareCopied ? "Message copied!" : "Share with someone you trust"}
+            </button>
+            <p style={{ marginTop: 8, fontSize: "0.8rem", color: "var(--muted)" }}>
+              Sends: "I may have been targeted by a scam. Here's what happened and what I'm doing about it."
+            </p>
+          </div>
+        </motion.div>
+
+        {stepConnector}
+
+        {/* ── Step 5: Protect ── */}
+        <motion.div {...fadeInDelay(0.5)}>
+          <div className="trust-card" style={{ borderLeft: "4px solid var(--primary-bright)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%",
+                background: "var(--primary-bright)", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: 15, flexShrink: 0,
+              }}>5</div>
+              <div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--primary-bright)", fontWeight: 700 }}>Protect</div>
+                <h3 style={{ margin: 0 }}>Lock down your accounts</h3>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Lock size={16} style={{ color: "var(--primary-bright)", marginTop: 3, flexShrink: 0 }} />
+                <p style={{ margin: 0 }}><strong>Change passwords</strong> for any accounts you shared information with — banking apps, email, UPI apps, and social media.</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Smartphone size={16} style={{ color: "var(--primary-bright)", marginTop: 3, flexShrink: 0 }} />
+                <p style={{ margin: 0 }}><strong>Enable 2FA</strong> (two-factor authentication) on all banking and payment apps. This adds a second lock even if your password is compromised.</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Eye size={16} style={{ color: "var(--primary-bright)", marginTop: 3, flexShrink: 0 }} />
+                <p style={{ margin: 0 }}><strong>Monitor your accounts</strong> for the next 30 days. Report any unauthorized transactions immediately.</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
+      {/* Footer */}
       <div style={{ textAlign: "center", marginTop: 32, padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12 }}>
-        <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-          Chetana is not a government service. For emergencies, contact local police or call 112.<br />
-          Women helpline: 181 · Senior citizens: 14567
+        <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: 8 }}>
+          Chetana is not a government service. For emergencies, contact local police or call 112.
+        </p>
+        <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: 0 }}>
+          Women helpline: 181 · Senior citizens: 14567 · Child helpline: 1098
         </p>
       </div>
     </motion.section>
@@ -2180,6 +2482,144 @@ export function IncidentStepper({ onNavigate }: { onNavigate: (p: PageId) => voi
         <button onClick={() => onNavigate("scan")} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 13, textDecoration: "underline" }}>
           Back to scanner
         </button>
+      </div>
+    </motion.section>
+  );
+}
+
+/* ── Family Page (Parivar) ───────────────────────────────────── */
+interface FamilyContact { name: string; phone: string; }
+const FAMILY_KEY = "chetana_family_contacts";
+const SENIOR_KEY = "chetana_senior_mode";
+
+export function FamilyPage() {
+  const [contacts, setContacts] = useState<FamilyContact[]>(() => {
+    try { return JSON.parse(localStorage.getItem(FAMILY_KEY) || "[]"); } catch { return []; }
+  });
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [seniorMode, setSeniorMode] = useState(() => localStorage.getItem(SENIOR_KEY) === "true");
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+
+  const saveContacts = (c: FamilyContact[]) => { setContacts(c); localStorage.setItem(FAMILY_KEY, JSON.stringify(c)); };
+
+  const addContact = () => {
+    const trimName = name.trim();
+    const trimPhone = phone.trim();
+    if (!trimName || !trimPhone) return;
+    if (contacts.length >= 5) return;
+    saveContacts([...contacts, { name: trimName, phone: trimPhone }]);
+    setName(""); setPhone("");
+  };
+
+  const removeContact = (idx: number) => { saveContacts(contacts.filter((_, i) => i !== idx)); };
+
+  const toggleSenior = () => {
+    const next = !seniorMode;
+    setSeniorMode(next);
+    localStorage.setItem(SENIOR_KEY, String(next));
+  };
+
+  const sendAlert = async () => {
+    const msg = "I received a suspicious message. Can you help me verify? Check it at chetana.activemirror.ai";
+    if (navigator.share) {
+      try { await navigator.share({ title: "Chetana Family Alert", text: msg }); setShareStatus("Shared!"); }
+      catch { setShareStatus(null); }
+    } else {
+      try { await navigator.clipboard.writeText(msg); setShareStatus("Copied to clipboard!"); }
+      catch { setShareStatus("Could not share"); }
+    }
+    if (shareStatus) setTimeout(() => setShareStatus(null), 3000);
+  };
+
+  const cardStyle: React.CSSProperties = { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "20px 24px" };
+  const inputStyle: React.CSSProperties = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none" };
+
+  return (
+    <motion.section className="panel" {...fadeIn}>
+      <div className="panel-header">
+        <h2><Users size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Parivar — Family Trust Circle</h2>
+        <p>Protect your family from scams. Add trusted contacts, send alerts instantly, and keep elders safe.</p>
+      </div>
+
+      {/* Senior-Safe Banner */}
+      {seniorMode && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 12, padding: "12px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <ShieldCheck size={18} style={{ color: "#22c55e", flexShrink: 0 }} />
+          <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 14 }}>Senior-safe mode active</span>
+        </motion.div>
+      )}
+
+      {/* Family Protection Score */}
+      <motion.div {...fadeInDelay(0.1)} style={{ ...cardStyle, marginBottom: 20, textAlign: "center" }}>
+        <Shield size={32} style={{ color: "var(--primary-bright)", marginBottom: 8 }} />
+        {contacts.length > 0 ? (
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#f8fafc" }}>Your family circle: {contacts.length} member{contacts.length !== 1 ? "s" : ""} protected</div>
+        ) : (
+          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.5)" }}>Add your first trusted contact to start protecting your family.</div>
+        )}
+      </motion.div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+
+        {/* Add Trusted Contacts */}
+        <motion.div {...fadeInDelay(0.2)} style={cardStyle}>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}><UserCheck size={18} style={{ color: "var(--primary-bright)" }} /> Trusted Contacts</h3>
+          {contacts.length < 5 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+              <input style={inputStyle} placeholder="Name" value={name} onChange={e => setName(e.target.value)} maxLength={40} />
+              <input style={inputStyle} placeholder="Phone number" value={phone} onChange={e => setPhone(e.target.value)} maxLength={15} type="tel" />
+              <button onClick={addContact} disabled={!name.trim() || !phone.trim()} style={{ background: "var(--primary-bright)", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontWeight: 600, cursor: "pointer", opacity: (!name.trim() || !phone.trim()) ? 0.4 : 1, transition: "opacity 0.2s" }}>
+                Add Contact ({contacts.length}/5)
+              </button>
+            </div>
+          )}
+          {contacts.length >= 5 && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>Maximum 5 contacts reached.</p>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {contacts.map((c, i) => (
+              <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Phone size={14} style={{ color: "var(--primary-bright)" }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#f8fafc" }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{c.phone}</div>
+                  </div>
+                </div>
+                <button onClick={() => removeContact(i)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", padding: 4 }} title="Remove">
+                  <X size={14} />
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* One-Tap Family Alert + Senior Toggle */}
+        <motion.div {...fadeInDelay(0.3)} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Alert Button */}
+          <div style={cardStyle}>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Share2 size={18} style={{ color: "#f59e0b" }} /> One-Tap Family Alert</h3>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>Send a pre-written alert to your family asking them to help verify a suspicious message.</p>
+            <button onClick={sendAlert} style={{ width: "100%", padding: "16px 20px", background: "linear-gradient(135deg, #f59e0b, #ef4444)", border: "none", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "transform 0.15s", boxShadow: "0 4px 24px rgba(245,158,11,0.25)" }}>
+              <AlertTriangle size={20} />
+              Alert My Family
+            </button>
+            {shareStatus && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 10, fontSize: 13, color: "#22c55e", textAlign: "center" }}>
+                {shareStatus}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Senior-Safe Toggle */}
+          <div style={cardStyle}>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Eye size={18} style={{ color: "#a78bfa" }} /> Senior-Safe Mode</h3>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>Enable simplified interface signals for elderly family members.</p>
+            <button onClick={toggleSenior} style={{ width: "100%", padding: "14px 20px", background: seniorMode ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)", border: seniorMode ? "2px solid rgba(34,197,94,0.4)" : "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: seniorMode ? "#22c55e" : "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all 0.2s" }}>
+              <ShieldCheck size={18} />
+              {seniorMode ? "Senior-Safe Mode: ON" : "Senior-Safe Mode: OFF"}
+            </button>
+          </div>
+        </motion.div>
       </div>
     </motion.section>
   );

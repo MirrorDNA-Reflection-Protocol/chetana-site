@@ -4,7 +4,7 @@ import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
   StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA, ShareCTA,
-  WeatherBoard, Atlas, TrustPage, PanicPage, IncidentStepper, Footer
+  WeatherBoard, Atlas, TrustPage, PanicPage, IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -395,6 +395,7 @@ export default function App() {
             {page === "incident" && <IncidentStepper onNavigate={setPage} />}
             {page === "vigilance" && <VigilancePage />}
             {page === "story" && <StoryPage />}
+            {page === "family" && <FamilyPage />}
 
           </motion.div>
         </AnimatePresence>

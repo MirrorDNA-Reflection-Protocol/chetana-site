@@ -92,6 +92,22 @@ app = FastAPI(
 from app.incident.incident_mode import router as incident_router  # noqa: E402
 app.include_router(incident_router)
 
+# ── B2B API (key-gated, versioned) ────────────────────────────────────────
+from app.b2b_router import b2b_router  # noqa: E402
+app.include_router(b2b_router)
+
+# ── Witness Chain (public transparency) ───────────────────────────────────
+# Proxies to the local witness verifier at :8950. No auth — transparency endpoint.
+@app.get("/api/witness/{path:path}")
+async def witness_proxy(path: str):
+    """Public witness chain verifier — tamper-evident AI audit trail."""
+    client = await get_client()
+    try:
+        resp = await client.get(f"http://localhost:8950/{path}", timeout=10.0)
+        return resp.json()
+    except Exception:
+        return {"error": "Witness chain verifier unavailable"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

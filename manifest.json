@@ -2,12 +2,42 @@
   "name": "Chetana — India's Free Scam Checker",
   "short_name": "Chetana",
   "description": "Screenshot it. Check it. Know in seconds. Free scam detection for India in 12 languages.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#060610",
   "theme_color": "#3b82f6",
+  "lang": "en-IN",
+  "categories": ["security", "utilities"],
   "icons": [
-    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "1024x1024", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/?share=true",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*", "audio/*", "video/*", "application/pdf"]
+        }
+      ]
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Scan Message",
+      "short_name": "Scan",
+      "description": "Check a suspicious message now",
+      "url": "/?action=scan",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "edge-truth.v1",
-  "generated_at": "2026-03-26T07:25:22.675259+00:00",
+  "generated_at": "2026-03-26T07:42:36.453418+00:00",
   "surface": {
     "id": "chetana-public-edge",
     "product": "Chetana",
@@ -35,9 +35,9 @@
     ],
     "watch_file_count": 56,
     "missing_paths": [],
-    "watch_fingerprint": "ee19d2c89da422d9f160163d1e21bbc1c858b798fb27f14fc8d7a52b0391f286",
+    "watch_fingerprint": "78ce5752e217003ee1ae45f91dd36d0879b797eda3a5cb997df44b38651456ac",
     "newest_path": "frontend/src/components.tsx",
-    "newest_mtime": "2026-03-26T07:25:16.968712+00:00"
+    "newest_mtime": "2026-03-26T07:42:31.853807+00:00"
   },
   "notes": [
     "Frontend assets are served by the FastAPI edge."

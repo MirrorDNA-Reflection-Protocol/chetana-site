@@ -145,7 +145,7 @@ const FALLBACK_TICKER = [
   { icon: "⚡", text: "24 lakh+ fraud complaints filed in 2025 — I4C/NCRP data" },
   { icon: "🟠", text: "1 in 5 UPI users affected by fraud in last 3 years — LocalCircles/NPCI survey" },
   { icon: "🔴", text: "51% of scam victims never report — I4C survey. Screenshot suspicious messages before they disappear" },
-  { icon: "⚡", text: "Got a suspicious message? Screenshot it and check on Chetana — free, instant, 12 languages" },
+  { icon: "⚡", text: "Got a suspicious message? Screenshot it and check on Chetana — free, instant, 12+ languages" },
 ];
 
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
@@ -579,6 +579,42 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
     sendChat(s);
   };
 
+  const handleSaveEvidence = async (msg: ChatMsg) => {
+    if (!msg.scanResult) return;
+    try {
+      const resp = await fetch(`${API}/api/evidence/bundle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scan_result: msg.scanResult,
+          original_text: msg.text,
+          notes: ""
+        })
+      });
+      const data = await resp.json();
+      const blob = new Blob([JSON.stringify(data.evidence_pack || data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evidence-pack-${data.incident_id || 'scan'}.json`;
+      a.click();
+      addMsg({ role: "bot", text: "Evidence pack saved. You can use this file when reporting to cybercrime authorities." });
+    } catch (e) {
+      addMsg({ role: "bot", text: "Failed to generate evidence pack. Please try again." });
+    }
+  };
+
+  const handleReportNow = (msg: ChatMsg) => {
+    const isFinancial = msg.text.toLowerCase().includes("bank") || msg.text.toLowerCase().includes("upi") || msg.text.toLowerCase().includes("payment") || msg.text.toLowerCase().includes("money");
+    if (isFinancial) {
+      window.open("tel:1930");
+      addMsg({ role: "bot", text: "Dialing 1930 (National Cybercrime Helpline). Stay on the line to report financial fraud." });
+    } else {
+      window.open("https://sancharsaathi.gov.in/sancharsaathi/chakshu", "_blank");
+      addMsg({ role: "bot", text: "Opening Chakshu portal. Report this communication fraud to the Department of Telecommunications." });
+    }
+  };
+
   const sendChat = async (text: string) => {
     addMsg({ role: "user", text });
     setLoading(true);
@@ -829,6 +865,12 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                       });
                     }}>
                       <ShieldAlert size={14} /> Protect me now
+                    </button>
+                    <button className="tool-evidence-btn" onClick={() => handleSaveEvidence(msg)} title="Download evidence for reporting">
+                      <FileText size={14} /> Save Evidence
+                    </button>
+                    <button className="tool-report-btn" onClick={() => handleReportNow(msg)} title="Report to authorities">
+                      <Flag size={14} /> Report Now
                     </button>
                   </div>
                 )}
@@ -1542,14 +1584,29 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   const [open, setOpen] = useState(!!inline);
   const [agreed, setAgreed] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
+  const [activeTab, setActiveTab] = useState<"chat" | "apk">("chat");
   const [input, setInput] = useState(initialInput || "");
+  const [apkUrl, setApkUrl] = useState("");
+  const [apkBrand, setApkBrand] = useState("");
+  const [apkResult, setApkResult] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingForOther, setCheckingForOther] = useState(false);
   const [sessionScans, setSessionScans] = useState(0);
+  const EXAMPLE_PROMPTS = [
+    "Hey! OMG is this you in this video?? 😂😂 https://insta-reelz.cc/video/8832k",
+    "Hi, I'm from HR at Flipkart. We found your resume on Naukri. Work from home, earn ₹10,000/day. Join our Telegram group to start.",
+    "URGENT: This is CBI Cyber Division. A case has been registered against your Aadhaar. To avoid arrest, pay ₹15,000 fine immediately via UPI.",
+  ];
+  const EXAMPLE_LABELS = [
+    "📸 'Is this you?' DM",
+    "💼 Too-good job offer",
+    "👮 Fake digital arrest",
+  ];
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
     text: "**Screenshot or paste** any suspicious message.\n\nWhatsApp, SMS, link, UPI ID — just drop it here.\nScreenshots are scanned on your device. Nothing leaves your phone.\n\n_Check karo. Safe raho._",
+    suggestions: EXAMPLE_LABELS,
   }]);
   const [listening, setListening] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -1622,7 +1679,47 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
     window.open(`https://wa.me/?text=${t}`, '_blank');
   };
 
+  const checkApkRisk = async () => {
+    if (!apkUrl) return;
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API}/api/apk/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: apkUrl, text: input, claimed_brand: apkBrand }),
+      });
+      const data = await resp.json();
+      setApkResult(data);
+    } catch (e) {
+      console.error("APK Check failed", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runSampleScan = (sampleText: string) => {
+    addMsg({ role: "user", text: sampleText });
+    setInput(""); setLoading(true);
+    (async () => {
+      try {
+        const mode = detectInputType(sampleText);
+        let resp: Response;
+        if (mode === "link") resp = await fetch(`${API}/api/link/check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: sampleText, lang }) });
+        else resp = await fetch(`${API}/api/scan/full`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: sampleText, lang }) });
+        if (!resp.ok) throw new Error("Server error");
+        const data = await resp.json();
+        const { text, scanResult, suggestions } = buildBotReply(mode, data);
+        addMsg({ role: "bot", text, scanResult, suggestions });
+        if (scanResult) recordScan(mode, scanResult);
+      } catch { addMsg({ role: "bot", text: "Couldn't complete the check. Try again." }); }
+      finally { setLoading(false); }
+    })();
+  };
+
   const handleSuggestion = (s: string) => {
+    // Example prompt chips — run sample scan
+    const exIdx = EXAMPLE_LABELS.indexOf(s);
+    if (exIdx !== -1) { runSampleScan(EXAMPLE_PROMPTS[exIdx]); return; }
     const lower = s.toLowerCase();
     if (lower === "call 1930") { window.open("tel:1930"); return; }
     if (lower === "open cybercrime.gov.in") { window.open("https://cybercrime.gov.in", "_blank"); return; }
@@ -1684,6 +1781,42 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   const acceptTerms = () => {
     localStorage.setItem("chetana_terms_accepted", new Date().toISOString());
     setAgreed(true);
+  };
+
+  const handleSaveEvidence = async (msg: ChatMsg) => {
+    if (!msg.scanResult) return;
+    try {
+      const resp = await fetch(`${API}/api/evidence/bundle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scan_result: msg.scanResult,
+          original_text: msg.text,
+          notes: ""
+        })
+      });
+      const data = await resp.json();
+      const blob = new Blob([JSON.stringify(data.evidence_pack || data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evidence-pack-${data.incident_id || 'scan'}.json`;
+      a.click();
+      addMsg({ role: "bot", text: "Evidence pack saved. You can use this file when reporting to cybercrime authorities." });
+    } catch (e) {
+      addMsg({ role: "bot", text: "Failed to generate evidence pack. Please try again." });
+    }
+  };
+
+  const handleReportNow = (msg: ChatMsg) => {
+    const isFinancial = msg.text.toLowerCase().includes("bank") || msg.text.toLowerCase().includes("upi") || msg.text.toLowerCase().includes("payment") || msg.text.toLowerCase().includes("money");
+    if (isFinancial) {
+      window.open("tel:1930");
+      addMsg({ role: "bot", text: "Dialing 1930 (National Cybercrime Helpline). Stay on the line to report financial fraud." });
+    } else {
+      window.open("https://sancharsaathi.gov.in/sancharsaathi/chakshu", "_blank");
+      addMsg({ role: "bot", text: "Opening Chakshu portal. Report this communication fraud to the Department of Telecommunications." });
+    }
   };
 
   const handleSend = async () => {
@@ -1866,9 +1999,20 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
               </div>
             )}
 
+            {/* Tab Switcher */}
+            <div className="sw-tabs">
+              <button className={`sw-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+                <Bot size={14} /> <span>Chat Scanner</span>
+              </button>
+              <button className={`sw-tab ${activeTab === 'apk' ? 'active' : ''}`} onClick={() => setActiveTab('apk')}>
+                <ShieldAlert size={14} /> <span>APK Danger Lane</span>
+              </button>
+            </div>
+
             {/* Messages */}
             <div className="sw-messages" ref={scrollRef} style={{ display: agreed ? undefined : 'none' }}>
-              {messages.map(msg => (
+              {activeTab === "chat" ? (
+                messages.map(msg => (
                 <div key={msg.id} className={`sw-msg ${msg.role}`}>
                   <div className={`sw-bubble ${msg.role}`}>
                     {msg.scanResult && (
@@ -1908,55 +2052,19 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                         {msg.scanResult.score >= 50 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                             <button
-                              onClick={() => {
-                                const sr = msg.scanResult!;
-                                const hash = Array.from(new Uint8Array(new TextEncoder().encode(msg.text))).reduce((a, b) => ((a << 5) - a + b) | 0, 0).toString(16);
-                                const evidenceText = [
-                                  `CHETANA EVIDENCE CARD`,
-                                  `Generated: ${new Date().toISOString()}`,
-                                  `---`,
-                                  `Verdict: ${sr.verdict}`,
-                                  `Risk Score: ${sr.score}/100`,
-                                  `Trust State: ${sr.trust_state || "unknown"}`,
-                                  `Signals: ${sr.signals.join("; ")}`,
-                                  `Reason Codes: ${(sr.reason_codes || []).join("; ") || "N/A"}`,
-                                  `Content Hash: ${hash}`,
-                                  `---`,
-                                  `Analysis:`,
-                                  msg.text,
-                                  `---`,
-                                  `This evidence was generated by Chetana (chetana.activemirror.ai).`,
-                                  `Advisory tool only. Not a legal determination.`,
-                                ].join("\n");
-                                const blob = new Blob([evidenceText], { type: "text/plain" });
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download = `chetana-evidence-${Date.now()}.txt`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                              }}
+                              onClick={() => handleSaveEvidence(msg)}
                               style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, cursor: "pointer" }}
-                              title="Download evidence card"
+                              title="Download evidence pack"
                             >
                               <FileText size={12} /> Save Evidence
                             </button>
-                            <a
-                              href="tel:1930"
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.15)", color: "#ff8a8a", fontSize: 11, textDecoration: "none", fontWeight: 600, cursor: "pointer" }}
-                              title="Call Cyber Crime Helpline"
+                            <button
+                              onClick={() => handleReportNow(msg)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.15)", color: "#ff8a8a", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                              title="Report to authorities"
                             >
-                              <Phone size={12} /> Call 1930
-                            </a>
-                            <a
-                              href="https://cybercrime.gov.in"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, textDecoration: "none", cursor: "pointer" }}
-                              title="File complaint at cybercrime.gov.in"
-                            >
-                              <Flag size={12} /> Report Online
-                            </a>
+                              <Flag size={12} /> Report Now
+                            </button>
                             <button
                               onClick={() => {
                                 const text = "I checked this with Chetana and it looks suspicious. Be careful. chetana.activemirror.ai";
@@ -1991,8 +2099,67 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                     )}
                   </div>
                 </div>
-              ))}
-              {loading && (
+              )) : (
+                <div className="sw-apk-lane">
+                  <div className="apk-intro">
+                    <ShieldAlert size={28} style={{ color: "var(--danger)" }} />
+                    <h4>APK Danger Lane</h4>
+                    <p>Verify app install links, SMS warnings, or suspicious URLs.</p>
+                  </div>
+                  
+                  <div className="apk-fields">
+                    <label>Install URL / Link</label>
+                    <input type="text" value={apkUrl} onChange={e => setApkUrl(e.target.value)} placeholder="https://example.com/app.apk" />
+                    
+                    <label>Claimed Brand (e.g. SBI, Police, DHL)</label>
+                    <input type="text" value={apkBrand} onChange={e => setApkBrand(e.target.value)} placeholder="Who does it say they are?" />
+                    
+                    <label>Warning / Message Text</label>
+                    <textarea value={input} onChange={e => setInput(e.target.value)} placeholder="Paste any text from the SMS or install prompt..." rows={3} />
+                    
+                    <button className="apk-check-btn" onClick={checkApkRisk} disabled={loading || !apkUrl}>
+                      {loading ? "Analyzing..." : "Confirm Security"}
+                    </button>
+                  </div>
+
+                  {apkResult && (
+                    <div className={`apk-result-card risk-${apkResult.risk_level}`}>
+                      <div className="apk-result-header">
+                        {apkResult.risk_level === "critical" || apkResult.risk_level === "high" ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
+                        <span>{apkResult.risk_level.toUpperCase()} RISK</span>
+                      </div>
+                      
+                      {apkResult.reason_tags.length > 0 && (
+                        <div className="apk-signals">
+                          {apkResult.reason_tags.map((t: string) => <span key={t} className="apk-tag">{t.replace(/_/g, ' ')}</span>)}
+                        </div>
+                      )}
+
+                      <div className="apk-actions-list">
+                        <h5>Recommended Actions:</h5>
+                        <ul>
+                          {apkResult.recommended_actions.map((a: string) => <li key={a}>{a}</li>)}
+                        </ul>
+                      </div>
+                      
+                      <div className="apk-result-footer">
+                        <button className="apk-save-btn" onClick={() => handleSaveEvidence({ 
+                          role: "bot", 
+                          text: `APK Risk Check: ${apkResult.risk_level}\nURL: ${apkUrl}`, 
+                          scanResult: { 
+                            verdict: apkResult.risk_level.toUpperCase(), 
+                            score: apkResult.risk_level === "critical" ? 95 : 75, 
+                            signals: apkResult.reason_tags 
+                          } 
+                        } as any)}>
+                          <FileText size={14} /> Save Report
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {activeTab === "chat" && loading && (
                 <div className="sw-msg bot">
                   <div className="sw-bubble bot sw-typing"><span /><span /><span /></div>
                 </div>

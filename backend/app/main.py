@@ -616,6 +616,13 @@ class ChatRequest(BaseModel):
     message: str = Field(..., max_length=2000)
 
 
+class APKCheckRequest(BaseModel):
+    url: Optional[str] = Field(default="", max_length=2048)
+    filename: Optional[str] = Field(default="", max_length=256)
+    text: Optional[str] = Field(default="", max_length=10000)
+    claimed_brand: Optional[str] = Field(default="", max_length=100)
+
+
 # ── Health ────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -1145,17 +1152,23 @@ async def upi_check(req: UpiCheckRequest):
     return {"error": "UPI check temporarily unavailable", "upi_id": req.upi_id, "verdict": "SERVICE_UNAVAILABLE", "risk_score": 0}
 
 
-@app.post("/api/phone/check")
-async def phone_check(req: PhoneCheckRequest):
-    """Proxy phone number check to Kavach."""
+    return {"error": "Phone check temporarily unavailable", "phone": req.phone, "verdict": "SERVICE_UNAVAILABLE", "risk_score": 0}
+
+
+    return {"error": "APK check temporarily unavailable", "risk_level": "unknown", "reason_tags": ["service_error"]}
+
+
+@app.post("/api/evidence/bundle")
+async def evidence_bundle_proxy(req: dict):
+    """Proxy evidence bundle generation to Kavach."""
     try:
         client = await get_client()
-        resp = await client.post(f"{KAVACH_URL}/api/phone/check", json={"phone": req.phone})
+        resp = await client.post(f"{KAVACH_URL}/api/evidence/bundle", json=req)
         if resp.status_code == 200:
             return resp.json()
     except Exception as e:
-        logger.warning("Kavach phone check failed: %s", e)
-    return {"error": "Phone check temporarily unavailable", "phone": req.phone, "verdict": "SERVICE_UNAVAILABLE", "risk_score": 0}
+        logger.warning("Kavach evidence bundle failed: %s", e)
+    return {"error": "Evidence generation temporarily unavailable"}
 
 
 @app.get("/api/kb/articles")

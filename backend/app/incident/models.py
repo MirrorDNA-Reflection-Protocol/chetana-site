@@ -171,3 +171,4 @@ class IncidentSession(BaseModel):
     guardian_alerted: bool              = False
     completed:        bool              = False
     follow_up_outcome: Optional[FollowUpOutcome] = None
+    evidence_pack_id:  Optional[str]     = None  # Result of P1: real capture

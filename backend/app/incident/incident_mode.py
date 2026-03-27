@@ -171,8 +171,39 @@ async def incident_action(req: IncidentActionRequest) -> IncidentActionResponse:
         )
 
     if action == "save_evidence":
-        # P0 stub: acknowledge. P1 will capture screenshot bundle.
-        logger.info("Evidence capture stub triggered: incident=%s", session.incident_id)
+        logger.info("Evidence capture triggered: incident=%s", session.incident_id)
+        
+        # Prepare payload for Kavach evidence bundle
+        # In a real system, we'd fetch the actual scan result from Kavach or DB.
+        # For this P1 integration, we reconstruct from session state.
+        import httpx
+        KAVACH_URL = "http://127.0.0.1:8790"
+        
+        scan_payload = {
+            "threat_score": session.score or 0,
+            "risk_level": session.risk_level.value,
+            "signals": session.raw_signals,
+            "category": session.category.value,
+            "metadata": {"source_hash": session.scan_id or "manual_entry"}
+        }
+        
+        bundle_req = {
+            "scan_result": scan_payload,
+            "notes": (req.payload or {}).get("notes", "Evidence captured via Chetana Incident Mode.")
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(f"{KAVACH_URL}/api/evidence/bundle", json=bundle_req)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    session.evidence_pack_id = data.get("id")
+                    _save_session(session)
+                    logger.info("Evidence bundle created: %s", session.evidence_pack_id)
+        except Exception as e:
+            logger.error("Failed to create evidence bundle: %s", e)
+            # Fallback: keep current screen, maybe show error in UI later
+
         screen = get_screen(session)
         return IncidentActionResponse(
             incident_id=session.incident_id,

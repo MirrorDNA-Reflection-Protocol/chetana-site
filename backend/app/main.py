@@ -30,7 +30,7 @@ from gates import gate_output, enforce_disclaimer  # noqa: E402
 
 logger = logging.getLogger("chetana.showcase")
 
-KAVACH_URL = "http://127.0.0.1:8790"
+KAVACH_URL = "http://127.0.0.1:8791"
 TELEGRAM_API = "https://api.telegram.org"
 
 
@@ -623,6 +623,11 @@ class APKCheckRequest(BaseModel):
     claimed_brand: Optional[str] = Field(default="", max_length=100)
 
 
+class OracleVerifyRequest(BaseModel):
+    hash: Optional[str] = Field(default=None, max_length=128)
+    url: Optional[str] = Field(default=None, max_length=2048)
+
+
 # ── Health ────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -1152,10 +1157,43 @@ async def upi_check(req: UpiCheckRequest):
     return {"error": "UPI check temporarily unavailable", "upi_id": req.upi_id, "verdict": "SERVICE_UNAVAILABLE", "risk_score": 0}
 
 
+@app.post("/api/phone/check")
+async def phone_check(req: PhoneCheckRequest):
+    """Proxy phone check to Kavach."""
+    try:
+        client = await get_client()
+        resp = await client.post(f"{KAVACH_URL}/api/phone/check", json={"phone": req.phone})
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning("Kavach phone check failed: %s", e)
     return {"error": "Phone check temporarily unavailable", "phone": req.phone, "verdict": "SERVICE_UNAVAILABLE", "risk_score": 0}
 
 
+@app.post("/api/apk/check")
+async def apk_check_proxy(req: APKCheckRequest):
+    """Proxy APK risk check to Kavach."""
+    try:
+        client = await get_client()
+        resp = await client.post(f"{KAVACH_URL}/api/apk/check", json=req.dict())
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning("Kavach APK check failed: %s", e)
     return {"error": "APK check temporarily unavailable", "risk_level": "unknown", "reason_tags": ["service_error"]}
+
+
+@app.post("/api/oracle/verify")
+async def oracle_verify_proxy(req: OracleVerifyRequest):
+    """Proxy Oracle media verification to Kavach."""
+    try:
+        client = await get_client()
+        resp = await client.post(f"{KAVACH_URL}/api/oracle/verify", json=req.dict())
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning("Kavach Oracle verify failed: %s", e)
+    return {"error": "Oracle verification temporarily unavailable", "state": "unable_to_verify", "trust_score": 0}
 
 
 @app.post("/api/evidence/bundle")

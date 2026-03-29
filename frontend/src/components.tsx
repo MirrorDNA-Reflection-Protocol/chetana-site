@@ -2012,7 +2012,8 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
             {/* Messages */}
             <div className="sw-messages" ref={scrollRef} style={{ display: agreed ? undefined : 'none' }}>
               {activeTab === "chat" ? (
-                messages.map(msg => (
+                <>
+                  {messages.map((msg) => (
                 <div key={msg.id} className={`sw-msg ${msg.role}`}>
                   <div className={`sw-bubble ${msg.role}`}>
                     {msg.scanResult && (
@@ -2099,7 +2100,9 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                     )}
                   </div>
                 </div>
-              )) : (
+                  ))}
+                </>
+              ) : (
                 <div className="sw-apk-lane">
                   <div className="apk-intro">
                     <ShieldAlert size={28} style={{ color: "var(--danger)" }} />

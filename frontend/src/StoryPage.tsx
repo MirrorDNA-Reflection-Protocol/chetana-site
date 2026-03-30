@@ -105,7 +105,7 @@ export default function StoryPage() {
           The Build
         </h2>
         <p style={{ color: "#b0b0c0", fontSize: "1rem", lineHeight: 1.7, margin: "0 0 24px", maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
-          10 months. Local hardware. No cloud. Here's a walkthrough of the system that powers Chetana.
+          Built on local hardware from Day 1. No cloud. Here's a walkthrough of the live sovereign system that powers Chetana.
         </p>
         <div style={{
           position: "relative",

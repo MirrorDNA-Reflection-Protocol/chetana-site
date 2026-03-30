@@ -17,6 +17,8 @@ export default function App() {
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [sharedContent, setSharedContent] = useState<string | null>(null);
   const [sharedAttachment, setSharedAttachment] = useState<File | null>(null);
+  const [updateReady, setUpdateReady] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const setPage = (p: PageId) => {
     if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic") {
@@ -94,11 +96,102 @@ export default function App() {
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    let disposed = false;
+    let registrationCleanup: (() => void) | undefined;
+    let intervalId: number | undefined;
+
+    const attachRegistration = (registration: ServiceWorkerRegistration) => {
+      if (registration.waiting) {
+        setUpdateReady(true);
+      }
+
+      const onUpdateFound = () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            setUpdateReady(true);
+          }
+        });
+      };
+
+      registration.addEventListener("updatefound", onUpdateFound);
+      intervalId = window.setInterval(() => {
+        registration.update().catch(() => {});
+      }, 180000);
+
+      return () => {
+        registration.removeEventListener("updatefound", onUpdateFound);
+      };
+    };
+
+    const onControllerChange = () => window.location.reload();
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        registration?.update().catch(() => {});
+      });
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (disposed || !registration) return;
+      registrationCleanup = attachRegistration(registration);
+      registration.update().catch(() => {});
+    });
+
+    return () => {
+      disposed = true;
+      if (intervalId) window.clearInterval(intervalId);
+      registrationCleanup?.();
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const refreshToLatest = async () => {
+    setRefreshing(true);
+    try {
+      if (!("serviceWorker" in navigator)) {
+        window.location.reload();
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.getRegistration();
+      await registration?.update().catch(() => {});
+
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        return;
+      }
+
+      window.location.reload();
+    } catch {
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="app-shell">
       <BackgroundMesh />
       <AlertBanner onNavigate={setPage as any} />
       <Nav page={page} setPage={setPage} />
+      {updateReady && (
+        <div className="app-update-banner">
+          <div className="app-update-copy">
+            <strong>New version ready.</strong>
+            <span>Refresh Chetana for the latest scam checks and fixes. नई version तैयार है.</span>
+          </div>
+          <button onClick={refreshToLatest} disabled={refreshing}>
+            {refreshing ? "Refreshing..." : "Refresh now"}
+          </button>
+        </div>
+      )}
       <main>
         <AnimatePresence mode="wait">
           <motion.div key={page} {...pageAnim}>

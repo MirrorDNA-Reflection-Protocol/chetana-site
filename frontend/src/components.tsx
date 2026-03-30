@@ -637,20 +637,21 @@ function detectFileType(file: File): ScanMode {
 
 function verdictClass(v: string, trustState?: string) {
   if (trustState === "blocked" || v === "SUSPICIOUS" || v === "HIGH") return "verdict-suspicious";
-  if (trustState === "inspect" || v === "UNCLEAR" || v === "MEDIUM") return "verdict-unclear";
+  if (trustState === "inspect" || trustState === "unverified" || v === "UNCLEAR" || v === "MEDIUM") return "verdict-unclear";
   return "verdict-low-risk";
 }
 
 function trustLabel(trustState?: string): string {
   if (trustState === "blocked") return "Blocked";
   if (trustState === "inspect") return "Inspect";
-  if (trustState === "unverified") return "Unverified";
+  if (trustState === "unverified") return "Need more";
   if (trustState === "trusted") return "Trusted";
   return "";
 }
 
 function verdictSummary(verdict: string, trustState?: string): string {
   if (trustState === "blocked" || verdict === "SUSPICIOUS" || verdict === "HIGH") return "Stop and verify";
+  if (trustState === "unverified") return "Not enough evidence yet";
   if (trustState === "inspect" || verdict === "UNCLEAR" || verdict === "MEDIUM") return "Pause and verify";
   return "Probably okay";
 }
@@ -673,6 +674,8 @@ function shareCopy(scanResult: NonNullable<ChatMsg["scanResult"]>): string {
   const why = scanResult.signals?.slice(0, 2).join(", ");
   const nextStep = summary === "Stop and verify"
     ? "Do not pay, click, or reply until you verify through an official app, website, or helpline."
+    : summary === "Not enough evidence yet"
+    ? "Get one more proof before you act: full chat, clearer screenshot, official callback, or family check."
     : summary === "Pause and verify"
     ? "Pause and double-check through a second trusted source before you act."
     : "Still verify if money, account access, or OTPs are involved.";
@@ -689,6 +692,127 @@ function isMoneyRisk(mode: ScanMode, explanation: string, signals: string[]): bo
   return mode === "upi" || mode === "qr" || /(bank|money|payment|refund|account|utr|transaction|wallet|collect request|qr|otp)/.test(context);
 }
 
+interface IncidentPattern {
+  id: string;
+  label: string;
+  steps: string[];
+  hindi: string;
+}
+
+function dedupeSteps(items: string[]): string[] {
+  return Array.from(new Set(items.filter(Boolean)));
+}
+
+function detectIncidentPattern(mode: ScanMode, explanation: string, signals: string[], action?: string, fileName?: string): IncidentPattern | null {
+  const context = `${mode} ${fileName || ""} ${explanation} ${action || ""} ${signals.join(" ")}`.toLowerCase();
+
+  if (/(digital arrest|cbi|police|crime branch|aadhaar case|court|customs|legal notice|arrest)/.test(context)) {
+    return {
+      id: "authority",
+      label: "Fake police / digital arrest pressure",
+      steps: [
+        "Hang up or stop replying. Real police or CBI do not collect money on calls or video.",
+        "Call a known family member right away if the caller is pressuring you to stay alone.",
+        "If they asked for money or account access, call 1930 and your bank immediately.",
+      ],
+      hindi: "डरिए मत. पैसे मत भेजो. 1930 पर कॉल करो.",
+    };
+  }
+
+  if (/(kyc|bank|account freeze|account blocked|debit card|credit card|rbi|sbi|hdfc|icici|axis|pan update|re-kyc)/.test(context)) {
+    return {
+      id: "bank",
+      label: "Bank / KYC scare message",
+      steps: [
+        "Open the real bank app or website yourself. Do not use the link in the message.",
+        "Call the official bank number from your card, statement, or app.",
+        "Do not share OTP, PIN, CVV, Aadhaar, or screen-share access.",
+      ],
+      hindi: "OTP मत दो. बैंक ऐप से खुद चेक करो.",
+    };
+  }
+
+  if (/(parcel|courier|delivery|refund|reschedule|india post|delhivery|bluedart|customs fee|small payment)/.test(context)) {
+    return {
+      id: "parcel",
+      label: "Parcel / refund trap",
+      steps: [
+        "Do not pay a small fee from the message to release a parcel or refund.",
+        "Open the shopping or courier app yourself and check the order there.",
+        "If the page asks for card details, UPI PIN, or screen access, stop.",
+      ],
+      hindi: "छोटा पेमेंट मत करो. असली ऐप में चेक करो.",
+    };
+  }
+
+  if ((mode === "media" && /(payment|utr|credited|merchant|receipt|screenshot|successful)/.test(context)) || /(payment screenshot|utr|collect request|merchant payment|proof of payment)/.test(context)) {
+    return {
+      id: "payment-proof",
+      label: "Fake payment screenshot / payment proof check",
+      steps: [
+        "Do not hand over goods yet.",
+        "Check the payment inside your real bank or UPI app. Do not trust only the screenshot.",
+        "Wait for confirmation from your own bank or settlement rail before closing the sale.",
+      ],
+      hindi: "सिर्फ स्क्रीनशॉट पर भरोसा मत करो. अपने बैंक ऐप में चेक करो.",
+    };
+  }
+
+  if (/(telegram|task|commission|part[- ]?time|work from home|job offer|resume|earn per day|investment group)/.test(context)) {
+    return {
+      id: "job-task",
+      label: "Job / task / easy-money trap",
+      steps: [
+        "Do not pay a joining fee, training fee, or task unlock fee.",
+        "Do not move to Telegram or another app unless you already trust the company.",
+        "Search the company name plus scam reports before replying.",
+      ],
+      hindi: "जॉइनिंग फीस मत दो. पहले कंपनी चेक करो.",
+    };
+  }
+
+  if (/(apk|anydesk|teamviewer|quicksupport|remote access|screen share|install app|download app|accessibility service)/.test(context)) {
+    return {
+      id: "apk",
+      label: "Install-this-app / remote-access trap",
+      steps: [
+        "Do not install the app or APK.",
+        "Do not share screen, enable accessibility, or give remote access.",
+        "If you already installed it, disconnect from the internet, uninstall it, and call your bank if payment apps were open.",
+      ],
+      hindi: "ऐप इंस्टॉल मत करो. स्क्रीन शेयर मत करो.",
+    };
+  }
+
+  if (mode === "voice" || /(voice clone|voice note|call recording|family member voice|ai voice)/.test(context)) {
+    return {
+      id: "voice",
+      label: "Voice impersonation / panic call",
+      steps: [
+        "Hang up and call the person back on a number you already know.",
+        "Ask a question only the real person would know.",
+        "If money is involved, wait and verify with family before sending anything.",
+      ],
+      hindi: "कॉल काटो. अपने नंबर पर वापस कॉल करो.",
+    };
+  }
+
+  if (mode === "link") {
+    return {
+      id: "link",
+      label: "Suspicious link or fake website",
+      steps: [
+        "Do not open the link again or download anything from it.",
+        "Open the real app or website yourself instead of using the message link.",
+        "If you already entered bank details or an OTP, call your bank immediately.",
+      ],
+      hindi: "लिंक मत खोलो. असली ऐप या वेबसाइट खुद खोलो.",
+    };
+  }
+
+  return null;
+}
+
 function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: string; scanResult: ChatMsg["scanResult"]; suggestions: string[] } {
   const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
   const verdict = data.verdict ?? data.risk_level?.toUpperCase() ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
@@ -696,10 +820,35 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const action = data.action_eligibility || data.recommended_action || "";
   const explanation = data.explanation || data.analysis || "";
   const moneyRisk = isMoneyRisk(mode, explanation, signals);
+  const scenario = detectIncidentPattern(mode, explanation, signals, action, fileName);
+  const needsMoreEvidence =
+    data.trust_state === "unverified" ||
+    ((verdict === "UNCLEAR" || verdict === "MEDIUM") && (signals.length < 2 || score < 55)) ||
+    ((mode === "media" || mode === "voice") && signals.length === 0 && score < 45);
+  const hindiQuickLine = needsMoreEvidence
+    ? "रुकिए. पहले जाँच कीजिए."
+    : moneyRisk
+    ? "पैसे मत भेजो. OTP मत दो. 1930 पर कॉल करो."
+    : scenario?.hindi || "रुकिए. पहले जाँच कीजिए.";
 
   let text = "";
 
-  if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
+  if (needsMoreEvidence) {
+    const actions = dedupeSteps([
+      scenario?.steps[0] || "",
+      mode === "media" || mode === "voice"
+        ? "Add the full chat, a clearer screenshot, or the original voice note before deciding."
+        : "Paste the full chat or the exact message, not only one line.",
+      "Verify through a second trusted source: official app, official website, known number, or a family member.",
+      moneyRisk ? "If money already moved or banking details were shared, call 1930 now." : "",
+    ]);
+    text = `**Not enough evidence yet.**\n\n`;
+    if (scenario) text += `**What this may be:**\n• ${scenario.label}\n\n`;
+    text += "I can't confirm this safely from the current evidence alone.\n\n";
+    text += "**What to do next:**\n";
+    text += actions.slice(0, 4).map((item) => `• ${item}`).join("\n");
+    text += `\n\n**Hindi quick line:**\n• ${hindiQuickLine}`;
+  } else if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
     const lead = mode === "link"
       ? "Do not open this link."
       : mode === "upi" || moneyRisk
@@ -709,9 +858,10 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
       : mode === "voice"
       ? "Do not send money from this call or voice note."
       : mode === "media"
-      ? "Do not trust this screenshot or clip yet."
-      : "Do not reply, click, or pay.";
-    const actions = [
+        ? "Do not trust this screenshot or clip yet."
+        : "Do not reply, click, or pay.";
+    const actions = dedupeSteps([
+      ...(scenario?.steps || []),
       mode === "link"
         ? "Do not tap the link or download anything from it."
         : mode === "voice"
@@ -725,32 +875,37 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
         ? "If money or account access is involved, call 1930 and your bank immediately."
         : "Block the sender if you do not know them.",
       "Save screenshots, UPI IDs, links, and call details before anything disappears.",
-    ];
+    ]);
     text = `**${lead}**\n\n`;
+    if (scenario) text += `**What this looks like:**\n• ${scenario.label}\n\n`;
     if (explanation) text += explanation + "\n\n";
     text += "**Why Chetana is worried:**\n";
     if (signals.length) text += signals.slice(0, 5).map(s => `• ${s}`).join("\n");
     else text += "• Matches known scam patterns\n• Urgency or pressure tactics detected";
-    text += `\n\n**Next safe steps:**\n${actions.map((item) => `• ${item}`).join("\n")}`;
+    text += `\n\n**Next safe steps:**\n${actions.slice(0, 5).map((item) => `• ${item}`).join("\n")}`;
     text += "\n\n**Remember:**\n• Real banks, police, and delivery companies do not rush you into paying on chat\n• Verify from the official app, website, or known number you already trust";
+    text += `\n\n**Hindi quick line:**\n• ${hindiQuickLine}`;
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
     const lead = mode === "voice" || mode === "media"
       ? "Pause. Verify this before you trust it."
       : "Pause. Verify this before you act.";
-    const actions = [
+    const actions = dedupeSteps([
+      ...(scenario?.steps || []),
       "Do not act under pressure. Give yourself a minute.",
       mode === "phone"
         ? "Call back on the official number you already know."
         : "Check through a second channel you already trust.",
       "Ask one trusted person to read or hear it before you pay or reply.",
-    ];
+    ]);
     text = `**${lead}**\n\n`;
+    if (scenario) text += `**What this may be:**\n• ${scenario.label}\n\n`;
     if (explanation) text += explanation + "\n\n";
     text += "**What looks off:**\n";
     if (signals.length) text += signals.slice(0, 4).map(s => `• ${s}`).join("\n");
     else text += "• Some suspicious patterns detected — not certain";
-    text += `\n\n**Next safe steps:**\n${actions.map((item) => `• ${item}`).join("\n")}`;
+    text += `\n\n**Next safe steps:**\n${actions.slice(0, 4).map((item) => `• ${item}`).join("\n")}`;
     text += "\n\n**Remember:**\n• One wrong letter can turn a real site into a fake one\n• If money is involved, verify before you approve or transfer";
+    text += `\n\n**Hindi quick line:**\n• ${hindiQuickLine}`;
   } else {
     text = `**Probably okay. Still verify if money is involved.**\n\n`;
     if (explanation) text += explanation + "\n\n";
@@ -760,17 +915,21 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
 
   // Context-aware follow-ups based on scan type + verdict
   let suggestions: string[];
-  if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
+  if (needsMoreEvidence) {
+    suggestions = ["Help me verify safely", "Ask family to verify", moneyRisk ? "What if I already paid?" : "Share this result", "Check something else"];
+  } else if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
     const typeQ = mode === "link" ? "Is this a phishing site?" : mode === "upi" ? "Should I block this UPI ID?" : mode === "phone" ? "Should I block this number?" : mode === "media" || mode === "voice" ? "Could this be fake?" : "How do I report this?";
-    suggestions = [moneyRisk ? "Call 1930" : typeQ, "What if I already paid?", "Share this result", "Check something else"];
+    suggestions = [moneyRisk ? "Call 1930" : typeQ, "What if I already paid?", "Ask family to verify", "Share this result"];
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
     const typeQ = mode === "link" ? "How to spot a fake website?" : mode === "upi" ? "How to verify a UPI ID?" : mode === "phone" ? "How to check a phone number?" : "Help me verify safely";
-    suggestions = ["Help me verify safely", typeQ, "Share this result", "Check something else"];
+    suggestions = ["Help me verify safely", typeQ, "Ask family to verify", "Check something else"];
   } else {
     suggestions = ["What scams are trending?", "My scan history", "Share this result", "Check something else"];
   }
 
-  const trust_state = data.trust_state || (verdict === "SUSPICIOUS" ? "blocked" : verdict === "UNCLEAR" ? "inspect" : "trusted");
+  const trust_state = needsMoreEvidence
+    ? "unverified"
+    : data.trust_state || (verdict === "SUSPICIOUS" ? "blocked" : verdict === "UNCLEAR" ? "inspect" : "trusted");
   const reason_codes: string[] = data.reason_codes || [];
   const kavach_score = data.kavach_score;
   const council_score = data.council_score;
@@ -879,6 +1038,15 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
     const lower = s.toLowerCase();
     if (lower === "call 1930") { window.open("tel:1930"); return; }
     if (lower === "open cybercrime.gov.in") { window.open("https://cybercrime.gov.in", "_blank"); return; }
+    if (lower === "what if i already paid?") {
+      addMsg({
+        role: "bot",
+        text: "**If money already moved:**\n• Call 1930 right now\n• Call your bank using the number in your bank app, card, or statement\n• Save screenshots, UTR, phone numbers, links, and chat history\n• Finish the complaint on cybercrime.gov.in as soon as you can\n\n**Hindi quick line:**\n• पैसे जा चुके हैं? अभी 1930 पर कॉल करो.",
+        suggestions: ["Call 1930", "Ask family to verify", "Share this result"],
+      });
+      window.open("tel:1930");
+      return;
+    }
     if (lower === "alert family") {
       if (navigator.share) {
         navigator.share({ title: "Chetana Alert", text: "I may have encountered a scam. Check this with me: https://chetana.activemirror.ai" }).catch(() => {});
@@ -887,6 +1055,16 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
         window.open(`https://wa.me/?text=${t}`, "_blank");
       }
       addMsg({ role: "bot", text: "Family alert shared. Stay calm — you're doing the right thing." });
+      return;
+    }
+    if (lower === "ask family to verify") {
+      if (navigator.share) {
+        navigator.share({ title: "Chetana Family Check", text: "Can you verify this with me? It feels suspicious. https://chetana.activemirror.ai" }).catch(() => {});
+      } else {
+        const t = encodeURIComponent("Can you verify this with me? It feels suspicious. https://chetana.activemirror.ai");
+        window.open(`https://wa.me/?text=${t}`, "_blank");
+      }
+      addMsg({ role: "bot", text: "Family check shared. Keep the chat open and do not pay or click until someone you trust confirms it." });
       return;
     }
     if (lower === "re-check with more context") {
@@ -1024,7 +1202,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
   };
 
   const recordScan = (mode: ScanMode, scanResult: NonNullable<ChatMsg["scanResult"]>) => {
-    trackVigilance("scan", `${mode}: ${scanResult.verdict} (${scanResult.score}/100)`);
+    trackVigilance("scan", `${friendlyScanType(mode)}: ${verdictSummary(scanResult.verdict, scanResult.trust_state)}`);
     try { new Audio("/ting.wav").play(); } catch {}
     try {
       const v = scanResult.verdict;
@@ -2290,7 +2468,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
     if (onCouncilUpdate && sr.council_votes && sr.council_votes.length > 0) {
       onCouncilUpdate({ votes: sr.council_votes, kavachScore: sr.kavach_score, councilScore: sr.council_score, agreement: sr.council_agreement, score: sr.score, verdict: sr.verdict });
     }
-    trackVigilance("scan", `${mode}: ${sr.verdict} (${sr.score}/100)`);
+    trackVigilance("scan", `${friendlyScanType(mode)}: ${verdictSummary(sr.verdict, sr.trust_state)}`);
     try { new Audio("/ting.wav").play(); } catch {}
     try { const v = sr.verdict; if (v === "SUSPICIOUS" || v === "HIGH") navigator.vibrate([100,50,100,50,100]); else if (v === "UNCLEAR" || v === "MEDIUM") navigator.vibrate([80,60,80]); else navigator.vibrate(50); } catch {}
     fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ event: "scan", scan_type: mode, verdict: sr.verdict, score: sr.score }) }).catch(() => {});

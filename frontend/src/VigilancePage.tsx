@@ -1,15 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Shield, ShieldCheck, Eye, Search, BookOpen, BarChart3, Link2, Copy, Download, CheckCircle, ChevronRight, Zap } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  CheckCircle,
+  Copy,
+  Download,
+  PhoneCall,
+  Search,
+  Shield,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 
-/* ── Crypto helpers ──────────────────────────────────────────── */
-async function sha256(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-function shortHash(h: string) { return h.slice(0, 8) + "…" + h.slice(-6); }
-
-/* ── Types ───────────────────────────────────────────────────── */
 interface VigilanceBlock {
   id: string;
   type: "scan" | "learn" | "weather" | "visit" | "terms" | "share";
@@ -26,7 +30,6 @@ interface VigilanceChain {
   started: string;
 }
 
-/* ── Vigilance Engine ────────────────────────────────────────── */
 const STORAGE_KEY = "chetana_vigilance";
 
 function getChain(): VigilanceChain {
@@ -34,37 +37,30 @@ function getChain(): VigilanceChain {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return { blocks: [], score: 0, level: "Newcomer", started: new Date().toISOString() };
+  return { blocks: [], score: 0, level: "New", started: new Date().toISOString() };
 }
 
 function calcLevel(score: number): string {
-  if (score >= 90) return "Guardian";
-  if (score >= 70) return "Sentinel";
-  if (score >= 50) return "Protector";
-  if (score >= 30) return "Aware";
-  if (score >= 10) return "Learner";
-  return "Newcomer";
+  if (score >= 80) return "Guardian";
+  if (score >= 60) return "Family helper";
+  if (score >= 40) return "Careful";
+  if (score >= 20) return "Getting sharper";
+  return "New";
 }
 
 function calcScore(blocks: VigilanceBlock[]): number {
-  const weights: Record<string, number> = { scan: 8, learn: 5, weather: 3, visit: 2, terms: 15, share: 4 };
-  const raw = blocks.reduce((sum, b) => sum + (weights[b.type] || 1), 0);
-  return Math.min(100, raw);
+  const weights: Record<string, number> = { scan: 10, learn: 6, weather: 4, visit: 2, terms: 8, share: 5 };
+  return Math.min(100, blocks.reduce((sum, block) => sum + (weights[block.type] || 1), 0));
 }
 
-const TYPE_META: Record<string, { icon: typeof Shield; color: string; label: string }> = {
-  scan: { icon: Search, color: "#2563EB", label: "Scam Check" },
-  learn: { icon: BookOpen, color: "#7C3AED", label: "Scam Learned" },
-  weather: { icon: BarChart3, color: "#F59E0B", label: "Weather Read" },
-  visit: { icon: Eye, color: "#0D9488", label: "Page Explored" },
-  terms: { icon: ShieldCheck, color: "#059669", label: "Terms Attested" },
-  share: { icon: Link2, color: "#E07A5F", label: "Shared Safety" },
-};
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
-/* ── Global tracker (call from anywhere) ─────────────────────── */
 export async function trackVigilance(type: VigilanceBlock["type"], label: string) {
   const chain = getChain();
-  const prevHash = chain.blocks.length > 0 ? chain.blocks[chain.blocks.length - 1].hash : "0000000000000000000000000000000000000000000000000000000000000000";
+  const prevHash = chain.blocks.length > 0 ? chain.blocks[chain.blocks.length - 1].hash : "0";
   const timestamp = new Date().toISOString();
   const hash = await sha256(`${prevHash}|${type}|${label}|${timestamp}`);
   const block: VigilanceBlock = { id: `v-${Date.now()}`, type, label, timestamp, hash, prevHash };
@@ -75,240 +71,238 @@ export async function trackVigilance(type: VigilanceBlock["type"], label: string
   localStorage.setItem(STORAGE_KEY, JSON.stringify(chain));
 }
 
-/* ── Page Component ──────────────────────────────────────────── */
+const TYPE_LABELS: Record<VigilanceBlock["type"], string> = {
+  scan: "Checked something suspicious",
+  learn: "Read a scam pattern",
+  weather: "Looked at Scam Weather",
+  visit: "Explored Chetana",
+  terms: "Accepted setup rules",
+  share: "Shared a warning",
+};
+
 export default function VigilancePage() {
   const [chain, setChain] = useState<VigilanceChain>(getChain);
-  const [proofGenerated, setProofGenerated] = useState(false);
-  const [proof, setProof] = useState<any>(null);
+  const [receipt, setReceipt] = useState<any>(null);
   const [copied, setCopied] = useState(false);
 
-  // Refresh chain from storage
   useEffect(() => {
-    const iv = setInterval(() => setChain(getChain()), 2000);
-    return () => clearInterval(iv);
+    trackVigilance("visit", "Opened Build Scam Sense page");
+    const intervalId = window.setInterval(() => setChain(getChain()), 2000);
+    return () => window.clearInterval(intervalId);
   }, []);
 
-  // Track this page visit
-  useEffect(() => {
-    trackVigilance("visit", "Proof-of-Vigilance page");
-  }, []);
-
-  const generateProof = useCallback(async () => {
-    if (chain.blocks.length < 2) return;
-    const chainHash = await sha256(JSON.stringify(chain.blocks));
-    const timestamp = new Date().toISOString();
-    const commitment = await sha256(chainHash + timestamp + chain.score.toString());
-    const proofObj = {
-      protocol: "Chetana Proof-of-Vigilance v1.0",
-      timestamp,
-      subject: {
-        level: chain.level,
-        score: chain.score,
-        totalActions: chain.blocks.length,
-        firstAction: chain.started,
-        latestAction: chain.blocks[chain.blocks.length - 1]?.timestamp,
-      },
-      chain: {
-        hash: chainHash,
-        length: chain.blocks.length,
-        types: Object.entries(
-          chain.blocks.reduce((acc, b) => { acc[b.type] = (acc[b.type] || 0) + 1; return acc; }, {} as Record<string, number>)
-        ).map(([type, count]) => ({ type, count })),
-        headBlock: shortHash(chain.blocks[chain.blocks.length - 1]?.hash || ""),
-      },
-      commitment: { merkleRoot: commitment, algorithm: "SHA-256" },
-      attestation: "This proof attests that the bearer has actively engaged with Chetana's scam detection tools, threat intelligence, and safety education — building verified digital vigilance over time.",
-      issuer: "Chetana by ActiveMirror (N1 Intelligence)",
-      jurisdiction: "India",
+  const saveReceipt = useCallback(async () => {
+    const summary = {
+      protocol: "chetana-progress-receipt.v1",
+      created_at: new Date().toISOString(),
+      level: chain.level,
+      score: chain.score,
+      total_actions: chain.blocks.length,
+      recent_actions: chain.blocks.slice(-6).reverse().map((block) => ({
+        type: block.type,
+        label: block.label,
+        timestamp: block.timestamp,
+      })),
+      reminder: "Chetana helps you pause and verify. Official recovery rails still matter.",
     };
-    setProof(proofObj);
-    setProofGenerated(true);
-    localStorage.setItem("chetana_vigilance_proof", JSON.stringify(proofObj));
+    setReceipt(summary);
+    localStorage.setItem("chetana_vigilance_proof", JSON.stringify(summary));
   }, [chain]);
 
-  const copyProof = () => {
-    navigator.clipboard.writeText(JSON.stringify(proof, null, 2));
+  const copyReceipt = () => {
+    if (!receipt) return;
+    navigator.clipboard.writeText(JSON.stringify(receipt, null, 2));
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    window.setTimeout(() => setCopied(false), 1800);
   };
 
-  const downloadProof = () => {
-    const blob = new Blob([JSON.stringify(proof, null, 2)], { type: "application/json" });
+  const downloadReceipt = () => {
+    if (!receipt) return;
+    const blob = new Blob([JSON.stringify(receipt, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `chetana-vigilance-${Date.now()}.json`; a.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chetana-progress-${Date.now()}.json`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
-  const scoreColor = chain.score >= 70 ? "#059669" : chain.score >= 30 ? "#F59E0B" : "#6B7280";
+  const progressColor = chain.score >= 60 ? "#22c55e" : chain.score >= 30 ? "#f59e0b" : "#60a5fa";
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 800, margin: "0 auto" }}>
-      {/* Header */}
-      <section className="page-intro" style={{ textAlign: "center", paddingBottom: 24 }}>
-        <div className="kicker" style={{ justifyContent: "center" }}><Zap size={14} /> Proof-of-Vigilance Protocol</div>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>Your Digital Safety Chain</h1>
-        <p style={{ maxWidth: "54ch", margin: "0 auto" }}>
-          Every scan, every scam type learned, every warning heeded adds a block to your vigilance chain.
-          Your safety awareness becomes a cryptographic credential — provable, portable, yours.
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 860, margin: "0 auto" }}>
+      <section className="page-intro" style={{ textAlign: "center", paddingBottom: 20 }}>
+        <div className="kicker" style={{ justifyContent: "center" }}>
+          <Shield size={14} />
+          Practice
+        </div>
+        <h1 style={{ fontSize: "clamp(30px, 4vw, 44px)" }}>Build scam sense, one habit at a time.</h1>
+        <p style={{ maxWidth: "58ch", margin: "0 auto" }}>
+          This page tracks simple safety habits: checking suspicious messages, reading scam patterns, watching live fraud pressure,
+          and sharing warnings before someone acts under panic.
         </p>
       </section>
 
-      {/* Score Card */}
-      <div className="panel" style={{ textAlign: "center", padding: "40px 28px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 0%, ${scoreColor}15, transparent 70%)`, pointerEvents: "none" }} />
-        <div style={{ position: "relative" }}>
-          <div style={{ fontSize: 72, fontWeight: 900, color: scoreColor, lineHeight: 1, letterSpacing: "-0.04em" }}>
-            {chain.score}
+      <div className="panel" style={{ overflow: "hidden", position: "relative", marginBottom: 18 }}>
+        <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at top, ${progressColor}18, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ position: "relative", display: "grid", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.55)", marginBottom: 6 }}>
+                Your progress
+              </div>
+              <div style={{ fontSize: 56, fontWeight: 900, color: progressColor, lineHeight: 1 }}>{chain.score}</div>
+              <div style={{ fontSize: 16, color: "rgba(255,255,255,0.86)", fontWeight: 700 }}>{chain.level}</div>
+            </div>
+            <div style={{ minWidth: 260, display: "grid", gap: 8 }}>
+              <strong style={{ color: "var(--heading)" }}>What this means</strong>
+              <span style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+                The more you check before you click, the sharper your judgment gets. This is not a score for vanity. It is a reminder to build better habits.
+              </span>
+              <span style={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                Hindi quick line: <strong>जल्दी मत करो. पहले जांच करो.</strong>
+              </span>
+            </div>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: scoreColor, textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>
-            {chain.level}
-          </div>
-          <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
-            {chain.blocks.length} actions in your vigilance chain
-          </div>
-          {/* Progress ring */}
-          <div style={{ margin: "20px auto 0", width: 200, position: "relative" }}>
-            <svg viewBox="0 0 200 12" style={{ width: "100%" }}>
-              <rect x="0" y="0" width="200" height="12" rx="6" fill="rgba(0,0,0,0.06)" />
-              <rect x="0" y="0" width={chain.score * 2} height="12" rx="6" fill={scoreColor} style={{ transition: "width 0.5s ease" }} />
-            </svg>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
-              <span>Newcomer</span><span>Learner</span><span>Protector</span><span>Sentinel</span><span>Guardian</span>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ width: "100%", height: 12, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+              <div style={{ width: `${chain.score}%`, height: "100%", background: progressColor, transition: "width 0.4s ease" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              <span>New</span>
+              <span>Getting sharper</span>
+              <span>Careful</span>
+              <span>Family helper</span>
+              <span>Guardian</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Chain Visualization */}
-      <div className="panel" style={{ padding: "24px 28px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--heading)", marginBottom: 2 }}>Vigilance Chain</h2>
-            <p style={{ fontSize: 13, color: "var(--muted)" }}>Each action adds a cryptographically linked block</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+        {[
+          { icon: <Search size={18} />, title: "Check first", copy: "Paste a suspicious message before you click, pay, or reply." },
+          { icon: <BookOpen size={18} />, title: "Learn the pattern", copy: "Bank/KYC, digital arrest, parcel refund, task scam, fake payment proof." },
+          { icon: <BarChart3 size={18} />, title: "Watch the pressure", copy: "Scam Weather shows what is rising before it reaches your family or your shop." },
+          { icon: <Users size={18} />, title: "Pull in family", copy: "When you are unsure, ask one trusted person before sending money." },
+        ].map((item) => (
+          <div key={item.title} className="panel" style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--primary-bright)", fontWeight: 700 }}>
+              {item.icon}
+              {item.title}
+            </div>
+            <p style={{ margin: 0, lineHeight: 1.65, color: "var(--muted)" }}>{item.copy}</p>
           </div>
+        ))}
+      </div>
+
+      <div className="panel" style={{ marginTop: 18, display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <strong style={{ display: "block", color: "var(--heading)" }}>Recent habit history</strong>
+            <span style={{ color: "var(--muted)", fontSize: 14 }}>The last few things you did on Chetana.</span>
+          </div>
+          <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>{chain.blocks.length} total actions</span>
         </div>
 
         {chain.blocks.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)" }}>
-            <Shield size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <p style={{ fontSize: 15, fontWeight: 600 }}>Your chain is empty</p>
-            <p style={{ fontSize: 13 }}>Start by checking a message, exploring the Scam Atlas, or reading Scam Weather.</p>
+          <div style={{ display: "grid", gap: 8, placeItems: "center", padding: "30px 20px", color: "var(--muted)", textAlign: "center" }}>
+            <ShieldCheck size={28} style={{ opacity: 0.45 }} />
+            <strong style={{ color: "var(--heading)" }}>Nothing yet</strong>
+            <span>Start with a suspicious message, Scam Weather, or the common scams page.</span>
           </div>
         ) : (
-          <div className="vigilance-chain">
-            {chain.blocks.slice(-12).reverse().map((block, i) => {
-              const meta = TYPE_META[block.type] || TYPE_META.visit;
-              const Icon = meta.icon;
-              return (
-                <motion.div
-                  key={block.id}
-                  className="vigilance-block"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <div className="vb-connector">
-                    <div className="vb-dot" style={{ background: meta.color }} />
-                    {i < chain.blocks.slice(-12).length - 1 && <div className="vb-line" />}
-                  </div>
-                  <div className="vb-content">
-                    <div className="vb-header">
-                      <div className="vb-icon" style={{ background: meta.color + "18", color: meta.color }}><Icon size={14} /></div>
-                      <div>
-                        <div className="vb-type">{meta.label}</div>
-                        <div className="vb-label">{block.label}</div>
-                      </div>
-                    </div>
-                    <div className="vb-meta">
-                      <span className="vb-hash" title={block.hash}>{shortHash(block.hash)}</span>
-                      <span className="vb-time">{new Date(block.timestamp).toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+          <div style={{ display: "grid", gap: 10 }}>
+            {chain.blocks.slice(-8).reverse().map((block) => (
+              <div
+                key={block.id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(255,255,255,0.03)",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "grid", gap: 2 }}>
+                  <strong style={{ color: "rgba(255,255,255,0.9)" }}>{TYPE_LABELS[block.type]}</strong>
+                  <span style={{ color: "var(--muted)", lineHeight: 1.5 }}>{block.label}</span>
+                </div>
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>
+                  {new Date(block.timestamp).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Generate Proof Button */}
-      <div style={{ textAlign: "center", margin: "24px 0" }}>
-        {!proofGenerated ? (
-          <button className="primary" onClick={generateProof} disabled={chain.blocks.length < 2}
-            style={{ padding: "14px 32px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Shield size={18} />
-            {chain.blocks.length >= 2 ? "Generate Proof-of-Vigilance" : `Need ${2 - chain.blocks.length} more action${2 - chain.blocks.length > 1 ? "s" : ""} to unlock`}
+      <div
+        className="panel"
+        style={{
+          marginTop: 18,
+          background: "rgba(239,68,68,0.08)",
+          borderColor: "rgba(239,68,68,0.18)",
+          display: "grid",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#fecaca" }}>
+          <AlertTriangle size={18} />
+          Recovery script
+        </div>
+        <div style={{ display: "grid", gap: 8, color: "rgba(255,255,255,0.85)", lineHeight: 1.6 }}>
+          <span>1. "I think I have been targeted by fraud. Please help me stop further loss."</span>
+          <span>2. Call <strong>1930</strong> and then call your bank using a number you already trust.</span>
+          <span>3. Keep the proof: screenshots, UTR, chat, phone number, link, voice note.</span>
+          <span style={{ color: "#fecaca" }}>Hindi quick line: <strong>पैसे गए हैं? अभी 1930 पर कॉल करो.</strong></span>
+        </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 18, display: "grid", gap: 14 }}>
+        <div>
+          <strong style={{ display: "block", color: "var(--heading)", marginBottom: 4 }}>Save your progress receipt</strong>
+          <span style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+            If you want, you can save a simple JSON receipt of your Chetana activity. This is optional and just for your own records.
+          </span>
+        </div>
+
+        {!receipt ? (
+          <button
+            className="primary"
+            onClick={saveReceipt}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px 20px", fontSize: 15 }}
+          >
+            <CheckCircle size={18} />
+            Save progress receipt
           </button>
         ) : (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "var(--safe)", fontWeight: 600, fontSize: 16 }}>
-            <CheckCircle size={20} /> Proof-of-Vigilance Generated
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--safe)", fontWeight: 700 }}>
+              <ShieldCheck size={18} />
+              Progress receipt saved
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="ghost" onClick={copyReceipt} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Copy size={14} />
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <button className="ghost" onClick={downloadReceipt} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Download size={14} />
+                Download
+              </button>
+              <button className="ghost" onClick={() => window.open("tel:1930")} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <PhoneCall size={14} />
+                Call 1930
+              </button>
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Proof Display */}
-      <AnimatePresence>
-        {proofGenerated && proof && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="panel" style={{ background: "var(--safe-light)", borderColor: "rgba(5,150,105,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ShieldCheck size={18} color="var(--safe)" />
-                <strong style={{ color: "var(--safe)" }}>Vigilance Proof Verified</strong>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="ghost" onClick={copyProof} style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  {copied ? <><CheckCircle size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-                </button>
-                <button className="ghost" onClick={downloadProof} style={{ padding: "6px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
-                  <Download size={12} /> Download
-                </button>
-              </div>
-            </div>
-
-            {/* Proof summary */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 16, padding: 16, background: "white", borderRadius: 12, border: "1px solid var(--line)" }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "var(--safe)" }}>{proof.subject.score}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>Vigilance Score</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "var(--primary)" }}>{proof.chain.length}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>Chain Blocks</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "var(--violet)" }}>{proof.subject.level}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>Trust Level</div>
-              </div>
-            </div>
-
-            <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", lineHeight: 1.6 }}>
-              Your vigilance has been cryptographically attested. This proof grows with every action you take on Chetana.
-            </p>
-            <p style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
-              Protocol: {proof.protocol} | Root: {shortHash(proof.commitment.merkleRoot)} | {proof.issuer}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* How it works */}
-      <div className="panel" style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--heading)", marginBottom: 16 }}>How Proof-of-Vigilance Works</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-          {[
-            { icon: <Search size={20} />, title: "Check", desc: "Every scan you perform adds a block", color: "#2563EB" },
-            { icon: <BookOpen size={20} />, title: "Learn", desc: "Reading scam types builds awareness", color: "#7C3AED" },
-            { icon: <BarChart3 size={20} />, title: "Monitor", desc: "Checking weather signals shows vigilance", color: "#F59E0B" },
-            { icon: <Shield size={20} />, title: "Prove", desc: "Generate a cryptographic proof anytime", color: "#059669" },
-          ].map(item => (
-            <div key={item.title} style={{ textAlign: "center", padding: 20 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: item.color + "15", color: item.color, display: "grid", placeItems: "center", margin: "0 auto 12px" }}>{item.icon}</div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--heading)", marginBottom: 4 }}>{item.title}</h3>
-              <p style={{ fontSize: 13, color: "var(--muted)" }}>{item.desc}</p>
-            </div>
-          ))}
-        </div>
       </div>
 
       <div style={{ height: 40 }} />

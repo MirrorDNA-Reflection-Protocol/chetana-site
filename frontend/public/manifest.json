@@ -1,7 +1,7 @@
 {
-  "name": "Chetana — India's Free Scam Checker",
+  "name": "Chetana — scam help for India",
   "short_name": "Chetana",
-  "description": "Screenshot it. Check it. Know in seconds. Free scam detection for India in 12 languages.",
+  "description": "Paste a suspicious message, screenshot, link, or payment request and get the next safe step.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

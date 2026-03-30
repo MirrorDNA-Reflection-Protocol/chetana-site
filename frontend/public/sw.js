@@ -8,7 +8,7 @@
  * Handles Web Share Target API for receiving shared content
  * from other apps (WhatsApp, Messages, Gallery, etc).
  */
-const CACHE_NAME = "chetana-v3";
+const CACHE_NAME = "chetana-v4";
 const OFFLINE_URLS = [
   "/",
   "/index.html",
@@ -34,6 +34,12 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 // Fetch: handle share target POSTs, API calls, and asset caching
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
@@ -53,6 +59,31 @@ self.addEventListener("fetch", (event) => {
           status: 503,
         })
       )
+    );
+    return;
+  }
+
+  if (
+    event.request.mode === "navigate" ||
+    url.pathname === "/" ||
+    url.pathname === "/index.html" ||
+    url.pathname === "/version.json" ||
+    url.pathname === "/.well-known/edge-truth.json"
+  ) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          return caches.match("/index.html");
+        })
     );
     return;
   }

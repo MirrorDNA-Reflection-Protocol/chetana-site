@@ -256,13 +256,13 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
           Built for India
         </motion.div>
         <motion.h1 {...fadeInDelay(0.12)}>
-          Got a suspicious message?
+          Something feels off?
           <br />
           Check before you click or pay.
         </motion.h1>
         <motion.p className="hero-lede" {...fadeInDelay(0.18)}>
-          WhatsApp, SMS, UPI, QR, parcel message, KYC alert, police threat, job offer, or payment screenshot.
-          Chetana helps you understand what to do next.
+          Paste the message, upload the screenshot, or drop the voice note.
+          Chetana tells you the next safe step.
         </motion.p>
         <motion.div {...fadeInDelay(0.22)}>
           <PastePromptMorph />
@@ -281,7 +281,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
           <span className="hero-trust-pill">Free to use</span>
           <span className="hero-trust-pill">WhatsApp, SMS, UPI, QR</span>
           <span className="hero-trust-pill">Local checks first</span>
-          <span className="hero-trust-pill">12 Indian languages</span>
+          <span className="hero-trust-pill">12+ langs</span>
         </motion.div>
         <motion.p className="hero-note" {...fadeInDelay(0.34)}>
           Want to share straight from WhatsApp? Install Chetana on your Android phone first.
@@ -307,19 +307,19 @@ export function FrontDoorSection({
   const routes = [
     {
       icon: <Search size={18} />,
-      title: "Someone sent a suspicious message",
+      title: "Is this message a lie?",
       copy: "Paste the text or upload the screenshot, voice note, or PDF.",
       action: "scan" as PageId,
     },
     {
       icon: <AlertTriangle size={18} />,
-      title: "I already paid or shared OTP/details",
+      title: "Money already gone?",
       copy: "Go straight to the help flow. If money moved, call 1930 first.",
       action: "panic" as PageId,
     },
     {
       icon: <Building2 size={18} />,
-      title: "I got a payment screenshot",
+      title: "Is this payment screenshot fake?",
       copy: "For shopkeepers, sellers, and delivery staff checking fake payment proof before handing over goods.",
       action: "merchant" as PageId,
     },
@@ -327,27 +327,30 @@ export function FrontDoorSection({
 
   const facts = [
     {
-      title: "Local-first where possible",
-      copy: "Text and screenshot reading start on your device when Chetana can make a strong local call.",
+      title: "Basic checks can start on your phone",
+      copy: "Chetana starts with local checks when it can make a strong call without sending everything away.",
     },
     {
-      title: "Server help only when needed",
-      copy: "Links, reputation checks, and some deeper media checks may use secure server analysis.",
+      title: "Deeper review only when needed",
+      copy: "Links, reputation checks, and tricky media may use secure server help when nuance matters.",
     },
     {
-      title: "1930 stays visible",
-      copy: "For money fraud in India, call 1930 fast and then finish the complaint on cybercrime.gov.in.",
+      title: "Official help stays visible",
+      copy: "If money moved, call 1930 fast and then finish the complaint on cybercrime.gov.in.",
+    },
+    {
+      title: "Scam Weather is public here",
+      copy: "You can see which fraud patterns are rising in India before they reach your family or your shop.",
     },
   ];
 
   return (
     <section className="front-door-shell">
-      <div className="front-door-story">
+        <div className="front-door-story">
         <div className="front-door-label">Start here</div>
         <h2>Three clear starts. No cyber jargon.</h2>
         <p>
-          Chetana should feel like a calm, street-smart guide for India: check suspicious content,
-          help people who already acted, and help shops verify payment proof before goods change hands.
+          Check a strange message, get help if money is already gone, or verify payment proof before goods change hands.
         </p>
         <div className="front-door-route-list">
           {routes.map((route) => (
@@ -382,6 +385,10 @@ export function FrontDoorSection({
             </button>
           </div>
         </div>
+        <div className="front-door-signal-links">
+          <button className="front-door-link-chip" onClick={() => onNavigate("weather")}>See Scam Weather</button>
+          <button className="front-door-link-chip" onClick={() => onNavigate("trust")}>How Chetana stays honest</button>
+        </div>
       </div>
       <div className="front-door-scanner" id="front-door-scanner">
         <ScanWidget
@@ -407,7 +414,7 @@ export function ShareInstallSection({ onNavigate }: { onNavigate: (target: PageI
     <ScrollReveal>
       <section className="front-door-install">
         <div className="front-door-install-copy">
-          <div className="front-door-label">PWA route</div>
+          <div className="front-door-label">Install on phone</div>
           <h2>Install once. Share from WhatsApp.</h2>
           <p>
             The fastest mobile flow is simple: install Chetana on your Android phone once, then share screenshots,
@@ -430,8 +437,8 @@ export function ShareInstallSection({ onNavigate }: { onNavigate: (target: PageI
           <div className="front-door-note-card">
             <Lock size={18} />
             <div>
-              <strong>Truthful privacy copy</strong>
-              <p>Text checks start locally. Some deeper checks may go to the server to help with nuance.</p>
+              <strong>Honest limits</strong>
+              <p>Basic checks can start locally. Some deeper checks still need data and server help.</p>
             </div>
           </div>
           <div className="front-door-install-actions">
@@ -441,6 +448,67 @@ export function ShareInstallSection({ onNavigate }: { onNavigate: (target: PageI
         </div>
       </section>
     </ScrollReveal>
+  );
+}
+
+export function ScanGuideRail({ signals, onNavigate }: { signals: WeatherSignal[]; onNavigate: (target: PageId) => void }) {
+  const rising = signals.slice(0, 4);
+
+  return (
+    <div className="scan-guide-shell">
+      <div className="scan-guide-card scan-guide-card-urgent">
+        <div className="scan-guide-label">If money already moved</div>
+        <h3>Stop here first.</h3>
+        <ul className="scan-guide-list">
+          <li>Call 1930 immediately.</li>
+          <li>Call your bank and ask for a freeze if money or access was shared.</li>
+          <li>Save screenshots, UPI IDs, call logs, and transaction IDs before they disappear.</li>
+        </ul>
+        <div className="scan-guide-actions">
+          <a href="tel:1930" className="scan-guide-btn scan-guide-btn-urgent">Call 1930</a>
+          <button className="scan-guide-btn" onClick={() => onNavigate("panic")}>Open help steps</button>
+        </div>
+      </div>
+
+      <div className="scan-guide-card">
+        <div className="scan-guide-label">How to use Chetana</div>
+        <h3>Use it like a calm second opinion.</h3>
+        <ul className="scan-guide-list">
+          <li>Paste the full message or upload the screenshot.</li>
+          <li>Do not tap links or call numbers inside the suspicious message.</li>
+          <li>If it feels urgent, pause. Real banks and police do not work like this.</li>
+        </ul>
+      </div>
+
+      <div className="scan-guide-card">
+        <div className="scan-guide-label">Rising now</div>
+        <h3>Scam Weather</h3>
+        <div className="scan-guide-weather-list">
+          {rising.map((signal) => (
+            <div key={signal.id} className={`scan-guide-weather-card ${signal.tone}`}>
+              <strong>{signal.label}</strong>
+              <span>{signal.delta}</span>
+            </div>
+          ))}
+        </div>
+        <p className="scan-guide-note">
+          Public trend view for India. Useful for spotting what is spreading right now.
+        </p>
+        <div className="scan-guide-actions">
+          <button className="scan-guide-btn" onClick={() => onNavigate("weather")}>See Scam Weather</button>
+          <button className="scan-guide-btn" onClick={() => onNavigate("atlas")}>See common scams</button>
+        </div>
+      </div>
+
+      <div className="scan-guide-card scan-guide-card-trust">
+        <div className="scan-guide-label">Trust signals</div>
+        <ul className="scan-guide-list scan-guide-list-tight">
+          <li>Private tool, not a government service.</li>
+          <li>Official recovery rails stay visible: 1930 and cybercrime.gov.in.</li>
+          <li>Basic checks can start locally. Deeper checks may use secure server help.</li>
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -504,11 +572,11 @@ export function StatsStrip() {
     <motion.div className="stats-strip" {...fadeInDelay(0.3)}>
       <div className="stat-item" translate="no">
         <div className="stat-value stat-value-glow">{stats.total_scans.toLocaleString()}</div>
-        <div className="stat-label">Scans run</div>
+        <div className="stat-label">Checks run</div>
       </div>
       <div className="stat-item" translate="no">
         <div className="stat-value stat-value-glow">{stats.scams_caught.toLocaleString()}</div>
-        <div className="stat-label">Threats caught</div>
+        <div className="stat-label">Risky checks flagged</div>
       </div>
       <div className="stat-item" translate="no">
         <div className="stat-value stat-value-glow">{stats.languages.toLocaleString()}</div>
@@ -581,46 +649,123 @@ function trustLabel(trustState?: string): string {
   return "";
 }
 
+function verdictSummary(verdict: string, trustState?: string): string {
+  if (trustState === "blocked" || verdict === "SUSPICIOUS" || verdict === "HIGH") return "Stop and verify";
+  if (trustState === "inspect" || verdict === "UNCLEAR" || verdict === "MEDIUM") return "Pause and verify";
+  return "Probably okay";
+}
+
+function friendlyScanType(type: string): string {
+  const labels: Record<string, string> = {
+    message: "Message",
+    link: "Link",
+    upi: "UPI ID",
+    phone: "Phone number",
+    media: "Screenshot / media",
+    voice: "Voice note",
+    qr: "QR code",
+  };
+  return labels[type] || type;
+}
+
+function shareCopy(scanResult: NonNullable<ChatMsg["scanResult"]>): string {
+  const summary = verdictSummary(scanResult.verdict, scanResult.trust_state);
+  const why = scanResult.signals?.slice(0, 2).join(", ");
+  const nextStep = summary === "Stop and verify"
+    ? "Do not pay, click, or reply until you verify through an official app, website, or helpline."
+    : summary === "Pause and verify"
+    ? "Pause and double-check through a second trusted source before you act."
+    : "Still verify if money, account access, or OTPs are involved.";
+  return [
+    `Chetana says: ${summary}`,
+    why ? `Why: ${why}` : "",
+    `Next step: ${nextStep}`,
+    "https://chetana.activemirror.ai",
+  ].filter(Boolean).join("\n");
+}
+
+function isMoneyRisk(mode: ScanMode, explanation: string, signals: string[]): boolean {
+  const context = `${explanation} ${signals.join(" ")}`.toLowerCase();
+  return mode === "upi" || mode === "qr" || /(bank|money|payment|refund|account|utr|transaction|wallet|collect request|qr|otp)/.test(context);
+}
+
 function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: string; scanResult: ChatMsg["scanResult"]; suggestions: string[] } {
   const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
   const verdict = data.verdict ?? data.risk_level?.toUpperCase() ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
   const signals: string[] = data.why_flagged || data.signals || data.red_flags || [];
   const action = data.action_eligibility || data.recommended_action || "";
   const explanation = data.explanation || data.analysis || "";
+  const moneyRisk = isMoneyRisk(mode, explanation, signals);
 
   let text = "";
 
   if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
-    text = `**High scam risk** (${score}/100)\n\n`;
+    const lead = mode === "link"
+      ? "Do not open this link."
+      : mode === "upi" || moneyRisk
+      ? "Do not pay yet."
+      : mode === "phone"
+      ? "Do not trust this caller yet."
+      : mode === "voice"
+      ? "Do not send money from this call or voice note."
+      : mode === "media"
+      ? "Do not trust this screenshot or clip yet."
+      : "Do not reply, click, or pay.";
+    const actions = [
+      mode === "link"
+        ? "Do not tap the link or download anything from it."
+        : mode === "voice"
+        ? "Hang up and call back on a known number you already trust."
+        : mode === "phone"
+        ? "Hang up and call the official number from the app or website you already trust."
+        : mode === "media"
+        ? "Do not trust the screenshot alone. Verify inside the real bank, courier, or UPI app."
+        : "Do not click, pay, or share OTPs.",
+      moneyRisk
+        ? "If money or account access is involved, call 1930 and your bank immediately."
+        : "Block the sender if you do not know them.",
+      "Save screenshots, UPI IDs, links, and call details before anything disappears.",
+    ];
+    text = `**${lead}**\n\n`;
     if (explanation) text += explanation + "\n\n";
-    text += "**Red flags:**\n";
+    text += "**Why Chetana is worried:**\n";
     if (signals.length) text += signals.slice(0, 5).map(s => `• ${s}`).join("\n");
     else text += "• Matches known scam patterns\n• Urgency or pressure tactics detected";
-    text += "\n\n**What to do now:**\n• Do not click, pay, or share OTPs\n• Block the sender\n• Report to cybercrime.gov.in or call 1930";
-    text += "\n\n**How to avoid this in the future:**\n• Never share OTPs, PINs, or passwords with anyone\n• Verify unknown contacts by calling back on an official number\n• If it feels urgent, it's probably a scam — real banks don't rush you";
+    text += `\n\n**Next safe steps:**\n${actions.map((item) => `• ${item}`).join("\n")}`;
+    text += "\n\n**Remember:**\n• Real banks, police, and delivery companies do not rush you into paying on chat\n• Verify from the official app, website, or known number you already trust";
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
-    text = `**Needs caution** (${score}/100)\n\n`;
+    const lead = mode === "voice" || mode === "media"
+      ? "Pause. Verify this before you trust it."
+      : "Pause. Verify this before you act.";
+    const actions = [
+      "Do not act under pressure. Give yourself a minute.",
+      mode === "phone"
+        ? "Call back on the official number you already know."
+        : "Check through a second channel you already trust.",
+      "Ask one trusted person to read or hear it before you pay or reply.",
+    ];
+    text = `**${lead}**\n\n`;
     if (explanation) text += explanation + "\n\n";
     text += "**What looks off:**\n";
     if (signals.length) text += signals.slice(0, 4).map(s => `• ${s}`).join("\n");
     else text += "• Some suspicious patterns detected — not certain";
-    text += "\n\n**What to do now:**\n• Don't act immediately — pause and verify\n• Call the sender on a known number to confirm\n• Forward to a trusted person for a second opinion";
-    text += "\n\n**How to stay safe:**\n• Always verify payment requests through a separate channel\n• Check URLs carefully — one wrong letter = fake site\n• When in doubt, don't click";
+    text += `\n\n**Next safe steps:**\n${actions.map((item) => `• ${item}`).join("\n")}`;
+    text += "\n\n**Remember:**\n• One wrong letter can turn a real site into a fake one\n• If money is involved, verify before you approve or transfer";
   } else {
-    text = `**Looks safe** (${score}/100)\n\n`;
+    text = `**Probably okay. Still verify if money is involved.**\n\n`;
     if (explanation) text += explanation + "\n\n";
     else text += "No obvious scam signals found.\n\n";
-    text += "**Stay safe anyway:**\n• Never share OTPs or passwords, even if asked by \"your bank\"\n• Bookmark your bank's real website — don't click links in messages\n• Check back here anytime something feels off";
+    text += "**Stay safe anyway:**\n• Never share OTPs or passwords, even if asked by \"your bank\"\n• Verify payment or account requests inside the real app\n• Check back here anytime something feels off";
   }
 
   // Context-aware follow-ups based on scan type + verdict
   let suggestions: string[];
   if (verdict === "SUSPICIOUS" || verdict === "HIGH") {
-    const typeQ = mode === "link" ? "Is this a phishing site?" : mode === "upi" ? "Should I block this UPI ID?" : mode === "phone" ? "Should I block this number?" : mode === "media" || mode === "voice" ? "Could this be a deepfake?" : "How do I report this?";
-    suggestions = [typeQ, "What if I already paid?", "Share this result", "Check something else"];
+    const typeQ = mode === "link" ? "Is this a phishing site?" : mode === "upi" ? "Should I block this UPI ID?" : mode === "phone" ? "Should I block this number?" : mode === "media" || mode === "voice" ? "Could this be fake?" : "How do I report this?";
+    suggestions = [moneyRisk ? "Call 1930" : typeQ, "What if I already paid?", "Share this result", "Check something else"];
   } else if (verdict === "UNCLEAR" || verdict === "MEDIUM") {
-    const typeQ = mode === "link" ? "How to spot a fake website?" : mode === "upi" ? "How to verify a UPI ID?" : mode === "phone" ? "How to check a phone number?" : "What are common scam signs?";
-    suggestions = ["How do I verify this?", typeQ, "Share this result", "Check something else"];
+    const typeQ = mode === "link" ? "How to spot a fake website?" : mode === "upi" ? "How to verify a UPI ID?" : mode === "phone" ? "How to check a phone number?" : "Help me verify safely";
+    suggestions = ["Help me verify safely", typeQ, "Share this result", "Check something else"];
   } else {
     suggestions = ["What scams are trending?", "My scan history", "Share this result", "Check something else"];
   }
@@ -899,7 +1044,18 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
 
   // Detected type indicator
   const detectedType = input.trim() ? detectInputType(input.trim()) : null;
-  const typeLabels: Partial<Record<ScanMode, string>> = { message: "Message scan", link: "Link check", upi: "UPI check", phone: "Phone lookup", media: "Image/video", voice: "Voice check", qr: "QR scan" };
+  const typeLabels: Partial<Record<ScanMode, string>> = { message: "Message", link: "Link", upi: "UPI ID", phone: "Phone number", media: "Screenshot / media", voice: "Voice note", qr: "QR code" };
+  const loadingHint = file
+    ? detectFileType(file) === "voice"
+      ? "Listening for pressure, urgency, and voice-clone signs..."
+      : "Reading the screenshot or file and checking for scam signs..."
+    : detectedType === "link"
+    ? "Checking the link before you open it..."
+    : detectedType === "upi"
+    ? "Checking the UPI ID before you pay..."
+    : detectedType === "phone"
+    ? "Checking the phone number before you call back..."
+    : "Reading the message and looking for pressure, urgency, and scam patterns...";
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false);
@@ -942,7 +1098,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
             <h1 className="tool-tagline">check karo,<br />safe raho</h1>
             <p className="tool-desc">
               Screenshot it, upload it, or just paste it.
-              Text, link, UPI ID, or phone number all work.
+              Text, link, UPI ID, phone number, screenshot, or voice note all work.
             </p>
             <p className="tool-desc-hi">
               बस पेस्ट करो, या screenshot upload करो.
@@ -956,7 +1112,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
             className="tool-textarea"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={file ? "Add a note (optional) or just hit Check..." : "Paste a suspicious message or link here, or upload a screenshot..."}
+            placeholder={file ? "Add a note (optional) or just hit Check..." : "Paste the message here, or upload a screenshot..."}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
           <div className="tool-input-bottom">
@@ -970,7 +1126,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
               {file && !input.trim() && <span className="tool-detect" style={{ background: 'var(--safe-light, rgba(34,197,94,0.1))', color: 'var(--safe, #22c55e)' }}>File ready to check</span>}
             </div>
             <button className={`tool-check${canSend ? " tool-check-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
-              {loading ? "Checking..." : "Check →"}
+              {loading ? "Checking..." : "Get next step →"}
             </button>
           </div>
           <div className="tool-trust-line">
@@ -984,9 +1140,9 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           {!hasResults && !loading && (
             <div className="tool-empty">
               <ShieldCheck size={36} style={{ opacity: 0.2, marginBottom: 8 }} />
-              <p className="tool-empty-title">Your result will appear here</p>
+              <p className="tool-empty-title">Paste something suspicious. Chetana will tell you the next safe step.</p>
               <div className="tool-catches">
-                <p className="tool-catches-label">Chetana catches:</p>
+                <p className="tool-catches-label">Good for these checks</p>
                 <div className="tool-catches-list">
                   <span>Fake KYC messages</span>
                   <span>UPI payment fraud</span>
@@ -998,13 +1154,16 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   <span>Bank impersonation</span>
                 </div>
               </div>
-              <p className="tool-stat">Rs 22,495 crore lost to scams in India last year. Don't be next.</p>
+              <p className="tool-stat">If money is already gone, stop here and call 1930 first.</p>
             </div>
           )}
           {loading && (
             <div className="tool-checking">
               <div className="tool-dots"><span /><span /><span /></div>
-              <span>Checking...</span>
+              <div className="tool-checking-copy">
+                <strong>Checking...</strong>
+                <span>{loadingHint}</span>
+              </div>
             </div>
           )}
           {hasResults && [...messages].reverse().filter(m => m.role === "bot").map(msg => (
@@ -1021,22 +1180,17 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                     {msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
                       ? <ShieldAlert size={20} /> : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
                       ? <AlertTriangle size={20} /> : <ShieldCheck size={20} />}
-                    <span>{
-                      msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" ? "High Risk"
-                      : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM" ? "Needs Caution"
-                      : "Looks Safe"
-                    }</span>
-                    <span className="tool-score">{msg.scanResult.score}/100</span>
+                    <span>{verdictSummary(msg.scanResult.verdict, msg.scanResult.trust_state)}</span>
                     {msg.scanResult.trust_state && <span className={`tool-trust-badge trust-${msg.scanResult.trust_state}`}>{trustLabel(msg.scanResult.trust_state)}</span>}
                   </div>
                   <div className="tool-card-share">
                     <button onClick={() => speakText(msg.text)} title="Read aloud"><Volume2 size={14} /></button>
                     <button onClick={() => {
-                      const t = encodeURIComponent(`Chetana: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\nhttps://chetana.activemirror.ai`);
+                      const t = encodeURIComponent(shareCopy(msg.scanResult!));
                       window.open(`https://wa.me/?text=${t}`, '_blank');
                     }} title="Share on WhatsApp"><Smartphone size={14} /></button>
                     <button onClick={() => {
-                      const text = `Chetana: ${msg.scanResult!.verdict} (${msg.scanResult!.score}/100)\nhttps://chetana.activemirror.ai`;
+                      const text = shareCopy(msg.scanResult!);
                       if (navigator.share) navigator.share({ title: "Chetana", text }).catch(() => {});
                       else { navigator.clipboard.writeText(text); }
                     }} title="Share"><Share2 size={14} /></button>
@@ -1086,7 +1240,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                 {(msg.scanResult.score > 40) && (
                   <div className="tool-challenge">
                     <button className="tool-challenge-btn" onClick={() => {
-                      const signals = msg.scanResult!.signals?.slice(0, 5).map((s: string) => `• ${s}`).join("\n") || "• High overall risk score";
+                      const signals = msg.scanResult!.signals?.slice(0, 5).map((s: string) => `• ${s}`).join("\n") || "• Multiple warning signs were detected";
                       addMsg({ role: "bot", text: `**Why this was flagged:**\n${signals}\n\nThese are the signals Chetana detected. If this seems wrong, you can re-check with more context or verify the source independently.\n\nChetana is a tool, not a judge. Your judgment matters.`, suggestions: ["Re-check with more context", "Help me verify safely"] });
                     }}>
                       This seems wrong?
@@ -1443,7 +1597,7 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
 export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const features = [
     { icon: <Building2 size={22} />, color: "saffron", title: "Merchant Protection", desc: "Stop losing money to fake payment screenshots and impersonation attacks. Verify every transaction before you ship.", click: "merchant" as PageId },
-    { icon: <Layers size={22} />, color: "violet", title: "Fraud Detection API", desc: "Add Chetana's scam detection to your app, website, or payment flow. One API call — instant fraud verdict for your users.", click: "nexus" as PageId, highlight: true },
+    { icon: <Layers size={22} />, color: "violet", title: "Safety API", desc: "Add Chetana to your app, website, or payment flow so users can pause and verify before they act.", click: "nexus" as PageId, highlight: true },
     { icon: <TrendingUp size={22} />, color: "blue", title: "Scam Trend Monitoring", desc: "See which scams are rising right now. Track fraud campaigns targeting your industry and get alerted before they hit.", click: "weather" as PageId },
     { icon: <UserCheck size={22} />, color: "safe", title: "Train Your Team", desc: "Help your employees spot scams before they fall for them. Real examples, real patterns, real protection.", click: "atlas" as PageId },
   ];
@@ -1487,7 +1641,7 @@ export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "
         </button>
         <button className="onboard-card" onClick={() => onNavigate("nexus")}>
           <div className="onboard-icon enterprise"><BarChart3 size={22} /></div>
-          <h3>Protect my institution</h3><p>Campaign graphs, analyst replay, enterprise trust.</p>
+          <h3>Protect my platform</h3><p>Add Chetana checks to your app, checkout, or support flow.</p>
         </button>
       </div>
     </motion.section>
@@ -1528,7 +1682,7 @@ export function Atlas({ threats }: { threats: ThreatEntry[] }) {
   return (
     <motion.section className="panel" {...fadeIn}>
       <div className="panel-header split">
-        <div><h2><BookOpen size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Encyclopedia</h2><p>Learn to spot every type of scam. Red flags, what to do, and how to stay safe.</p></div>
+        <div><h2><BookOpen size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Common scam patterns</h2><p>Learn the red flags, what to do next, and how to stay safe.</p></div>
         <div className="filters">
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search scams..." />
           <select value={surface} onChange={e => setSurface(e.target.value)}>
@@ -1637,22 +1791,21 @@ export function DashboardGallery() {
 export function TrustPage() {
   const items: [string, string, React.ReactNode][] = [
     ["We show our work", "Every result tells you exactly WHY something looks suspicious — not just a score. You see the evidence.", <Eye size={20} />],
-    ["We tell you what to do", "Not just \"this is dangerous.\" We give you clear next steps: block, report, call 1930, or relax.", <CheckCircle size={20} />],
+    ["We tell you the next safe step", "Not just \"this is dangerous.\" We tell you what to do next: pause, block, call 1930, call your bank, or relax.", <CheckCircle size={20} />],
     ["Local first, server only when needed", "Text checks can start in your browser. Links, reputation checks, and deeper media analysis may use secure server-side processing when needed.", <Lock size={20} />],
-    ["You decide what happens next", "The web app advises; it does not automatically block, report, or act for you. The final call stays with you.", <Users size={20} />]
+    ["Official help stays visible", "Chetana is not a government service, but it keeps 1930 and cybercrime.gov.in visible so you can move to the real recovery rail fast.", <Users size={20} />]
   ];
   return (
     <motion.section className="panel" {...fadeIn}>
       <div className="panel-header"><h2><ShieldCheck size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Why Trust Chetana?</h2><p>We built this to protect people, not to collect data or sell fear.</p></div>
       <div className="trust-grid">{items.map(([title, copy, icon]) => <div className="trust-card" key={title}><div style={{ color: "var(--primary-bright)", marginBottom: 8 }}>{icon}</div><h3>{title}</h3><p>{copy}</p></div>)}</div>
-      <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="proof-banner">
+      <div className="proof-banner">
         <div className="proof-banner-icon"><ShieldCheck size={20} /></div>
         <div className="proof-banner-text">
-          <strong>Proof-of-Memory Protocol</strong>
-          <span>Cryptographic attestation that users read and understood — not just clicked through.</span>
+          <strong>Public signals, honest limits</strong>
+          <span>Scam Weather reflects live pressure signals on the site, while 1930 and cybercrime.gov.in stay visible as the official recovery rail.</span>
         </div>
-        <ChevronRight size={18} className="proof-banner-arrow" />
-      </a>
+      </div>
 
       {/* Local vs Cloud — Trust by Design */}
       <div style={{ marginTop: 32 }}>
@@ -1783,18 +1936,18 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   const [checkingForOther, setCheckingForOther] = useState(false);
   const [sessionScans, setSessionScans] = useState(0);
   const EXAMPLE_PROMPTS = [
-    "Hey! OMG is this you in this video?? 😂😂 https://insta-reelz.cc/video/8832k",
-    "Hi, I'm from HR at Flipkart. We found your resume on Naukri. Work from home, earn ₹10,000/day. Join our Telegram group to start.",
+    "URGENT: Your SBI KYC will be blocked today. Update now: https://sbi-kyc-update.top",
+    "Parcel refund pending. Pay ₹1 by UPI now to avoid return. Screenshot attached.",
     "URGENT: This is CBI Cyber Division. A case has been registered against your Aadhaar. To avoid arrest, pay ₹15,000 fine immediately via UPI.",
   ];
   const EXAMPLE_LABELS = [
-    "📸 'Is this you?' DM",
-    "💼 Too-good job offer",
-    "👮 Fake digital arrest",
+    "🏦 Bank / KYC message",
+    "📦 Parcel / refund message",
+    "👮 Police / arrest threat",
   ];
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
-    text: "**Screenshot or paste** any suspicious message.\n\nWhatsApp, SMS, UPI request, QR, parcel message, KYC alert, or payment screenshot — just drop it here.\nChetana checks on-device first when possible, then asks the server for help if needed.\n\n_check karo, safe raho._",
+    text: "**Paste or upload** anything suspicious.\n\nWhatsApp, SMS, UPI request, QR, parcel message, KYC alert, voice note, or payment screenshot — just drop it here.\nChetana checks here first when it can, and asks for deeper help only when needed.\n\n_check karo, safe raho._",
     suggestions: EXAMPLE_LABELS,
   }]);
   const [listening, setListening] = useState(false);
@@ -1871,13 +2024,13 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   };
 
   const shareResult = (sr: ChatMsg["scanResult"]) => {
-    const text = `Chetana scam check: ${sr!.verdict} (${sr!.score}/100)\n${sr!.signals.slice(0, 2).join(", ")}\n\nCheck yours free: https://chetana.activemirror.ai`;
+    const text = shareCopy(sr!);
     if (navigator.share) navigator.share({ title: "Chetana Scam Check", text }).catch(() => {});
     else { navigator.clipboard.writeText(text); addMsg({ role: "bot", text: "Result copied to clipboard. Share it with your family!" }); }
   };
 
   const shareWhatsApp = (sr: ChatMsg["scanResult"]) => {
-    const t = encodeURIComponent(`Chetana: ${sr!.verdict} (${sr!.score}/100)\nCheck yours free: https://chetana.activemirror.ai`);
+    const t = encodeURIComponent(shareCopy(sr!));
     window.open(`https://wa.me/?text=${t}`, '_blank');
   };
 
@@ -1959,9 +2112,9 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
         const recent = history.slice(0, 5).map((h: any) => {
           const d = new Date(h.ts);
           const icon = h.verdict === "SUSPICIOUS" || h.verdict === "HIGH" ? "🔴" : h.verdict === "UNCLEAR" || h.verdict === "MEDIUM" ? "🟡" : "🟢";
-          return `${icon} ${h.verdict} (${h.score}/100) — ${h.type} — ${d.toLocaleDateString()}`;
+          return `${icon} ${verdictSummary(h.verdict, h.trust_state)} — ${friendlyScanType(h.type)} — ${d.toLocaleDateString()}`;
         }).join("\n");
-        addMsg({ role: "bot", text: `**Your Safety Dashboard**\n\n**${history.length}** total scans · **${safe}** safe · **${caution}** caution · **${risky}** high risk\n\n**Recent:**\n${recent}\n\n_Keep checking. Stay safe._`, suggestions: ["What scams are trending?", "Check something else"] });
+        addMsg({ role: "bot", text: `**Your Safety Dashboard**\n\n**${history.length}** total checks · **${safe}** okay · **${caution}** verify · **${risky}** stop and verify\n\n**Recent:**\n${recent}\n\n_check karo, safe raho._`, suggestions: ["What scams are trending?", "Check something else"] });
       }
       return;
     }
@@ -2143,7 +2296,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
     fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ event: "scan", scan_type: mode, verdict: sr.verdict, score: sr.score }) }).catch(() => {});
     try {
       const h = JSON.parse(localStorage.getItem("chetana_history") || "[]");
-      h.unshift({ verdict: sr.verdict, score: sr.score, type: mode, ts: Date.now() });
+      h.unshift({ verdict: sr.verdict, trust_state: sr.trust_state, score: sr.score, type: mode, ts: Date.now() });
       if (h.length > 100) h.length = 100;
       localStorage.setItem("chetana_history", JSON.stringify(h));
       localStorage.setItem("chetana_scan_count", String((parseInt(localStorage.getItem("chetana_scan_count") || "0")) + 1));
@@ -2204,10 +2357,10 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
             {/* Tab Switcher */}
             <div className="sw-tabs">
               <button className={`sw-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
-                <Bot size={14} /> <span>Chat Scanner</span>
+                <Bot size={14} /> <span>Messages & screenshots</span>
               </button>
               <button className={`sw-tab ${activeTab === 'apk' ? 'active' : ''}`} onClick={() => setActiveTab('apk')}>
-                <ShieldAlert size={14} /> <span>APK Danger Lane</span>
+                <ShieldAlert size={14} /> <span>App link / APK</span>
               </button>
             </div>
 
@@ -2224,8 +2377,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                           {msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH"
                             ? <ShieldAlert size={14} /> : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM"
                             ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
-                          <span>{msg.scanResult.trust_state === "blocked" || msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" ? "High Risk" : msg.scanResult.trust_state === "inspect" || msg.scanResult.verdict === "UNCLEAR" || msg.scanResult.verdict === "MEDIUM" ? "Caution" : "Safe"}</span>
-                          <span className="sw-score">{msg.scanResult.score}/100</span>
+                          <span>{verdictSummary(msg.scanResult.verdict, msg.scanResult.trust_state)}</span>
                           {msg.scanResult.trust_state && <span className={`sw-trust-badge trust-${msg.scanResult.trust_state}`}>{trustLabel(msg.scanResult.trust_state)}</span>}
                         </div>
                         <div className="sw-result-actions">
@@ -2308,8 +2460,8 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                 <div className="sw-apk-lane">
                   <div className="apk-intro">
                     <ShieldAlert size={28} style={{ color: "var(--danger)" }} />
-                    <h4>APK Danger Lane</h4>
-                    <p>Verify app install links, SMS warnings, or suspicious URLs.</p>
+                    <h4>App install warning</h4>
+                    <p>Check app install links, SMS warnings, or suspicious download URLs before you install anything.</p>
                   </div>
                   
                   <div className="apk-fields">
@@ -3007,25 +3159,25 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <div className="brand-glyph" style={{ width: 36, height: 36 }}><Shield size={16} /></div>
             <div>
               <div className="brand-title" style={{ fontSize: 17 }}>Chetana</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>India's free scam checker</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>check karo, safe raho</div>
             </div>
           </div>
-          <p className="footer-desc">AI-powered scam detection and trust verification. Check messages, links, UPI IDs, and phone numbers against live threat intelligence.</p>
+          <p className="footer-desc">Paste suspicious messages, links, payment screenshots, or voice notes. Chetana tells you the next safe step.</p>
         </div>
         <div className="footer-links">
           <div className="footer-col">
             <h4>Product</h4>
-            <button onClick={() => onNavigate("consumer")}>Consumer</button>
-            <button onClick={() => onNavigate("merchant")}>Merchant</button>
-            <button onClick={() => onNavigate("nexus")}>Nexus</button>
+            <button onClick={() => onNavigate("consumer")}>Everyday checks</button>
+            <button onClick={() => onNavigate("merchant")}>For shops</button>
+            <button onClick={() => onNavigate("nexus")}>Merchant API</button>
             <button onClick={() => { window.open("https://t.me/chetnaShieldBot", "_blank"); }}>Telegram Bot</button>
           </div>
           <div className="footer-col">
             <h4>Intelligence</h4>
             <button onClick={() => onNavigate("weather")}>Scam Weather</button>
-            <button onClick={() => onNavigate("atlas")}>Scam Atlas</button>
-            <button onClick={() => onNavigate("trust")}>Trust by Design&#8482;</button>
-            <button onClick={() => onNavigate("vigilance")}>Vigilance</button>
+            <button onClick={() => onNavigate("atlas")}>Common scams</button>
+            <button onClick={() => onNavigate("trust")}>Trust & data</button>
+            <button onClick={() => onNavigate("family")}>Family help</button>
           </div>
           <div className="footer-col">
             <h4>Emergency</h4>
@@ -3058,7 +3210,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <span className="powered-sep">|</span>
             <span className="powered-brand">MirrorDNA</span>
             <span className="powered-sep">|</span>
-            <a href="https://activemirror.ai/proof/" target="_blank" rel="noopener" className="powered-link">Proof-of-Memory</a>
+            <span className="powered-link">Built in India</span>
           </div>
           <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror (N1 Intelligence). All rights reserved.</div>
         </div>

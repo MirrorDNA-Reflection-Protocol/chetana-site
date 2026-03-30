@@ -14,13 +14,21 @@ import {
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
 import { trackVigilance } from "./VigilancePage";
-import { AuroraBackground, SpotlightCard, AnimatedGradientText, GridPattern, ScrollReveal, Meteors } from "./effects";
+import { AuroraBackground, SpotlightCard, GridPattern, ScrollReveal, Meteors } from "./effects";
 import { localScreenshotScan, localPatternScan } from "./localScanner";
 // i18n handled by Google Translate widget (index.html)
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
 const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
 const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d } });
+const PASTE_LANGUAGE_PROMPTS = [
+  { language: "English", text: "just paste it" },
+  { language: "हिन्दी", text: "बस पेस्ट करो" },
+  { language: "বাংলা", text: "শুধু পেস্ট করুন" },
+  { language: "தமிழ்", text: "இதை பேஸ்ட் பண்ணுங்க" },
+  { language: "తెలుగు", text: "ఇక్కడ పేస్ట్ చేయండి" },
+  { language: "मराठी", text: "फक्त पेस्ट करा" },
+];
 
 /* ── Background Mesh (Aurora + Grid + Meteors) ───────────────── */
 export function BackgroundMesh() {
@@ -38,17 +46,12 @@ export function BackgroundMesh() {
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false);
-  const termsAccepted = !!localStorage.getItem("chetana_terms_accepted");
   const items: { id: PageId; label: string; restricted?: boolean; urgent?: boolean }[] = [
     { id: "home", label: "Home" },
-    { id: "panic", label: "Already Paid?", urgent: true },
-    { id: "consumer", label: "Consumer", restricted: true },
-    { id: "weather", label: "Scam Trends", restricted: true },
-    { id: "atlas", label: "Scam Atlas", restricted: true },
-    { id: "nexus", label: "API" },
-    { id: "family", label: "Family" },
+    { id: "scan", label: "Check" },
+    { id: "panic", label: "Money Gone?", urgent: true },
+    { id: "merchant", label: "For Shops" },
     { id: "trust", label: "Trust" },
-    { id: "story", label: "Story" },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
@@ -57,7 +60,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         <div className="brand-glyph"><img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
         <div>
           <div className="brand-title">Chetana</div>
-          <div className="brand-sub">Check karo. Safe raho.</div>
+          <div className="brand-sub">check karo, safe raho</div>
         </div>
       </div>
       <div className={`nav-links${open ? " open" : ""}`}>
@@ -68,7 +71,6 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
             onClick={() => navigate(item.id)}
           >
             {item.label}
-            {!termsAccepted && item.restricted && <Lock size={10} style={{ marginLeft: 4, opacity: 0.5 }} />}
           </button>
         ))}
       </div>
@@ -196,62 +198,249 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
 }
 
 /* ── Hero ────────────────────────────────────────────────────── */
-export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
-  const openScanner = () => {
-    onNavigate("scan" as any);
-  };
+function PastePromptMorph() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setIndex((current) => (current + 1) % PASTE_LANGUAGE_PROMPTS.length);
+    }, 2200);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const phrase = PASTE_LANGUAGE_PROMPTS[index];
+
   return (
-    <section style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '120px 0 40px' }}>
-      <video autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} src="/chetana_short_final.mp4" />
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(6,6,16,0.4) 0%, rgba(6,6,16,0.75) 50%, rgba(6,6,16,1) 100%)', zIndex: 1 }} />
-      <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 20px', maxWidth: 640 }}>
-        <motion.h1 {...fadeInDelay(0.15)} style={{ fontSize: 'clamp(2.25rem, 8vw, 4.5rem)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 12 }}>
-          <AnimatedGradientText>Check karo.</AnimatedGradientText><br /><AnimatedGradientText>Safe raho.</AnimatedGradientText>
+    <div className="hero-language-morph" aria-label="Paste in any language">
+      <div className="hero-language-hint">
+        <Globe size={14} />
+        <span>Paste in any language</span>
+      </div>
+      <div className="hero-language-stage">
+        <AnimatePresence initial={false} mode="wait">
+          <motion.div
+            key={`${phrase.language}-${phrase.text}`}
+            className="hero-language-card"
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.28, ease: "easeOut" }}
+          >
+            <span className="hero-language-name">{phrase.language}</span>
+            <strong className="hero-language-text">{phrase.text}</strong>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
+  const jumpToScanner = () => {
+    const node = document.getElementById("front-door-scanner");
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    onNavigate("scan");
+  };
+
+  return (
+    <section className="hero hero-compressed">
+      <div className="hero-watermark">CHETANA</div>
+      <div className="hero-copy-shell">
+        <motion.div className="kicker kicker-glow" {...fadeInDelay(0.05)}>
+          <ShieldCheck size={14} />
+          Built for India
+        </motion.div>
+        <motion.h1 {...fadeInDelay(0.12)}>
+          Got a suspicious message?
+          <br />
+          Check before you click or pay.
         </motion.h1>
-        <motion.p {...fadeInDelay(0.2)} style={{ fontSize: 'clamp(0.65rem, 1.8vw, 0.95rem)', color: 'rgba(255,255,255,0.45)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 20 }}>
-          Check before you trust. Act before you lose.
+        <motion.p className="hero-lede" {...fadeInDelay(0.18)}>
+          WhatsApp, SMS, UPI, QR, parcel message, KYC alert, police threat, job offer, or payment screenshot.
+          Chetana helps you understand what to do next.
         </motion.p>
-        <motion.p {...fadeInDelay(0.25)} style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', lineHeight: 1.7, color: 'rgba(255,255,255,0.7)', maxWidth: 480, margin: '0 auto 28px', fontWeight: 500 }}>
-          Got a suspicious message? Screenshot it. Drop it here. We'll tell you if it's a scam — in seconds, for free.
+        <motion.div {...fadeInDelay(0.22)}>
+          <PastePromptMorph />
+        </motion.div>
+        <motion.div className="hero-actions" {...fadeInDelay(0.24)}>
+          <button className="hero-primary-btn" onClick={jumpToScanner}>
+            <Upload size={17} />
+            Paste or upload
+          </button>
+          <button className="hero-secondary-btn" onClick={() => onNavigate("panic")}>
+            <AlertTriangle size={17} />
+            Money gone?
+          </button>
+        </motion.div>
+        <motion.div className="hero-meta" {...fadeInDelay(0.3)}>
+          <span className="hero-trust-pill">Free to use</span>
+          <span className="hero-trust-pill">WhatsApp, SMS, UPI, QR</span>
+          <span className="hero-trust-pill">Local checks first</span>
+          <span className="hero-trust-pill">12 Indian languages</span>
+        </motion.div>
+        <motion.p className="hero-note" {...fadeInDelay(0.34)}>
+          Want to share straight from WhatsApp? Install Chetana on your Android phone first.
         </motion.p>
-
-        {/* Intent rail cards — 3 quick-action entry points */}
-        <motion.div {...fadeInDelay(0.3)} className="hero-intent-grid">
-          <button onClick={openScanner} className="hero-intent-card">
-            <CreditCard size={20} style={{ color: '#f97316', flexShrink: 0 }} />
-            <span>Someone wants money</span>
-          </button>
-          <button onClick={openScanner} className="hero-intent-card">
-            <Building2 size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
-            <span>Claims to be police / bank / govt</span>
-          </button>
-          <button onClick={openScanner} className="hero-intent-card">
-            <Link2 size={20} style={{ color: '#8b5cf6', flexShrink: 0 }} />
-            <span>I got a link or QR</span>
-          </button>
-        </motion.div>
-
-        {/* Main CTA — opens the scanner */}
-        <motion.div {...fadeInDelay(0.35)} className="hero-cta-wrap" onClick={openScanner}>
-          <span className="hero-cta-glow-border" />
-          <button className="hero-scan-cta">
-            <Upload size={18} />
-            <span>Upload screenshot</span>
-            <span style={{ opacity: 0.45, fontWeight: 400, fontSize: '0.85em' }}>— it's free</span>
-          </button>
-        </motion.div>
-
-        <motion.div {...fadeInDelay(0.4)} style={{ textAlign: 'center', marginTop: 12, color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem' }}>
-          or paste any message, link, UPI ID, or phone number
-        </motion.div>
-
-        <motion.div {...fadeInDelay(0.45)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-          <span className="hero-trust-pill">Screenshots stay on your device</span>
-          <span className="hero-trust-pill" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(180,180,255,0.8)' }}>12+ languages</span>
-          <span className="hero-trust-pill">Screenshots · SMS · Links · UPI · Voice</span>
-        </motion.div>
       </div>
     </section>
+  );
+}
+
+export function FrontDoorSection({
+  onNavigate,
+  onRequireProof,
+  onCouncilUpdate,
+  initialInput,
+  initialFile,
+}: {
+  onNavigate: (target: PageId) => void;
+  onRequireProof?: () => void;
+  onCouncilUpdate?: (data: any) => void;
+  initialInput?: string | null;
+  initialFile?: File | null;
+}) {
+  const routes = [
+    {
+      icon: <Search size={18} />,
+      title: "Someone sent a suspicious message",
+      copy: "Paste the text or upload the screenshot, voice note, or PDF.",
+      action: "scan" as PageId,
+    },
+    {
+      icon: <AlertTriangle size={18} />,
+      title: "I already paid or shared OTP/details",
+      copy: "Go straight to the help flow. If money moved, call 1930 first.",
+      action: "panic" as PageId,
+    },
+    {
+      icon: <Building2 size={18} />,
+      title: "I got a payment screenshot",
+      copy: "For shopkeepers, sellers, and delivery staff checking fake payment proof before handing over goods.",
+      action: "merchant" as PageId,
+    },
+  ];
+
+  const facts = [
+    {
+      title: "Local-first where possible",
+      copy: "Text and screenshot reading start on your device when Chetana can make a strong local call.",
+    },
+    {
+      title: "Server help only when needed",
+      copy: "Links, reputation checks, and some deeper media checks may use secure server analysis.",
+    },
+    {
+      title: "1930 stays visible",
+      copy: "For money fraud in India, call 1930 fast and then finish the complaint on cybercrime.gov.in.",
+    },
+  ];
+
+  return (
+    <section className="front-door-shell">
+      <div className="front-door-story">
+        <div className="front-door-label">Start here</div>
+        <h2>Three clear starts. No cyber jargon.</h2>
+        <p>
+          Chetana should feel like a calm, street-smart guide for India: check suspicious content,
+          help people who already acted, and help shops verify payment proof before goods change hands.
+        </p>
+        <div className="front-door-route-list">
+          {routes.map((route) => (
+            <button key={route.title} className="front-door-route" onClick={() => onNavigate(route.action)}>
+              <span className="front-door-route-icon">{route.icon}</span>
+              <span>
+                <strong>{route.title}</strong>
+                <small>{route.copy}</small>
+              </span>
+              <ChevronRight size={16} />
+            </button>
+          ))}
+        </div>
+        <div className="front-door-facts">
+          {facts.map((fact) => (
+            <div key={fact.title} className="front-door-fact">
+              <strong>{fact.title}</strong>
+              <p>{fact.copy}</p>
+            </div>
+          ))}
+        </div>
+        <div className="front-door-help">
+          <div>
+            <span className="front-door-help-label">Need help right now?</span>
+            <strong>Call 1930 if money already moved.</strong>
+            <small>After that, finish the complaint on cybercrime.gov.in so the case is properly logged.</small>
+          </div>
+          <div className="front-door-help-actions">
+            <a href="tel:1930" className="front-door-help-btn">Call 1930</a>
+            <button className="front-door-help-btn front-door-help-btn-secondary" onClick={() => onNavigate("panic")}>
+              Open help steps
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="front-door-scanner" id="front-door-scanner">
+        <ScanWidget
+          onRequireProof={onRequireProof}
+          inline
+          onCouncilUpdate={onCouncilUpdate}
+          initialInput={initialInput}
+          initialFile={initialFile}
+        />
+      </div>
+    </section>
+  );
+}
+
+export function ShareInstallSection({ onNavigate }: { onNavigate: (target: PageId) => void }) {
+  const steps = [
+    "Install Chetana on your Android home screen.",
+    "From WhatsApp, Messages, Gallery, or Files, tap Share and pick Chetana.",
+    "Chetana opens with your screenshot, voice note, or text ready to check. If share is not available, upload or paste manually.",
+  ];
+
+  return (
+    <ScrollReveal>
+      <section className="front-door-install">
+        <div className="front-door-install-copy">
+          <div className="front-door-label">PWA route</div>
+          <h2>Install once. Share from WhatsApp.</h2>
+          <p>
+            The fastest mobile flow is simple: install Chetana on your Android phone once, then share screenshots,
+            audio, video, or PDFs straight from WhatsApp or your gallery into the checker.
+          </p>
+          <ol className="front-door-install-steps">
+            {steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+        <div className="front-door-install-notes">
+          <div className="front-door-note-card">
+            <Smartphone size={18} />
+            <div>
+              <strong>Best mobile flow</strong>
+              <p>Android install plus share sheet into Chetana.</p>
+            </div>
+          </div>
+          <div className="front-door-note-card">
+            <Lock size={18} />
+            <div>
+              <strong>Truthful privacy copy</strong>
+              <p>Text checks start locally. Some deeper checks may go to the server to help with nuance.</p>
+            </div>
+          </div>
+          <div className="front-door-install-actions">
+            <button className="front-door-help-btn" onClick={() => onNavigate("trust")}>See data handling</button>
+            <button className="front-door-help-btn front-door-help-btn-secondary" onClick={() => onNavigate("merchant")}>Shop payment checks</button>
+          </div>
+        </div>
+      </section>
+    </ScrollReveal>
   );
 }
 
@@ -572,7 +761,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           const d = new Date(h.ts);
           return `${h.verdict} (${h.score}/100) — ${h.type} — ${d.toLocaleDateString()}`;
         }).join("\n");
-        addMsg({ role: "bot", text: `**Your last ${Math.min(history.length, 10)} scans:**\n${summary}\n\nTotal: ${history.length} scans. _Check karo. Safe raho._` });
+        addMsg({ role: "bot", text: `**Your last ${Math.min(history.length, 10)} scans:**\n${summary}\n\nTotal: ${history.length} scans. _check karo, safe raho._` });
       }
       return;
     }
@@ -734,7 +923,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           <img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 8 }} />
           <div>
             <div className="tool-brand-name">Chetana</div>
-            <div className="tool-brand-tag">India's free scam checker</div>
+            <div className="tool-brand-tag">check karo, safe raho</div>
           </div>
         </div>
         <div className="tool-header-right">
@@ -750,13 +939,13 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
         {/* Left panel — identity + input */}
         <div className={`tool-input-panel${dragging ? " tool-dragging" : ""}`}>
           <div className="tool-hero">
-            <h1 className="tool-tagline">Check karo.<br />Safe raho.</h1>
+            <h1 className="tool-tagline">check karo,<br />safe raho</h1>
             <p className="tool-desc">
-              Got a suspicious message? Screenshot it and upload here.
-              Or paste any text, link, UPI ID, or phone number.
+              Screenshot it, upload it, or just paste it.
+              Text, link, UPI ID, or phone number all work.
             </p>
             <p className="tool-desc-hi">
-              Suspicious message ka screenshot lo aur yahan upload karo.
+              बस पेस्ट करो, या screenshot upload करो.
             </p>
           </div>
 
@@ -786,7 +975,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           </div>
           <div className="tool-trust-line">
             <ShieldCheck size={13} />
-            <span>Free. No login. No data stored. Works in 12 Indian languages.</span>
+            <span>Free. No login. Local checks first. Server help when needed.</span>
           </div>
         </div>
 
@@ -878,13 +1067,13 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                 {msg.scanResult.score >= 70 && (
                   <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
                     <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
-                    <span>9 out of 10 people who saw this type of message chose not to proceed. Take a moment before acting.</span>
+                    <span>This matches high-risk scam patterns. Pause and verify through an official channel before you act.</span>
                   </div>
                 )}
                 {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
                   <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
                     <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
-                    <span>7 out of 10 people who checked this chose to verify further before acting.</span>
+                    <span>There are warning signs here. Verify independently before you click, pay, reply, or install anything.</span>
                   </div>
                 )}
                 {/* Wait before acting countdown — DANGER only */}
@@ -1222,7 +1411,7 @@ export function StoriesSection() {
 export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const features = [
     { icon: <MessageCircle size={22} />, color: "blue", title: "Screenshot & Upload", desc: "Got a suspicious WhatsApp or SMS? Screenshot it. Upload it here. We scan it instantly.", click: "scan" as PageId },
-    { icon: <Link2 size={22} />, color: "teal", title: "Paste Any Message", desc: "Copy the suspicious text. Paste it in the scanner. 4 AI judges check it from 4 countries.", click: "scan" as PageId },
+    { icon: <Link2 size={22} />, color: "teal", title: "Paste Any Message", desc: "Copy the suspicious text. Paste it in the scanner. Chetana cross-checks common India scam patterns before you act.", click: "scan" as PageId },
     { icon: <CreditCard size={22} />, color: "saffron", title: "Check UPI & Links", desc: "Someone sent a payment link or UPI ID? Check it before you click. Don't lose money.", click: "scan" as PageId },
     { icon: <Users size={22} />, color: "violet", title: "Teach Your Family", desc: "Show your parents and elders how to screenshot and check. Works in 12 Indian languages.", click: "scan" as PageId },
   ];
@@ -1231,7 +1420,7 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
       <div className="section-header">
         <motion.div className="kicker" {...fadeIn}><Shield size={14} /> For you & your family</motion.div>
         <motion.h2 {...fadeInDelay(0.05)}>Screenshot It. Check It.</motion.h2>
-        <motion.p {...fadeInDelay(0.1)}>Got a suspicious message? Screenshot it and upload — or just paste it. Free. Instant. 4 AI judges vote on every scan.</motion.p>
+        <motion.p {...fadeInDelay(0.1)}>Got a suspicious WhatsApp, SMS, UPI request, QR, parcel alert, or fake customer-care message? Screenshot it and check first.</motion.p>
       </div>
       <div className="feature-grid">
         {features.map((f, i) => (
@@ -1449,8 +1638,8 @@ export function TrustPage() {
   const items: [string, string, React.ReactNode][] = [
     ["We show our work", "Every result tells you exactly WHY something looks suspicious — not just a score. You see the evidence.", <Eye size={20} />],
     ["We tell you what to do", "Not just \"this is dangerous.\" We give you clear next steps: block, report, call 1930, or relax.", <CheckCircle size={20} />],
-    ["Your data stays private", "We check your message and forget it. Nothing is stored, sold, or shared. Ever.", <Lock size={20} />],
-    ["You decide, not us", "We give you the facts. The final call is always yours. We never block or act without your say.", <Users size={20} />]
+    ["Local first, server only when needed", "Text checks can start in your browser. Links, reputation checks, and deeper media analysis may use secure server-side processing when needed.", <Lock size={20} />],
+    ["You decide what happens next", "The web app advises; it does not automatically block, report, or act for you. The final call stays with you.", <Users size={20} />]
   ];
   return (
     <motion.section className="panel" {...fadeIn}>
@@ -1488,9 +1677,9 @@ export function TrustPage() {
         <h3 style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}><Users size={18} /> Family protection rules</h3>
         <div className="trust-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className="trust-card"><p>Family alerts are <strong>opt-in</strong>. Nobody is notified unless you choose to send an alert.</p></div>
-          <div className="trust-card"><p>Guardian roles must be <strong>explicitly set</strong> by the user. There is no default surveillance.</p></div>
-          <div className="trust-card"><p>What gets shared is a <strong>safe summary</strong>, not raw content. Sensitive messages stay on your device.</p></div>
-          <div className="trust-card"><p>Emergency escalation clearly states <strong>what will be shared and with whom</strong> before you confirm.</p></div>
+          <div className="trust-card"><p>Chetana should show you <strong>what will be shared before you send it</strong>. There is no default family broadcasting.</p></div>
+          <div className="trust-card"><p>Checking a suspicious message does <strong>not automatically notify family members</strong>. Sharing is a separate user action.</p></div>
+          <div className="trust-card"><p>Emergency escalation keeps <strong>1930 and cybercrime.gov.in</strong> visible so you can move from advice to official reporting quickly.</p></div>
         </div>
       </div>
 
@@ -1540,7 +1729,7 @@ export function TelegramCTA() {
 /* ── Share Chetana ──────────────────────────────────────────── */
 export function ShareCTA() {
   const url = "https://chetana.activemirror.ai";
-  const msg = "Check karo. Safe raho. — Free AI scam checker for India. Check suspicious messages, links, UPI IDs, and phone numbers instantly.";
+  const msg = "check karo, safe raho — Free scam check for India. Paste suspicious messages, links, UPI IDs, and phone numbers for a calm next step.";
   const [copied, setCopied] = useState(false);
   const share = (platform: string) => {
     const links: Record<string, string> = {
@@ -1580,7 +1769,7 @@ export function ShareCTA() {
 }
 
 /* ── Floating Scan Widget (WhatsApp-style) ───────────────────── */
-export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInput }: { onRequireProof?: () => void; inline?: boolean; onCouncilUpdate?: (data: any) => void; initialInput?: string | null }) {
+export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInput, initialFile }: { onRequireProof?: () => void; inline?: boolean; onCouncilUpdate?: (data: any) => void; initialInput?: string | null; initialFile?: File | null }) {
   const [open, setOpen] = useState(!!inline);
   const [agreed, setAgreed] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [lang, setLang] = useState(() => localStorage.getItem("chetana_lang") || detectBrowserLang());
@@ -1605,7 +1794,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   ];
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
-    text: "**Screenshot or paste** any suspicious message.\n\nWhatsApp, SMS, link, UPI ID — just drop it here.\nScreenshots are scanned on your device. Nothing leaves your phone.\n\n_Check karo. Safe raho._",
+    text: "**Screenshot or paste** any suspicious message.\n\nWhatsApp, SMS, UPI request, QR, parcel message, KYC alert, or payment screenshot — just drop it here.\nChetana checks on-device first when possible, then asks the server for help if needed.\n\n_check karo, safe raho._",
     suggestions: EXAMPLE_LABELS,
   }]);
   const [listening, setListening] = useState(false);
@@ -1642,10 +1831,23 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
+  useEffect(() => {
+    if (initialInput) {
+      setInput((prev) => prev || initialInput);
+    }
+  }, [initialInput]);
+
+  useEffect(() => {
+    if (initialFile) {
+      setFile((prev) => prev ?? initialFile);
+      setActiveTab("chat");
+    }
+  }, [initialFile]);
+
   // Auto-submit shared content from PWA share target
   const sharedHandled = useRef(false);
   useEffect(() => {
-    if (initialInput && !sharedHandled.current && agreed) {
+    if ((initialInput || initialFile) && !sharedHandled.current && agreed) {
       sharedHandled.current = true;
       const timer = setTimeout(() => {
         const btn = document.querySelector(".tool-check-ready") as HTMLButtonElement;
@@ -1653,7 +1855,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [initialInput, agreed]);
+  }, [initialInput, initialFile, agreed]);
 
   const addMsg = (msg: Omit<ChatMsg, "id">) => {
     setMessages(prev => [...prev, { ...msg, id: msgId.current++ }]);
@@ -1738,7 +1940,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
       return;
     }
     if (lower === "help me verify safely") {
-      addMsg({ role: "bot", text: "**Safe verification steps:**\n• Contact the sender through a known, official channel (not the number/link they gave you)\n• Search the phone number or UPI ID on Google — scam reports often surface\n• Ask a family member or friend for a second opinion\n• Check cybercrime.gov.in for similar reported patterns\n\nNever click links or call numbers provided in the suspicious message itself." });
+      addMsg({ role: "bot", text: "**Safe verification steps:**\n• Contact the bank, courier, company, or police helpline through the official app, website, or number you already trust\n• Search the mobile number, UPI ID, or business name on Google — scam reports often show up\n• Ask a family member, neighbour, or colleague for a second opinion\n• Check cybercrime.gov.in for similar fraud patterns\n\nNever click links or call numbers written inside the suspicious message itself." });
       return;
     }
     if (lower === "share this result") {
@@ -1842,7 +2044,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
               risk_score: localResult.score,
               verdict: localResult.verdict,
               why_flagged: localResult.signals,
-              explanation: "Scanned on your device — your screenshot never left your phone.",
+              explanation: "Scanned locally first. Chetana only reaches for server help when deeper review is needed.",
             }, f.name);
             addMsg({ role: "bot", text: text + ocrNote, scanResult, suggestions });
             if (scanResult) recordScan("media", scanResult);
@@ -1971,7 +2173,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                 <div className="sw-avatar"><Shield size={16} /></div>
                 <div>
                   <div className="sw-title">Chetana</div>
-                  <div className="sw-subtitle">Scam checker · Always online</div>
+                  <div className="sw-subtitle">check karo, safe raho</div>
                 </div>
               </div>
               <div className="sw-header-right">
@@ -1987,8 +2189,8 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
               <div className="sw-consent">
                 <ShieldCheck size={20} style={{ color: 'var(--safe)', marginBottom: 8 }} />
                 <p className="sw-consent-text">
-                  Chetana checks your message and forgets it. Nothing is stored, sold, or shared.
-                  Results are advisory — not legal determinations.
+                  Text checks can start locally. Links, media, and deeper reviews may use server help when needed.
+                  Results are advisory, not legal determinations.
                 </p>
                 <button className="sw-consent-btn" onClick={acceptTerms}>
                   I understand — let me scan
@@ -2031,17 +2233,17 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                           <button onClick={() => shareWhatsApp(msg.scanResult)} title="Share on WhatsApp"><Smartphone size={13} /></button>
                           <button onClick={() => shareResult(msg.scanResult)} title="Share"><Share2 size={13} /></button>
                         </div>
-                        {/* Social proof warning */}
+                        {/* Risk framing */}
                         {msg.scanResult.score >= 70 && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
                             <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-                            <span>9 out of 10 people who saw this type of message chose not to proceed. Take a moment before acting.</span>
+                            <span>This looks risky. Stop for a moment and verify through the bank app, official website, or known helpline before you act.</span>
                           </div>
                         )}
                         {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
                           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
                             <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
-                            <span>7 out of 10 people who checked this chose to verify further before acting.</span>
+                            <span>There are warning signs here. Verify first before you click, pay, reply, install an app, or share OTP details.</span>
                           </div>
                         )}
                         {msg.scanResult.score >= 70 && (
@@ -2213,7 +2415,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                   }
                 }}
               />
-              <button className={`sw-send${canSend ? " sw-send-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
+              <button className={`sw-send${canSend ? " sw-send-ready tool-check-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
                 <Send size={16} />
               </button>
             </div>

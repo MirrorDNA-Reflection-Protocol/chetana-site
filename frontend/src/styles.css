@@ -171,9 +171,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 .not-govt-badge {
   display: flex; align-items: center;
   padding: 4px 10px; font-size: 10px; font-weight: 600;
-  letter-spacing: 0.04em; color: rgba(0,0,0,0.08);
+  letter-spacing: 0.04em; color: rgba(255,255,255,0.62);
   border-radius: 999px; white-space: nowrap; flex-shrink: 0;
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
   cursor: default;
 }
 
@@ -218,6 +219,128 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+.hero-compressed {
+  padding: 72px 0 32px;
+}
+.hero-copy-shell {
+  position: relative;
+  z-index: 2;
+  max-width: 860px;
+  padding: 36px 32px;
+  border-radius: 28px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    radial-gradient(circle at top left, rgba(59,130,246,0.12), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(245,158,11,0.08), transparent 32%),
+    rgba(10, 12, 20, 0.66);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.28);
+}
+.hero-lede {
+  max-width: 660px;
+  margin: 0 auto;
+  font-size: clamp(1.05rem, 2.5vw, 1.28rem);
+  line-height: 1.75;
+  color: rgba(255,255,255,0.74);
+}
+.hero-language-morph {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin-top: 18px;
+}
+.hero-language-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.72);
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+}
+.hero-language-stage {
+  width: 100%;
+  min-height: 84px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+.hero-language-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background:
+    linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(15, 23, 42, 0.68)),
+    linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(59, 130, 246, 0.06));
+  box-shadow: 0 18px 40px rgba(0,0,0,0.22);
+}
+.hero-language-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.56);
+}
+.hero-language-text {
+  font-size: clamp(1.18rem, 2.8vw, 1.6rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: var(--heading);
+}
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.hero-primary-btn,
+.hero-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 190px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  font-size: 0.98rem;
+  font-weight: 600;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.hero-primary-btn {
+  color: #f8fafc;
+  background: linear-gradient(135deg, rgba(30,64,175,0.9), rgba(59,130,246,0.92));
+  box-shadow: 0 14px 30px rgba(37,99,235,0.22);
+}
+.hero-secondary-btn {
+  color: rgba(255,255,255,0.86);
+  background: rgba(255,255,255,0.05);
+}
+.hero-primary-btn:hover,
+.hero-secondary-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.22);
+}
+.hero-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.hero-note {
+  margin-top: 16px;
+  font-size: 0.92rem;
+  color: rgba(255,255,255,0.52);
 }
 .hero p {
   color: var(--muted);
@@ -1574,13 +1697,239 @@ select { appearance: none; cursor: pointer; }
 
 .hero-trust-pill {
   font-size: 12px;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.64);
   font-weight: 500;
   padding: 4px 10px;
   border-radius: 6px;
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
   letter-spacing: 0.02em;
+}
+.front-door-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+  gap: 22px;
+  align-items: stretch;
+  margin: 0 auto 28px;
+}
+.front-door-story,
+.front-door-install {
+  border-radius: 26px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10, 12, 20, 0.74);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+}
+.front-door-story {
+  padding: 28px;
+}
+.front-door-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245,158,11,0.18);
+  background: rgba(245,158,11,0.1);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.front-door-story h2,
+.front-door-install h2 {
+  margin-top: 16px;
+  font-size: clamp(1.9rem, 3.6vw, 2.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--heading);
+}
+.front-door-story > p,
+.front-door-install-copy > p {
+  margin-top: 14px;
+  color: rgba(255,255,255,0.68);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.front-door-route-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.front-door-route {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.front-door-route:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.05);
+}
+.front-door-route span {
+  display: block;
+}
+.front-door-route strong {
+  display: block;
+  color: var(--heading);
+  font-size: 1rem;
+}
+.front-door-route small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255,255,255,0.56);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.front-door-route-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(59,130,246,0.14);
+  color: #93c5fd;
+}
+.front-door-facts {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+.front-door-fact {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.front-door-fact strong {
+  display: block;
+  color: var(--heading);
+  font-size: 0.98rem;
+}
+.front-door-fact p {
+  margin-top: 6px;
+  color: rgba(255,255,255,0.58);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+.front-door-help {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(239,68,68,0.16);
+  background: linear-gradient(135deg, rgba(239,68,68,0.14), rgba(124,45,18,0.08));
+}
+.front-door-help-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.56);
+}
+.front-door-help strong {
+  display: block;
+  margin-top: 6px;
+  color: #fee2e2;
+  font-size: 1rem;
+}
+.front-door-help small {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255,255,255,0.62);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.front-door-help-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.front-door-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 124px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.front-door-help-btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.86);
+}
+.front-door-scanner .sw-window.sw-inline {
+  height: 100%;
+  max-height: none;
+  min-height: 720px;
+  border-radius: 24px;
+  border-color: rgba(255,255,255,0.08);
+  background: rgba(8, 10, 16, 0.9);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.24);
+}
+.front-door-install {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 20px;
+  padding: 28px;
+  margin: 0 auto 34px;
+}
+.front-door-install-steps {
+  margin: 22px 0 0;
+  padding-left: 20px;
+  color: rgba(255,255,255,0.78);
+}
+.front-door-install-steps li {
+  margin-bottom: 12px;
+  line-height: 1.65;
+}
+.front-door-install-notes {
+  display: grid;
+  gap: 12px;
+}
+.front-door-note-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+.front-door-note-card strong {
+  display: block;
+  color: var(--heading);
+}
+.front-door-note-card p {
+  margin-top: 4px;
+  color: rgba(255,255,255,0.58);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.front-door-install-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }
 /* Intent rail grid */
 .hero-intent-grid {
@@ -1616,10 +1965,49 @@ select { appearance: none; cursor: pointer; }
 @media (max-width: 640px) {
   .hero-scan-cta { font-size: 14px; padding: 12px 20px; }
   .hero-intent-card { font-size: 0.82rem; padding: 10px 12px; }
+  .hero-copy-shell { padding: 26px 18px; }
+  .hero-actions { flex-direction: column; }
+  .hero-primary-btn, .hero-secondary-btn { width: 100%; }
 }
 @media (max-width: 480px) {
   .hero-intent-card { font-size: 0.82rem; padding: 12px 14px; gap: 8px; }
   .hero-intent-grid { grid-template-columns: 1fr; max-width: 300px; }
+}
+@media (max-width: 960px) {
+  .front-door-shell,
+  .front-door-install {
+    grid-template-columns: 1fr;
+  }
+  .front-door-help {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 768px) {
+  .front-door-shell {
+    gap: 16px;
+  }
+  .front-door-story {
+    order: 2;
+    padding: 22px 18px;
+  }
+  .front-door-scanner {
+    order: 1;
+  }
+  .front-door-scanner .sw-window.sw-inline {
+    min-height: 0;
+    height: auto;
+    max-height: 72vh;
+  }
+  .front-door-install {
+    padding: 22px 18px;
+  }
+  .front-door-route {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .front-door-route svg:last-child {
+    display: none;
+  }
 }
 
 .section-glow-divider {

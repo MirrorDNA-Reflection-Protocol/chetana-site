@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
-  StoriesSection, ConsumerSection, EnterpriseSection, TelegramCTA, ShareCTA,
-  WeatherBoard, Atlas, TrustPage, PanicPage, IncidentStepper, FamilyPage, Footer
+  ConsumerSection, WeatherBoard, Atlas, TrustPage, PanicPage,
+  IncidentStepper, FamilyPage, Footer, FrontDoorSection, ShareInstallSection
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -38,6 +38,7 @@ export default function App() {
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [councilData, setCouncilData] = useState<any>(null);
   const [sharedContent, setSharedContent] = useState<string | null>(null);
+  const [sharedAttachment, setSharedAttachment] = useState<File | null>(null);
   const [vidIdx, setVidIdx] = useState(0);
   const activePreview = previewClips[vidIdx];
   useEffect(() => { const t = setInterval(() => setVidIdx(i => (i + 1) % previewClips.length), 6000); return () => clearInterval(t); }, []);
@@ -52,21 +53,68 @@ export default function App() {
 
   // Handle share target intake + PWA shortcuts on load
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const isShare = params.has("share");
-    const sharedText = params.get("shared_text");
-    const isAction = params.get("action") === "scan";
-    const isPwa = params.get("source") === "pwa";
+    let cancelled = false;
 
-    if (isShare && sharedText) {
-      setSharedContent(decodeURIComponent(sharedText));
-      _setPage("scan");
-      // Clean URL without reload
-      window.history.replaceState({}, "", "/");
-    } else if (isAction || isPwa) {
-      _setPage("scan");
-      window.history.replaceState({}, "", "/");
-    }
+    const bootFromIntent = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const isShare = params.has("share");
+      const isAction = params.get("action") === "scan";
+      const isPwa = params.get("source") === "pwa";
+      let sharedText = params.get("shared_text");
+      let sharedFile: File | null = null;
+
+      if (isShare && "caches" in window) {
+        try {
+          const cache = await caches.open("chetana-share");
+          const payloadResp = await cache.match("/shared-payload");
+
+          if (payloadResp) {
+            const payload = await payloadResp.json();
+
+            if (!sharedText) {
+              const stitched = [payload.title, payload.text, payload.url].filter(Boolean).join(" ").trim();
+              sharedText = stitched || null;
+            }
+
+            const fileCount = Number(payload.fileCount || 0);
+            if (fileCount > 0) {
+              const fileResp = await cache.match("/shared-file-0");
+              if (fileResp) {
+                const blob = await fileResp.blob();
+                const filename = fileResp.headers.get("X-Filename") || `shared-${Date.now()}`;
+                sharedFile = new File([blob], filename, {
+                  type: blob.type || fileResp.headers.get("Content-Type") || "application/octet-stream",
+                });
+              }
+
+              for (let i = 0; i < fileCount; i += 1) {
+                await cache.delete(`/shared-file-${i}`);
+              }
+            }
+
+            await cache.delete("/shared-payload");
+          }
+        } catch (error) {
+          console.error("Failed to hydrate PWA share payload", error);
+        }
+      }
+
+      if (cancelled) return;
+
+      setSharedContent(sharedText || null);
+      setSharedAttachment(sharedFile);
+
+      if (isShare || isAction || isPwa) {
+        setPage("scan");
+        window.history.replaceState({}, "", "/");
+      }
+    };
+
+    void bootFromIntent();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
@@ -82,16 +130,14 @@ export default function App() {
 
             {page === "home" && <>
               <Hero onNavigate={setPage as any} />
-              <StatsStrip />
-              <StoriesSection />
-              <TelegramCTA />
-              <ShareCTA />
-              <ConsumerSection onNavigate={setPage} />
-              <hr className="section-glow-divider" />
-              <EnterpriseSection onNavigate={setPage} />
-              <hr className="section-glow-divider" />
-              <WeatherBoard signals={weather.slice(0, 6)} />
-              <TrustPage />
+              <FrontDoorSection
+                onNavigate={setPage}
+                onRequireProof={() => setPage("proof")}
+                onCouncilUpdate={setCouncilData}
+                initialInput={sharedContent}
+                initialFile={sharedAttachment}
+              />
+              <ShareInstallSection onNavigate={setPage} />
             </>}
 
             {page === "consumer" && <>
@@ -274,7 +320,7 @@ export default function App() {
                           )}
                           {!councilData && (
                             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 1.4, margin: '4px 0 0', textAlign: 'center' }}>
-                              Paste a suspicious message → 4 AI judges deliberate in real time.
+                              Paste a suspicious message and Chetana will compare local signals with deeper analysis when needed.
                             </p>
                           )}
                         </div>
@@ -382,7 +428,13 @@ export default function App() {
                 </div>
                 {/* RIGHT — Chat box (primary on mobile, shows first via CSS order) */}
                 <div className="scan-page-main">
-                  <ScanWidget onRequireProof={() => setPage("proof")} inline onCouncilUpdate={setCouncilData} initialInput={sharedContent} />
+                  <ScanWidget
+                    onRequireProof={() => setPage("proof")}
+                    inline
+                    onCouncilUpdate={setCouncilData}
+                    initialInput={sharedContent}
+                    initialFile={sharedAttachment}
+                  />
                 </div>
               </section>
               <StatsStrip />

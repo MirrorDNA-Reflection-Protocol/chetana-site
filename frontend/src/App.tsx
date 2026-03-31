@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
-  ConsumerSection, WeatherBoard, Atlas, TrustPage, PanicPage,
+  ConsumerSection, SafetyRadar, Atlas, TrustPage, PanicPage,
   IncidentStepper, FamilyPage, Footer, FrontDoorSection, ShareInstallSection, ScanGuideRail
 } from "./components";
 import ProofPage from "./ProofPage";
@@ -215,7 +215,7 @@ export default function App() {
                   <p>Paste a message, link, UPI ID, or phone number and get the next safe step.</p>
                 </div>
               </section>
-              <WeatherBoard signals={weather.slice(0, 5)} />
+              <SafetyRadar signals={weather.slice(0, 5)} />
               <Atlas threats={threats} />
             </>}
 
@@ -236,7 +236,7 @@ export default function App() {
                   <p>For shopkeepers, sellers, and delivery staff checking fake payment screenshots, impersonation, and UPI fraud.</p>
                 </div>
               </section>
-              <WeatherBoard signals={weather.slice(0, 5)} />
+              <SafetyRadar signals={weather.slice(0, 5)} />
               <Atlas threats={threats} />
             </>}
 
@@ -248,7 +248,7 @@ export default function App() {
                   <p>Add Chetana to your app, website, or payment flow so users can pause and verify before they act.</p>
                 </div>
               </section>
-              <WeatherBoard signals={weather.slice(0, 5)} />
+              <SafetyRadar signals={weather.slice(0, 5)} />
               <Atlas threats={threats} />
             </>}
 
@@ -269,7 +269,7 @@ export default function App() {
               <StatsStrip />
             </>}
 
-            {page === "weather" && <WeatherBoard signals={weather} />}
+            {page === "weather" && <SafetyRadar signals={weather} />}
             {page === "trust" && <TrustPage />}
             {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("scan"); }} />}
             {page === "panic" && <PanicPage />}

@@ -102,18 +102,18 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
           display: "grid",
           gap: 10,
           marginBottom: 18,
-          background: "rgba(239,68,68,0.08)",
-          borderColor: "rgba(239,68,68,0.18)",
+          background: "rgba(239,68,68,0.1)",
+          borderColor: "rgba(239,68,68,0.2)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#fecaca", fontWeight: 700 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--danger)", fontWeight: 700 }}>
           <AlertTriangle size={18} />
           If money already moved, call 1930 first.
         </div>
-        <p style={{ margin: 0, color: "rgba(255,255,255,0.8)", lineHeight: 1.65 }}>
+        <p style={{ margin: 0, color: "var(--text)", lineHeight: 1.65 }}>
           Then call your bank and finish the complaint on <strong>cybercrime.gov.in</strong>.
         </p>
-        <p style={{ margin: 0, color: "#fecaca", lineHeight: 1.6 }}>
+        <p style={{ margin: 0, color: "var(--danger)", lineHeight: 1.6 }}>
           अगर पैसे जा चुके हैं, अभी <strong>1930</strong> पर कॉल करें।
         </p>
       </div>
@@ -128,7 +128,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
             <p style={{ margin: 0, lineHeight: 1.7, color: "var(--muted)" }}>{card.body}</p>
             <div style={{ display: "grid", gap: 8 }}>
               {card.bullets.map((bullet) => (
-                <div key={bullet} style={{ display: "flex", gap: 8, alignItems: "flex-start", color: "rgba(255,255,255,0.82)", lineHeight: 1.55 }}>
+                <div key={bullet} style={{ display: "flex", gap: 8, alignItems: "flex-start", color: "var(--text)", lineHeight: 1.55 }}>
                   <span style={{ color: "var(--primary-bright)" }}>•</span>
                   <span>{bullet}</span>
                 </div>
@@ -158,9 +158,9 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
                 gap: 12,
                 padding: "14px 16px",
                 borderRadius: 14,
-                border: checks[index] ? "1px solid rgba(34,197,94,0.35)" : "1px solid rgba(255,255,255,0.1)",
-                background: checks[index] ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.03)",
-                color: "rgba(255,255,255,0.9)",
+                border: checks[index] ? "1px solid rgba(34,197,94,0.4)" : "1px solid var(--line-bright)",
+                background: checks[index] ? "rgba(34,197,94,0.08)" : "var(--bg-card)",
+                color: "var(--text-bright)",
                 textAlign: "left",
                 cursor: "pointer",
               }}
@@ -172,8 +172,8 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
                   borderRadius: 999,
                   display: "grid",
                   placeItems: "center",
-                  background: checks[index] ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.08)",
-                  color: checks[index] ? "#22c55e" : "rgba(255,255,255,0.45)",
+                  background: checks[index] ? "rgba(34,197,94,0.2)" : "rgba(128,128,128,0.1)",
+                  color: checks[index] ? "#22c55e" : "var(--muted)",
                   flexShrink: 0,
                   marginTop: 1,
                 }}
@@ -198,7 +198,7 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
             <span style={{ color: "var(--muted)", lineHeight: 1.6 }}>
               Once you continue, Chetana opens the checker. On Android, you can install it once and then share straight from WhatsApp, Messages, or Gallery.
             </span>
-            <span style={{ color: "rgba(255,255,255,0.68)", lineHeight: 1.6 }}>
+            <span style={{ color: "var(--text)", lineHeight: 1.6 }}>
               Hindi quick line: <strong>रुकिए, जांच कीजिए, फिर ही पैसे भेजिए।</strong>
             </span>
           </div>

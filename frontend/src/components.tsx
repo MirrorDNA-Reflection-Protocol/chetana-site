@@ -73,18 +73,14 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
             {item.label}
           </button>
         ))}
+        <button className="theme-toggle" onClick={() => {
+          document.documentElement.classList.toggle("theme-light");
+        }}>
+          <span style={{ fontSize: 18 }}>🌓</span>
+        </button>
       </div>
       <div className="nav-right">
         <div className="not-govt-badge" title="Chetana is a private AI tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Not a govt service</div>
-        <button className="theme-toggle" onClick={() => {
-          const root = document.documentElement;
-          const isLight = root.classList.contains("theme-light");
-          root.classList.toggle("theme-light", !isLight);
-          root.classList.toggle("theme-dark", isLight);
-          localStorage.setItem("chetana_theme", isLight ? "dark" : "light");
-        }} aria-label="Toggle theme" title="Switch light/dark theme">
-          {typeof window !== "undefined" && document.documentElement.classList.contains("theme-light") ? <Moon size={16} /> : <Sun size={16} />}
-        </button>
         <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
         </button>
@@ -544,7 +540,7 @@ export function StatsStrip() {
   const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
   const personalScans = parseInt(localStorage.getItem("chetana_scan_count") || "0");
   const trustLevel = personalScans >= 50 ? "Sentinel" : personalScans >= 20 ? "Guardian" : personalScans >= 5 ? "Vigilant" : personalScans >= 1 ? "Aware" : "New";
-  const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#3b82f6" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "rgba(255,255,255,0.3)";
+  const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#3b82f6" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "var(--muted)";
 
   useEffect(() => {
     let cancelled = false;
@@ -610,7 +606,7 @@ export function StatsStrip() {
         <div className="stat-label">Languages</div>
       </div>
       {personalScans > 0 && (
-        <div className="stat-item" translate="no" style={{ borderLeft: '1px solid rgba(255,255,255,0.08)', paddingLeft: 24 }}>
+        <div className="stat-item" translate="no" style={{ borderLeft: '1px solid var(--line)', paddingLeft: 24 }}>
           <div className="stat-value" style={{ color: trustColor, fontSize: 18 }}>{trustLevel}</div>
           <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Shield size={10} style={{ color: trustColor }} />
@@ -1434,7 +1430,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
               {detectedType && detectedType !== "message" && (
                 <span className="tool-detect">{typeLabels[detectedType]}</span>
               )}
-              {file && !input.trim() && <span className="tool-detect" style={{ background: 'var(--safe-light, rgba(34,197,94,0.1))', color: 'var(--safe, #22c55e)' }}>File ready to check</span>}
+              {file && !input.trim() && <span className="tool-detect" style={{ background: 'var(--safe-light)', color: 'var(--safe)' }}>File ready to check</span>}
             </div>
             <button className={`tool-check${canSend ? " tool-check-ready" : ""}`} onClick={handleSend} disabled={!canSend}>
               {loading ? "Checking..." : "Get next step →"}
@@ -1710,7 +1706,7 @@ function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string;
                 <div className="incident-icon-row"><ShieldAlert size={28} className="incident-red" /></div>
                 <h3>{screen.headline}</h3>
                 <ul className="incident-donts">
-                  {screen.do_nots?.map((d, i) => <li key={i}><X size={14} className="incident-red" /> {d}</li>)}
+                  {screen.do_nots?.map((d: string, i: number) => <li key={i}><X size={14} className="incident-red" /> {d}</li>)}
                 </ul>
                 <p className="incident-disclosure">{screen.processing_disclosure}</p>
                 <div className="incident-actions">
@@ -1727,13 +1723,13 @@ function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string;
                 {(screen.known_signals?.length ?? 0) > 0 && (
                   <div className="incident-signals">
                     <h4>Confirmed signals</h4>
-                    <ul>{screen.known_signals?.map((s, i) => <li key={i}><AlertTriangle size={12} className="incident-red" /> {s}</li>)}</ul>
+                    <ul>{screen.known_signals?.map((s: string, i: number) => <li key={i}><AlertTriangle size={12} className="incident-red" /> {s}</li>)}</ul>
                   </div>
                 )}
                 {(screen.suspected_signals?.length ?? 0) > 0 && (
                   <div className="incident-signals suspected">
                     <h4>Suspected</h4>
-                    <ul>{screen.suspected_signals?.map((s, i) => <li key={i}><Eye size={12} className="incident-amber" /> {s}</li>)}</ul>
+                    <ul>{screen.suspected_signals?.map((s: string, i: number) => <li key={i}><Eye size={12} className="incident-amber" /> {s}</li>)}</ul>
                   </div>
                 )}
                 <p className="incident-trust-note">{screen.trust_note}</p>
@@ -1746,7 +1742,7 @@ function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string;
               {step === "next_actions" && (<>
                 <h3>What to do now</h3>
                 <ol className="incident-steps-list">
-                  {screen.actions?.map((a, i) => <li key={i}><span className="incident-step-num">{i + 1}</span> {a}</li>)}
+                  {screen.actions?.map((a: string, i: number) => <li key={i}><span className="incident-step-num">{i + 1}</span> {a}</li>)}
                 </ol>
                 <div className="incident-actions">
                   <a href="tel:1930" className="incident-btn-urgent" onClick={() => doAction("call_1930")}><Phone size={14} /> Call 1930</a>
@@ -1939,8 +1935,8 @@ export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "
   );
 }
 
-/* ── Weather Board ───────────────────────────────────────────── */
-export function WeatherBoard({ signals }: { signals: WeatherSignal[] }) {
+/* ── Safety Radar (formerly Weather Board) ───────────────────── */
+export function SafetyRadar({ signals }: { signals: WeatherSignal[] }) {
   const confirmed = signals.filter(s => s.lane === "confirmed");
   const reported = signals.filter(s => s.lane === "reported");
   const signal = signals.filter(s => s.lane === "signal");
@@ -2012,8 +2008,8 @@ export function Atlas({ threats }: { threats: ThreatEntry[] }) {
             <p>{t.summary}</p>
             <div className="tag-row">{t.languages.map(l => <span key={l} className="tag">{l}</span>)}</div>
             <div className="two-col">
-              <div><strong style={{ color: "var(--heading)" }}>Red flags</strong><ul>{t.redFlags.map(r => <li key={r}>{r}</li>)}</ul></div>
-              <div><strong style={{ color: "var(--heading)" }}>What to do</strong><ul>{t.actions.map(a => <li key={a}>{a}</li>)}</ul></div>
+              <div><strong style={{ color: "var(--text-bright)" }}>Red flags</strong><ul>{t.redFlags.map(r => <li key={r}>{r}</li>)}</ul></div>
+              <div><strong style={{ color: "var(--text-bright)" }}>What to do</strong><ul>{t.actions.map(a => <li key={a}>{a}</li>)}</ul></div>
             </div>
           </motion.article>
         ))}
@@ -2041,10 +2037,10 @@ export function MirrorGraph({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
             if (k === "surface") return "#f59e0b";
             return "#6B7280";
           },
-          label: "data(label)", color: "#94a3b8", "font-size": 11 as any, "text-wrap": "wrap", "text-max-width": 90 as any, width: 34, height: 34,
-          "border-width": 1, "border-color": "#0a0a1a"
+          label: "data(label)", color: "var(--muted)", "font-size": 11 as any, "text-wrap": "wrap", "text-max-width": 90 as any, width: 34, height: 34,
+          "border-width": 1, "border-color": "var(--bg-body)"
         }},
-        { selector: "edge", style: { width: 2, "line-color": "#1e293b", "target-arrow-color": "#1e293b", "target-arrow-shape": "triangle", "curve-style": "bezier", label: "data(label)", color: "#475569", "font-size": 9 }},
+        { selector: "edge", style: { width: 2, "line-color": "var(--line)", "target-arrow-color": "var(--line)", "target-arrow-shape": "triangle", "curve-style": "bezier", label: "data(label)", color: "var(--muted)", "font-size": 9 }},
         { selector: ".faded", style: { opacity: 0.15 } }
       ]
     });
@@ -2063,7 +2059,7 @@ export function TuiPanel({ lines }: { lines: string[] }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!mountRef.current) return;
-    const term = new Terminal({ theme: { background: "#060610", foreground: "#94a3b8", cursor: "#14b8a6" }, fontSize: 12, rows: 18 });
+    const term = new Terminal({ theme: { background: "var(--bg-body)", foreground: "var(--muted)", cursor: "#14b8a6" }, fontSize: 12, rows: 18 });
     const fit = new FitAddon();
     term.loadAddon(fit); term.open(mountRef.current); fit.fit();
     term.writeln("chetana-control-shell v1");
@@ -2175,7 +2171,7 @@ export function TrustPage() {
 /* ── Telegram CTA ────────────────────────────────────────────── */
 export function TelegramCTA() {
   return (
-    <motion.div className="proof-banner" {...fadeIn} style={{ cursor: "pointer", maxWidth: 720, margin: "0 auto 32px" }} onClick={() => window.open("https://t.me/chetnaShieldBot", "_blank")}>
+    <motion.div className="proof-banner" {...fadeIn} style={{ cursor: "pointer", margin: "0 auto 32px" }} onClick={() => window.open("https://t.me/chetnaShieldBot", "_blank")}>
       <div className="proof-banner-icon" style={{ background: "linear-gradient(135deg, #0088cc, #229ED9)" }}>
         <Smartphone size={20} />
       </div>
@@ -2696,19 +2692,19 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                         </div>
                         {/* Risk framing */}
                         {msg.scanResult.score >= 70 && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 4, fontSize: 11.5, color: "var(--text)", lineHeight: 1.4 }}>
                             <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
                             <span>This looks risky. Stop for a moment and verify through the bank app, official website, or known helpline before you act.</span>
                           </div>
                         )}
                         {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 4, fontSize: 11.5, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 7, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 4, fontSize: 11.5, color: "var(--text)", lineHeight: 1.4 }}>
                             <Shield size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
                             <span>There are warning signs here. Verify first before you click, pay, reply, install an app, or share OTP details.</span>
                           </div>
                         )}
                         {msg.scanResult.score >= 70 && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(239,68,68,0.06)", marginTop: 3, fontSize: 11, color: "rgba(255,180,180,0.7)", fontStyle: "italic" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(239,68,68,0.06)", marginTop: 3, fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>
                             <span>Take 5 minutes to think before responding to this message</span>
                           </div>
                         )}
@@ -2717,14 +2713,14 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                             <button
                               onClick={() => handleSaveEvidence(msg)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, cursor: "pointer" }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--bg-raised)", color: "var(--text)", fontSize: 11, cursor: "pointer" }}
                               title="Download evidence pack"
                             >
                               <FileText size={12} /> Save Evidence
                             </button>
                             <button
                               onClick={() => handleReportNow(msg)}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.15)", color: "#ff8a8a", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--danger)", background: "rgba(239,68,68,0.15)", color: "var(--danger)", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
                               title="Report to authorities"
                             >
                               <Flag size={12} /> Report Now
@@ -2738,7 +2734,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                                   navigator.clipboard?.writeText(text);
                                 }
                               }}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", fontSize: 11, cursor: "pointer" }}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--bg-raised)", color: "var(--text)", fontSize: 11, cursor: "pointer" }}
                               title="Share warning"
                             >
                               <Share2 size={12} /> Share Warning
@@ -2906,12 +2902,12 @@ export function PanicPage() {
 
   const stepConnector = (
     <div style={{ display: "flex", justifyContent: "center", padding: "4px 0" }}>
-      <div style={{ width: 2, height: 20, background: "rgba(255,255,255,0.08)", borderRadius: 1 }} />
+      <div style={{ width: 2, height: 20, background: "var(--line)", borderRadius: 1 }} />
     </div>
   );
 
   return (
-    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 720, margin: "0 auto" }}>
+    <motion.section className="panel" {...fadeIn} style={{ margin: "0 auto" }}>
       {/* Header */}
       <div className="panel-header" style={{ textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}><AlertTriangle size={48} style={{ color: "var(--danger)" }} /></div>
@@ -3024,16 +3020,16 @@ export function PanicPage() {
 
         {/* ── Step 4: Alert Family ── */}
         <motion.div {...fadeInDelay(0.4)}>
-          <div className="trust-card" style={{ borderLeft: "4px solid var(--safe, #22c55e)" }}>
+          <div className="trust-card" style={{ borderLeft: "4px solid var(--safe)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <div style={{
                 width: 32, height: 32, borderRadius: "50%",
-                background: "var(--safe, #22c55e)", color: "#fff",
+                background: "var(--safe)", color: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 800, fontSize: 15, flexShrink: 0,
               }}>4</div>
               <div>
-                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--safe, #22c55e)", fontWeight: 700 }}>Alert Family</div>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--safe)", fontWeight: 700 }}>Alert Family</div>
                 <h3 style={{ margin: 0 }}>You are not alone. This is not your fault.</h3>
               </div>
             </div>
@@ -3041,8 +3037,8 @@ export function PanicPage() {
             <button onClick={handleShare} style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               marginTop: 10, padding: "10px 22px",
-              background: shareCopied ? "var(--safe, #22c55e)" : "rgba(34,197,94,0.12)",
-              color: shareCopied ? "#fff" : "var(--safe, #22c55e)",
+              background: shareCopied ? "var(--safe)" : "rgba(34,197,94,0.12)",
+              color: shareCopied ? "#fff" : "var(--safe)",
               border: shareCopied ? "none" : "1px solid rgba(34,197,94,0.3)",
               borderRadius: 10, fontWeight: 600, fontSize: "0.9rem",
               cursor: "pointer", transition: "all 0.2s ease",
@@ -3092,12 +3088,9 @@ export function PanicPage() {
       </div>
 
       {/* Footer */}
-      <div style={{ textAlign: "center", marginTop: 32, padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12 }}>
-        <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginBottom: 8 }}>
-          Chetana is not a government service. For emergencies, contact local police or call 112.
-        </p>
-        <p style={{ fontSize: "0.8rem", color: "var(--muted)", margin: 0 }}>
-          Women helpline: 181 · Senior citizens: 14567 · Child helpline: 1098
+      <div style={{ textAlign: "center", marginTop: 32, padding: 20, background: "var(--bg-raised)", borderRadius: 12 }}>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--muted)", fontStyle: "italic" }}>
+          All results are guidance. Verify identity via official channels.
         </p>
       </div>
     </motion.section>
@@ -3159,21 +3152,21 @@ export function IncidentStepper({ onNavigate }: { onNavigate: (p: PageId) => voi
   const stepNames = ["Stabilize", "What this is", "Next actions", "Family", "Follow-up"];
 
   if (error) return (
-    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
+    <motion.section className="panel" {...fadeIn} style={{ margin: "0 auto", textAlign: "center" }}>
       <p style={{ color: "var(--danger)" }}>Could not start incident mode: {error}</p>
       <button className="tool-protect-btn" style={{ marginTop: 16, width: "auto" }} onClick={() => onNavigate("scan")}>Back to scanner</button>
     </motion.section>
   );
 
   if (loading && !screen) return (
-    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto", textAlign: "center", padding: 40 }}>
+    <motion.section className="panel" {...fadeIn} style={{ margin: "0 auto", textAlign: "center", padding: 40 }}>
       <ShieldAlert size={32} style={{ color: "var(--danger)", marginBottom: 12 }} />
       <p>Starting incident mode...</p>
     </motion.section>
   );
 
   return (
-    <motion.section className="panel" {...fadeIn} style={{ maxWidth: 680, margin: "0 auto" }}>
+    <motion.section className="panel" {...fadeIn} style={{ margin: "0 auto" }}>
       {/* Progress bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
         {stepNames.map((name, i) => (
@@ -3365,8 +3358,8 @@ export function FamilyPage() {
     if (shareStatus) setTimeout(() => setShareStatus(null), 3000);
   };
 
-  const cardStyle: React.CSSProperties = { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "20px 24px" };
-  const inputStyle: React.CSSProperties = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none" };
+  const cardStyle: React.CSSProperties = { background: "var(--bg-card)", border: "1px solid var(--line)", borderRadius: 16, padding: "20px 24px" };
+  const inputStyle: React.CSSProperties = { background: "var(--bg-input)", border: "1px solid var(--line-bright)", borderRadius: 10, padding: "10px 14px", color: "var(--text-bright)", fontSize: 14, width: "100%", outline: "none" };
 
   return (
     <motion.section className="panel" {...fadeIn}>
@@ -3387,9 +3380,9 @@ export function FamilyPage() {
       <motion.div {...fadeInDelay(0.1)} style={{ ...cardStyle, marginBottom: 20, textAlign: "center" }}>
         <Shield size={32} style={{ color: "var(--primary-bright)", marginBottom: 8 }} />
         {contacts.length > 0 ? (
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#f8fafc" }}>Your family circle: {contacts.length} member{contacts.length !== 1 ? "s" : ""} protected</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-bright)" }}>Your family circle: {contacts.length} member{contacts.length !== 1 ? "s" : ""} protected</div>
         ) : (
-          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.5)" }}>Add your first trusted contact to start protecting your family.</div>
+          <div style={{ fontSize: 15, color: "var(--muted)" }}>Add your first trusted contact to start protecting your family.</div>
         )}
       </motion.div>
 
@@ -3407,18 +3400,18 @@ export function FamilyPage() {
               </button>
             </div>
           )}
-          {contacts.length >= 5 && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>Maximum 5 contacts reached.</p>}
+          {contacts.length >= 5 && <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>Maximum 5 contacts reached.</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {contacts.map((c, i) => (
-              <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 14px" }}>
+              <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-raised)", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Phone size={14} style={{ color: "var(--primary-bright)" }} />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#f8fafc" }}>{c.name}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{c.phone}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-bright)" }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>{c.phone}</div>
                   </div>
                 </div>
-                <button onClick={() => removeContact(i)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", padding: 4 }} title="Remove">
+                <button onClick={() => removeContact(i)} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }} title="Remove">
                   <X size={14} />
                 </button>
               </motion.div>
@@ -3431,7 +3424,7 @@ export function FamilyPage() {
           {/* Alert Button */}
           <div style={cardStyle}>
             <h3 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Share2 size={18} style={{ color: "#f59e0b" }} /> One-Tap Family Alert</h3>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>Send a pre-written alert to your family asking them to help verify a suspicious message.</p>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>Send a pre-written alert to your family asking them to help verify a suspicious message.</p>
             <button onClick={sendAlert} style={{ width: "100%", padding: "16px 20px", background: "linear-gradient(135deg, #f59e0b, #ef4444)", border: "none", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "transform 0.15s", boxShadow: "0 4px 24px rgba(245,158,11,0.25)" }}>
               <AlertTriangle size={20} />
               Alert My Family
@@ -3446,8 +3439,8 @@ export function FamilyPage() {
           {/* Senior-Safe Toggle */}
           <div style={cardStyle}>
             <h3 style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}><Eye size={18} style={{ color: "#a78bfa" }} /> Senior-Safe Mode</h3>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, lineHeight: 1.5 }}>Enable simplified interface signals for elderly family members.</p>
-            <button onClick={toggleSenior} style={{ width: "100%", padding: "14px 20px", background: seniorMode ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)", border: seniorMode ? "2px solid rgba(34,197,94,0.4)" : "1px solid rgba(255,255,255,0.1)", borderRadius: 14, color: seniorMode ? "#22c55e" : "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all 0.2s" }}>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>Enable simplified interface signals for elderly family members.</p>
+            <button onClick={toggleSenior} style={{ width: "100%", padding: "14px 20px", background: seniorMode ? "rgba(34,197,94,0.15)" : "var(--bg-input)", border: seniorMode ? "2px solid rgba(34,197,94,0.4)" : "1px solid var(--line-bright)", borderRadius: 14, color: seniorMode ? "#22c55e" : "var(--muted)", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all 0.2s" }}>
               <ShieldCheck size={18} />
               {seniorMode ? "Senior-Safe Mode: ON" : "Senior-Safe Mode: OFF"}
             </button>

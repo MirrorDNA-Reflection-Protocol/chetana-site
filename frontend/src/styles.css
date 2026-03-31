@@ -75,6 +75,34 @@ body { top: 0 !important; }
   --violet-light: rgba(139, 92, 246, 0.1);
   --teal: #14b8a6;
   --teal-light: rgba(20, 184, 166, 0.08);
+
+  /* Transition for theme switching */
+  --theme-transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* ── Light Theme Tokens ──────────────────────────────────────── */
+:root.theme-light,
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) {
+    --bg: #ffffff;
+    --bg-raised: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-solid: #ffffff;
+    --bg-nav: rgba(255, 255, 255, 0.92);
+    --bg-input: #f1f5f9;
+
+    --text: #000000;
+    --text-bright: #000000;
+    --muted: #4b5563;
+    --heading: #000000;
+    --line: rgba(0, 0, 0, 0.1);
+    --line-bright: rgba(0, 0, 0, 0.16);
+
+    --primary-glow: rgba(59, 130, 246, 0.1);
+    --primary-light: rgba(59, 130, 246, 0.05);
+
+    color-scheme: light;
+  }
 }
 
 /* ── Base ────────────────────────────────────────────────────── */
@@ -88,6 +116,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: var(--theme-transition);
 }
 
 button, input, select, textarea { font: inherit; }
@@ -143,21 +172,30 @@ a { color: var(--primary-bright); text-decoration: none; }
 
 /* ── Layout ──────────────────────────────────────────────────── */
 .app-shell { position: relative; z-index: 1; min-height: 100vh; overflow-x: hidden; }
-main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 18px 80px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+@media (max-width: 480px) {
+  main { padding: 0 12px 60px; }
+}
 .app-update-banner {
   max-width: 1200px;
   margin: 14px auto 0;
   padding: 14px 18px;
   border-radius: 18px;
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  background:
-    linear-gradient(135deg, rgba(37,99,235,0.18), rgba(245,158,11,0.1)),
-    rgba(10, 12, 20, 0.82);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.2);
+  border: 1px solid var(--line-bright);
+  background: var(--bg-raised);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  transition: var(--theme-transition);
 }
 .app-update-copy {
   display: grid;
@@ -302,15 +340,18 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 .hero-copy-shell {
   position: relative;
   z-index: 2;
+  width: 100%;
   max-width: 860px;
   padding: 36px 32px;
   border-radius: 28px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background:
-    radial-gradient(circle at top left, rgba(59,130,246,0.12), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(245,158,11,0.08), transparent 32%),
-    rgba(10, 12, 20, 0.66);
-  box-shadow: 0 30px 80px rgba(0,0,0,0.28);
+  border: 1px solid var(--line-bright);
+  background: var(--bg-card);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.15);
+  transition: var(--theme-transition);
+  box-sizing: border-box;
+}
+@media (max-width: 480px) {
+  .hero-copy-shell { padding: 24px 16px; border-radius: 20px; }
 }
 .hero-lede {
   max-width: 660px;
@@ -1843,7 +1884,7 @@ select { appearance: none; cursor: pointer; }
 .front-door-story > p,
 .front-door-install-copy > p {
   margin-top: 14px;
-  color: rgba(255,255,255,0.68);
+  color: var(--text);
   font-size: 1rem;
   line-height: 1.75;
 }
@@ -2004,7 +2045,7 @@ select { appearance: none; cursor: pointer; }
 }
 .front-door-install {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 20px;
   padding: 28px;
   margin: 0 auto 34px;
@@ -2080,9 +2121,10 @@ select { appearance: none; cursor: pointer; }
 @media (max-width: 640px) {
   .hero-scan-cta { font-size: 14px; padding: 12px 20px; }
   .hero-intent-card { font-size: 0.82rem; padding: 10px 12px; }
-  .hero-copy-shell { padding: 26px 18px; }
-  .hero-actions { flex-direction: column; }
-  .hero-primary-btn, .hero-secondary-btn { width: 100%; }
+  .hero-copy-shell { padding: 26px 18px; text-align: center; }
+  .hero-actions { flex-direction: column; align-items: center; }
+  .hero-primary-btn, .hero-secondary-btn { width: 100%; max-width: 320px; }
+  .hero-reassurance { text-align: center; }
 }
 @media (max-width: 480px) {
   .hero-intent-card { font-size: 0.82rem; padding: 12px 14px; gap: 8px; }
@@ -2102,23 +2144,16 @@ select { appearance: none; cursor: pointer; }
   .front-door-shell {
     gap: 16px;
   }
-  .front-door-story {
-    order: 2;
-    padding: 22px 18px;
-  }
-  .front-door-scanner {
-    order: 1;
-  }
-  .front-door-scanner .sw-window.sw-inline {
-    min-height: 0;
-    height: auto;
-    max-height: 72vh;
-  }
   .front-door-install {
-    padding: 22px 18px;
+    padding: 16px 14px;
+  }
+  .front-door-story {
+    padding: 16px 14px;
+    order: 2;
   }
   .front-door-route {
     grid-template-columns: auto minmax(0, 1fr);
+    padding: 14px 12px;
   }
   .front-door-route svg:last-child {
     display: none;
@@ -3645,7 +3680,9 @@ select { appearance: none; cursor: pointer; }
   border: 1px solid var(--line);
 }
 .hero-reassurance {
+  display: block;
   text-align: center;
+  width: 100%;
   font-size: 13px;
   color: var(--muted);
   margin-top: 16px;
@@ -3671,7 +3708,7 @@ select { appearance: none; cursor: pointer; }
   font-size: 13px;
   color: var(--text);
   background: rgba(255,255,255,0.04);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-bright);
   border-radius: 24px;
   cursor: pointer;
   transition: all 0.2s;
@@ -3990,15 +4027,15 @@ select { appearance: none; cursor: pointer; }
     margin-top: 20px;
   }
   .front-door-chip-row {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    padding-bottom: 4px;
+    overflow-x: visible;
+    flex-wrap: wrap;
+    padding-bottom: 0;
   }
   .front-door-chip {
-    scroll-snap-align: start;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.3;
   }
 }
 
@@ -4255,133 +4292,56 @@ body { top: 0 !important; }
   --teal-light: rgba(13, 148, 136, 0.05);
 }
 
-/* ── Theme Toggle Button ─────────────────────────────────────── */
+
+/* ── Theme Toggle & Mobile Overrides ─────────────────────────── */
 .theme-toggle {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-bright);
+  color: var(--text-bright);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--bg-card);
-  color: var(--muted);
   cursor: pointer;
-  transition: all 0.2s;
+  z-index: 50;
+  transition: var(--theme-transition);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
 }
+
 .theme-toggle:hover {
+  transform: translateY(-2px);
   color: var(--primary-bright);
-  border-color: var(--primary);
-  background: var(--primary-light);
+  background: var(--bg-raised);
+  border-color: var(--primary-glow);
 }
 
-/* ── Light Mode Element Overrides ────────────────────────────── */
-.theme-light .hero-copy-shell {
-  border-color: rgba(0, 0, 0, 0.08);
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 34%),
-    radial-gradient(circle at bottom right, rgba(217, 119, 6, 0.04), transparent 32%),
-    rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-}
-.theme-light .hero-lede {
-  color: #52525b;
-}
-.theme-light .hero-language-hint {
-  border-color: rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.03);
-}
-.theme-light .hero-kicker {
-  color: #3f3f46;
-  border-color: rgba(0, 0, 0, 0.1);
-  background: rgba(37, 99, 235, 0.06);
-}
-.theme-light .hero-secondary-btn {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #3f3f46;
-}
-.theme-light .not-govt-badge {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.1);
-  color: #71717a;
-}
-.theme-light .nav {
-  border-bottom-color: rgba(0, 0, 0, 0.06);
-}
-.theme-light .nav-hamburger span {
-  background: #3f3f46;
-}
-.theme-light .hero-rail-item {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.1);
-}
-.theme-light .front-door-chip {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.1);
-}
-.theme-light .emergency-action-bar {
-  background: rgba(255, 255, 255, 0.95);
-  border-top-color: rgba(0, 0, 0, 0.1);
-}
-.theme-light .emergency-action-chip {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.12);
-  color: #18181b;
-}
-.theme-light .radar-card {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-}
-.theme-light .trust-wrap-card {
-  background: #ffffff;
-}
-.theme-light .hero-primary-btn {
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-}
-.theme-light .front-door-card {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.06);
-}
-.theme-light .hero h1 {
-  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 40%, #7c3aed 70%, #d97706 100%);
-  background-size: 220% 220%;
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-.theme-light .hero-reassurance {
-  color: #71717a;
-}
-.theme-light .front-door-privacy {
-  color: #71717a;
-}
-.theme-light .tool-privacy-line {
-  color: #71717a;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not(.theme-dark) .hero-copy-shell {
-    border-color: rgba(0, 0, 0, 0.08);
-    background:
-      radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 34%),
-      radial-gradient(circle at bottom right, rgba(217, 119, 6, 0.04), transparent 32%),
-      rgba(255, 255, 255, 0.92);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+@media (max-width: 768px) {
+  .theme-toggle {
+    bottom: 84px;
+    right: 16px;
   }
-  :root:not(.theme-dark) .hero-lede { color: #52525b; }
-  :root:not(.theme-dark) .hero-language-hint { border-color: rgba(0,0,0,0.08); background: rgba(0,0,0,0.03); }
-  :root:not(.theme-dark) .hero-kicker { color: #3f3f46; border-color: rgba(0,0,0,0.1); background: rgba(37,99,235,0.06); }
-  :root:not(.theme-dark) .hero-secondary-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #3f3f46; }
-  :root:not(.theme-dark) .not-govt-badge { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #71717a; }
-  :root:not(.theme-dark) .nav { border-bottom-color: rgba(0,0,0,0.06); }
-  :root:not(.theme-dark) .nav-hamburger span { background: #3f3f46; }
-  :root:not(.theme-dark) .hero-rail-item { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.1); }
-  :root:not(.theme-dark) .front-door-chip { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.1); }
-  :root:not(.theme-dark) .emergency-action-bar { background: rgba(255,255,255,0.95); border-top-color: rgba(0,0,0,0.1); }
-  :root:not(.theme-dark) .emergency-action-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); color: #18181b; }
-  :root:not(.theme-dark) .radar-card { background: #fff; border-color: rgba(0,0,0,0.08); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-  :root:not(.theme-dark) .trust-wrap-card { background: #fff; }
-  :root:not(.theme-dark) .front-door-card { background: #fff; border-color: rgba(0,0,0,0.06); }
-  :root:not(.theme-dark) .hero-reassurance { color: #71717a; }
 }
+
+/* ── Responsive Card Fixes ──────────────────────────────────── */
+.radar-grid, .feature-grid, .card-grid {
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+.panel, .onboard-card, .feature-card, .radar-card, .trust-card {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 380px) {
+  .panel { padding: 16px 12px; }
+  h1 { font-size: 28px !important; }
+}
+

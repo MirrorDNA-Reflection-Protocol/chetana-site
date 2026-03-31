@@ -808,7 +808,7 @@ select { appearance: none; cursor: pointer; }
 }
 .ticker-track {
   display: flex; align-items: center; height: 34px;
-  animation: ticker-scroll 70s linear infinite;
+  animation: ticker-scroll 120s linear infinite;
   white-space: nowrap; will-change: transform;
 }
 .ticker-track:hover { animation-play-state: paused; }
@@ -1268,7 +1268,7 @@ select { appearance: none; cursor: pointer; }
 .nav-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .nav-hamburger {
   display: none; flex-direction: column; justify-content: center; gap: 5px;
-  width: 36px; height: 36px; background: transparent; border: none;
+  width: 44px; height: 44px; background: transparent; border: none;
   cursor: pointer; padding: 4px; border-radius: 8px;
 }
 .nav-hamburger span { display: block; width: 20px; height: 2px; background: var(--muted); border-radius: 2px; transition: all .2s; }
@@ -3063,7 +3063,7 @@ select { appearance: none; cursor: pointer; }
 }
 .sw-action {
   background: none; border: none; color: var(--muted);
-  cursor: pointer; padding: 6px; border-radius: 8px;
+  cursor: pointer; padding: 10px; border-radius: 8px; min-width: 44px; min-height: 44px;
   transition: all 0.15s; flex-shrink: 0;
 }
 .sw-action:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
@@ -3119,7 +3119,7 @@ select { appearance: none; cursor: pointer; }
 .sw-send {
   background: var(--muted); color: white;
   border: none; border-radius: 50%;
-  width: 34px; height: 34px;
+  width: 44px; height: 44px;
   display: grid; place-items: center;
   cursor: not-allowed; flex-shrink: 0;
   transition: background 0.2s, opacity 0.2s, transform 0.15s;
@@ -3500,7 +3500,7 @@ select { appearance: none; cursor: pointer; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
+  padding: 12px 8px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
@@ -4081,7 +4081,7 @@ select { appearance: none; cursor: pointer; }
 .ticker-track {
   display: inline-flex;
   gap: 0;
-  animation: ticker-scroll 45s linear infinite;
+  animation: ticker-scroll 120s linear infinite;
   white-space: nowrap;
 }
 @keyframes ticker-scroll {
@@ -4260,8 +4260,8 @@ body { top: 0 !important; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--bg-card);

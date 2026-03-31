@@ -9,7 +9,7 @@ import {
   Link2, Phone, CreditCard, AlertTriangle, CheckCircle, ChevronRight,
   Globe, Users, Building2, Zap, Eye, BookOpen, BarChart3, Lock, Smartphone,
   TrendingUp, FileWarning, UserCheck, Layers, Mic, QrCode, ImageIcon,
-  Upload, FileText, Bot, Paperclip, ChevronDown, Volume2, Flag, Info, Share2
+  Upload, FileText, Bot, Paperclip, ChevronDown, Volume2, Flag, Info, Share2, Sun, Moon
 } from "lucide-react";
 import { PageId, ThreatEntry, WeatherSignal, GraphNode, GraphEdge, ScanResult } from "./types";
 import { ShieldAnim, FloatingCards, RadarAnim, CountUp, ScanAnim, GlobeAnim } from "./animations";
@@ -49,7 +49,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
   const items: { id: PageId; label: string; restricted?: boolean; urgent?: boolean }[] = [
     { id: "home", label: "Home" },
     { id: "scan", label: "Check" },
-    { id: "panic", label: "Money Gone?", urgent: true },
+    { id: "panic", label: "Need Help?", urgent: true },
     { id: "merchant", label: "For Shops" },
     { id: "trust", label: "Trust" },
   ];
@@ -76,6 +76,15 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
       </div>
       <div className="nav-right">
         <div className="not-govt-badge" title="Chetana is a private AI tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Not a govt service</div>
+        <button className="theme-toggle" onClick={() => {
+          const root = document.documentElement;
+          const isLight = root.classList.contains("theme-light");
+          root.classList.toggle("theme-light", !isLight);
+          root.classList.toggle("theme-dark", isLight);
+          localStorage.setItem("chetana_theme", isLight ? "dark" : "light");
+        }} aria-label="Toggle theme" title="Switch light/dark theme">
+          {typeof window !== "undefined" && document.documentElement.classList.contains("theme-light") ? <Moon size={16} /> : <Sun size={16} />}
+        </button>
         <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
         </button>
@@ -253,38 +262,39 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
       <div className="hero-copy-shell">
         <motion.div className="kicker kicker-glow" {...fadeInDelay(0.05)}>
           <ShieldCheck size={14} />
-          Built for India
+          Free. No sign-up. Check anything.
         </motion.div>
         <motion.h1 {...fadeInDelay(0.12)}>
-          Something feels off?
+          Not sure if this is safe?
           <br />
-          Check before you click or pay.
+          Check it here.
         </motion.h1>
         <motion.p className="hero-lede" {...fadeInDelay(0.18)}>
-          Paste the message, upload the screenshot, or drop the voice note.
-          Chetana tells you the next safe step.
+          Paste a suspicious message, payment screenshot, link, QR, or voice note.
+          Chetana helps you figure out the safest next step for India.
         </motion.p>
         <motion.div {...fadeInDelay(0.22)}>
           <PastePromptMorph />
         </motion.div>
-        <motion.div className="hero-actions" {...fadeInDelay(0.24)}>
+        <motion.div className="hero-rail" {...fadeInDelay(0.24)}>
+          <span className="hero-rail-item"><MessageCircle size={16} /> Message</span>
+          <span className="hero-rail-item"><ImageIcon size={16} /> Screenshot</span>
+          <span className="hero-rail-item"><Link2 size={16} /> Link</span>
+          <span className="hero-rail-item"><QrCode size={16} /> QR</span>
+          <span className="hero-rail-item"><Mic size={16} /> Voice</span>
+        </motion.div>
+        <motion.div className="hero-actions" {...fadeInDelay(0.28)}>
           <button className="hero-primary-btn" onClick={jumpToScanner}>
             <Upload size={17} />
             Paste or upload
           </button>
           <button className="hero-secondary-btn" onClick={() => onNavigate("panic")}>
             <AlertTriangle size={17} />
-            Money gone?
+            Need help?
           </button>
         </motion.div>
-        <motion.div className="hero-meta" {...fadeInDelay(0.3)}>
-          <span className="hero-trust-pill">Free to use</span>
-          <span className="hero-trust-pill">WhatsApp, SMS, UPI, QR</span>
-          <span className="hero-trust-pill">Local checks first</span>
-          <span className="hero-trust-pill">12+ langs</span>
-        </motion.div>
-        <motion.p className="hero-note" {...fadeInDelay(0.34)}>
-          Want to share straight from WhatsApp? Install Chetana on your Android phone first.
+        <motion.p className="hero-reassurance" {...fadeInDelay(0.32)}>
+          Nothing happens automatically. You're just checking.
         </motion.p>
       </div>
     </section>
@@ -339,7 +349,7 @@ export function FrontDoorSection({
       copy: "If money moved, call 1930 fast and then finish the complaint on cybercrime.gov.in.",
     },
     {
-      title: "Scam Weather is public here",
+      title: "Safety Radar is public here",
       copy: "You can see which fraud patterns are rising in India before they reach your family or your shop.",
     },
   ];
@@ -364,6 +374,23 @@ export function FrontDoorSection({
             </button>
           ))}
         </div>
+        <div className="front-door-examples">
+          <div className="front-door-label">Try an example</div>
+          <div className="front-door-chip-row">
+            {[
+              { label: "Fake payment screenshot", icon: <CreditCard size={14} /> },
+              { label: "Unknown WhatsApp message", icon: <MessageCircle size={14} /> },
+              { label: "Suspicious link", icon: <Link2 size={14} /> },
+              { label: "UPI QR request", icon: <QrCode size={14} /> },
+              { label: "\u201CDigital arrest\u201D call", icon: <Phone size={14} /> },
+            ].map((chip) => (
+              <button key={chip.label} className="front-door-chip" onClick={() => onNavigate("scan")}>
+                {chip.icon} {chip.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="front-door-privacy">Nothing is stored unless you choose to save it.</p>
         <div className="front-door-facts">
           {facts.map((fact) => (
             <div key={fact.title} className="front-door-fact">
@@ -386,7 +413,7 @@ export function FrontDoorSection({
           </div>
         </div>
         <div className="front-door-signal-links">
-          <button className="front-door-link-chip" onClick={() => onNavigate("weather")}>See Scam Weather</button>
+          <button className="front-door-link-chip" onClick={() => onNavigate("weather")}>See Safety Radar</button>
           <button className="front-door-link-chip" onClick={() => onNavigate("trust")}>How Chetana stays honest</button>
         </div>
       </div>
@@ -482,7 +509,7 @@ export function ScanGuideRail({ signals, onNavigate }: { signals: WeatherSignal[
 
       <div className="scan-guide-card">
         <div className="scan-guide-label">Rising now</div>
-        <h3>Scam Weather</h3>
+        <h3>Safety Radar</h3>
         <div className="scan-guide-weather-list">
           {rising.map((signal) => (
             <div key={signal.id} className={`scan-guide-weather-card ${signal.tone}`}>
@@ -495,7 +522,7 @@ export function ScanGuideRail({ signals, onNavigate }: { signals: WeatherSignal[
           Public trend view for India. Useful for spotting what is spreading right now.
         </p>
         <div className="scan-guide-actions">
-          <button className="scan-guide-btn" onClick={() => onNavigate("weather")}>See Scam Weather</button>
+          <button className="scan-guide-btn" onClick={() => onNavigate("weather")}>See Safety Radar</button>
           <button className="scan-guide-btn" onClick={() => onNavigate("atlas")}>See common scams</button>
         </div>
       </div>
@@ -936,6 +963,112 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const council_agreement = data.council_agreement;
   const council_votes: CouncilVote[] = data.council_votes || [];
   return { text, scanResult: { verdict, score, signals, action, trust_state, reason_codes, kavach_score, council_score, council_agreement, council_votes }, suggestions };
+}
+
+/* ── TrustWrap Card — structured result display ────────────── */
+function TrustWrapCard({ scanResult, fullText }: { scanResult: NonNullable<ChatMsg["scanResult"]>; fullText: string }) {
+  const [detailed, setDetailed] = useState(() => localStorage.getItem("chetana_detail_pref") === "detailed");
+  const toggleDetail = () => {
+    const next = !detailed;
+    setDetailed(next);
+    localStorage.setItem("chetana_detail_pref", next ? "detailed" : "simple");
+  };
+
+  const isDanger = scanResult.trust_state === "blocked" || scanResult.verdict === "SUSPICIOUS" || scanResult.verdict === "HIGH";
+  const isUnclear = scanResult.trust_state === "inspect" || scanResult.verdict === "UNCLEAR" || scanResult.verdict === "MEDIUM";
+  const signals = scanResult.signals || [];
+  const topReasons = signals.slice(0, 3);
+
+  const nextStep = isDanger
+    ? "Do not pay, click, or share any codes. Verify through an official channel you already trust."
+    : isUnclear
+    ? "Pause. Verify this through a second trusted source before you act."
+    : "No obvious scam signals found. Still verify if money is involved.";
+
+  return (
+    <div className={`trust-wrap-card ${isDanger ? "trust-wrap-danger" : isUnclear ? "trust-wrap-caution" : "trust-wrap-safe"}`}>
+      <div className="trust-wrap-reasons">
+        <strong className="trust-wrap-heading">{isDanger ? "Why this looks suspicious" : isUnclear ? "What looks off" : "What we checked"}</strong>
+        {topReasons.length > 0 ? (
+          <ul className="trust-wrap-list">
+            {topReasons.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        ) : (
+          <p className="trust-wrap-none">{isDanger ? "Matches known scam patterns" : "No strong warning signals detected"}</p>
+        )}
+      </div>
+      <div className="trust-wrap-next">
+        <strong>Safe next step</strong>
+        <p>{nextStep}</p>
+      </div>
+      <button className="trust-wrap-toggle" onClick={toggleDetail}>
+        <ChevronDown size={14} style={{ transform: detailed ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+        {detailed ? "Show less" : "Show full details"}
+      </button>
+      {detailed && (
+        <div className="trust-wrap-detail">
+          {fullText.split("\n").map((line, i) => {
+            if (!line.trim()) return null;
+            const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m: string, p: string) => `<strong>${p}</strong>`);
+            const isBullet = line.trim().startsWith("\u2022");
+            return <p key={i} className={isBullet ? "tool-bullet" : ""} dangerouslySetInnerHTML={{ __html: isBullet ? bold.replace("\u2022", "") : bold }} />;
+          })}
+          {signals.length > 3 && (
+            <div className="trust-wrap-all-signals">
+              <strong>All signals ({signals.length})</strong>
+              <ul>{signals.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Emergency Action Bar — sticky bottom for dangerous results ── */
+function EmergencyActionBar({ verdict, reasons }: { verdict?: string; reasons?: string[] }) {
+  const shareLines = [
+    "\u26a0\ufe0f Chetana Safety Alert",
+    "",
+    verdict ? "Verdict: " + verdict : "Something looks suspicious.",
+  ];
+  if (reasons && reasons.length > 0) {
+    shareLines.push("", "Why:");
+    reasons.slice(0, 3).forEach(r => shareLines.push("\u2022 " + r));
+  }
+  shareLines.push("", "Safe next step: Don\u2019t pay or share details until you verify.", "", "Check anything free at chetana.activemirror.ai");
+  const shareText = shareLines.join("\n");
+  return (
+    <div className="emergency-action-bar">
+      <div className="emergency-action-scroll">
+        <button className="emergency-action-chip emergency-chip-warn" onClick={() => {}}>
+          <ShieldAlert size={15} /> Don{"\u2019"}t pay
+        </button>
+        <button className="emergency-action-chip" onClick={() => window.open("tel:")}>
+          <Phone size={15} /> Call bank
+        </button>
+        <button className="emergency-action-chip emergency-chip-urgent" onClick={() => window.open("tel:1930")}>
+          <Phone size={15} /> Call 1930
+        </button>
+        <button className="emergency-action-chip" onClick={() => window.open("https://sancharsaathi.gov.in/sfc/Home/sfc-complaint.jsp", "_blank")}>
+          <Flag size={15} /> Report to Chakshu
+        </button>
+        <button className="emergency-action-chip" onClick={() => {}}>
+          <FileText size={15} /> Save evidence
+        </button>
+        <button className="emergency-action-chip" onClick={() => {
+          if (navigator.share) {
+            navigator.share({ title: "Chetana Safety Alert", text: shareText }).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(shareText).then(() => alert("Warning copied to clipboard")).catch(() => {});
+          }
+        }}>
+          <Share2 size={15} /> Share warning
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const LANGUAGES = [
@@ -1395,24 +1528,11 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                     </button>
                   </div>
                 )}
-                {/* Social proof warning for high-risk results */}
-                {msg.scanResult.score >= 70 && (
-                  <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,200,200,0.85)", lineHeight: 1.4 }}>
-                    <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
-                    <span>This matches high-risk scam patterns. Pause and verify through an official channel before you act.</span>
-                  </div>
-                )}
-                {msg.scanResult.score >= 50 && msg.scanResult.score < 70 && (
-                  <div className="tool-social-proof" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", marginTop: 6, fontSize: 13, color: "rgba(255,220,170,0.85)", lineHeight: 1.4 }}>
-                    <Shield size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
-                    <span>There are warning signs here. Verify independently before you click, pay, reply, or install anything.</span>
-                  </div>
-                )}
-                {/* Wait before acting countdown — DANGER only */}
-                {msg.scanResult.score >= 70 && (
-                  <div className="tool-wait-prompt" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(239,68,68,0.06)", marginTop: 4, fontSize: 12, color: "rgba(255,180,180,0.7)", fontStyle: "italic" }}>
-                    <span>Take 5 minutes to think before responding to this message</span>
-                  </div>
+                {/* TrustWrap structured result card */}
+                <TrustWrapCard scanResult={msg.scanResult} fullText={msg.text} />
+                {/* Emergency Action Bar for dangerous results */}
+                {(msg.scanResult.verdict === "SUSPICIOUS" || msg.scanResult.verdict === "HIGH" || msg.scanResult.trust_state === "blocked" || msg.scanResult.score >= 65) && (
+                  <EmergencyActionBar verdict={msg.scanResult.verdict} reasons={msg.scanResult.signals} />
                 )}
                 {/* False positive challenge */}
                 {(msg.scanResult.score > 40) && (
@@ -1426,14 +1546,6 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   </div>
                 )}
               </>)}
-              <div className="tool-card-body">{msg.text.split("\n").map((line, i) => {
-                if (!line.trim()) return null;
-                // Sanitize: strip all HTML tags first, then apply safe bold markdown
-                const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
-                const isBullet = line.trim().startsWith("•");
-                return <p key={i} className={isBullet ? "tool-bullet" : ""} dangerouslySetInnerHTML={{ __html: isBullet ? bold.replace("•", "") : bold }} />;
-              })}</div>
               {msg.suggestions && (
                 <div className="tool-suggestions">
                   {msg.suggestions.map((s, i) => (
@@ -1447,6 +1559,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
       </div>
 
       {/* Footer — one line */}
+      <p className="tool-privacy-line">Nothing is stored unless you choose to save it. Your data stays on your device for basic checks.</p>
       <footer className="tool-footer">
         Advisory only — not a government service · Emergency: 1930 · <a href="https://activemirror.ai" target="_blank" rel="noopener">activemirror.ai</a>
       </footer>
@@ -1776,7 +1889,7 @@ export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => v
   const features = [
     { icon: <Building2 size={22} />, color: "saffron", title: "Merchant Protection", desc: "Stop losing money to fake payment screenshots and impersonation attacks. Verify every transaction before you ship.", click: "merchant" as PageId },
     { icon: <Layers size={22} />, color: "violet", title: "Safety API", desc: "Add Chetana to your app, website, or payment flow so users can pause and verify before they act.", click: "nexus" as PageId, highlight: true },
-    { icon: <TrendingUp size={22} />, color: "blue", title: "Scam Trend Monitoring", desc: "See which scams are rising right now. Track fraud campaigns targeting your industry and get alerted before they hit.", click: "weather" as PageId },
+    { icon: <TrendingUp size={22} />, color: "blue", title: "Safety Radar", desc: "See what's happening right now. Confirmed threats, reported patterns, and early signals across India.", click: "weather" as PageId },
     { icon: <UserCheck size={22} />, color: "safe", title: "Train Your Team", desc: "Help your employees spot scams before they fall for them. Real examples, real patterns, real protection.", click: "atlas" as PageId },
   ];
   return (
@@ -1828,20 +1941,38 @@ export function Onboarding({ onNavigate }: { onNavigate: (target: "consumer" | "
 
 /* ── Weather Board ───────────────────────────────────────────── */
 export function WeatherBoard({ signals }: { signals: WeatherSignal[] }) {
+  const confirmed = signals.filter(s => s.lane === "confirmed");
+  const reported = signals.filter(s => s.lane === "reported");
+  const signal = signals.filter(s => s.lane === "signal");
+
+  const renderLane = (title: string, items: WeatherSignal[], laneClass: string) => (
+    <div className={`radar-lane ${laneClass}`}>
+      <h3 className="radar-lane-title">{title}</h3>
+      {items.map((s, i) => (
+        <motion.div key={s.id} className={`radar-card ${s.tone}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <div className="radar-card-header">
+            <span className="radar-card-label">{s.label}</span>
+            <span className="radar-card-delta">{s.delta}</span>
+          </div>
+          {s.detail && <p className="radar-card-detail">{s.detail}</p>}
+          {s.action && <p className="radar-card-action"><strong>What to do:</strong> {s.action}</p>}
+          <div className="meter"><div className="meter-fill" style={{ width: `${s.pressure}%` }} /></div>
+        </motion.div>
+      ))}
+      {items.length === 0 && <p className="radar-lane-empty">Nothing in this lane right now.</p>}
+    </div>
+  );
+
   return (
     <motion.section className="panel" {...fadeIn}>
       <div className="panel-header">
-        <h2><BarChart3 size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Scam Trends Right Now</h2>
-        <p>Which scams are rising in India today? See what's happening live.</p>
+        <h2><ShieldCheck size={20} style={{ verticalAlign: "middle", marginRight: 8 }} />Safety Radar</h2>
+        <p>What's happening right now in India. Three lanes: confirmed threats, reported patterns, and early signals.</p>
       </div>
-      <div className="weather-grid">
-        {signals.map((s, i) => (
-          <motion.div key={s.id} className={`weather-card ${s.tone}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <div className="weather-top"><span>{s.label}</span><strong>{s.delta}</strong></div>
-            <div className="meter"><div className="meter-fill" style={{ width: `${s.pressure}%` }} /></div>
-            <div className="weather-bottom"><span>pressure</span><strong>{s.pressure}</strong></div>
-          </motion.div>
-        ))}
+      <div className="radar-grid">
+        {renderLane("Confirmed", confirmed, "radar-confirmed")}
+        {renderLane("Reported", reported, "radar-reported")}
+        {renderLane("Signal", signal, "radar-signal")}
       </div>
     </motion.section>
   );
@@ -1981,7 +2112,7 @@ export function TrustPage() {
         <div className="proof-banner-icon"><ShieldCheck size={20} /></div>
         <div className="proof-banner-text">
           <strong>Public signals, honest limits</strong>
-          <span>Scam Weather reflects live pressure signals on the site, while 1930 and cybercrime.gov.in stay visible as the official recovery rail.</span>
+          <span>Safety Radar reflects live pressure signals on the site, while 1930 and cybercrime.gov.in stay visible as the official recovery rail.</span>
         </div>
       </div>
 
@@ -3352,7 +3483,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
           </div>
           <div className="footer-col">
             <h4>Intelligence</h4>
-            <button onClick={() => onNavigate("weather")}>Scam Weather</button>
+            <button onClick={() => onNavigate("weather")}>Safety Radar</button>
             <button onClick={() => onNavigate("atlas")}>Common scams</button>
             <button onClick={() => onNavigate("trust")}>Trust & data</button>
             <button onClick={() => onNavigate("family")}>Family help</button>

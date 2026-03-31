@@ -388,16 +388,16 @@ export const threats: ThreatEntry[] = [
 ];
 
 export const weather: WeatherSignal[] = [
-  { id: "w1", label: "UPI payment fraud", pressure: 86, delta: "high", tone: "red" },
-  { id: "w2", label: "Courier phishing", pressure: 62, delta: "moderate", tone: "amber" },
-  { id: "w3", label: "Bank impersonation", pressure: 73, delta: "high", tone: "red" },
-  { id: "w4", label: "QR traps", pressure: 58, delta: "moderate", tone: "amber" },
-  { id: "w5", label: "Fake news / media panic", pressure: 41, delta: "low", tone: "violet" },
-  { id: "w6", label: "Digital arrest", pressure: 82, delta: "high", tone: "amber" },
-  { id: "w7", label: "KYC update fraud", pressure: 68, delta: "high", tone: "red" },
-  { id: "w8", label: "Voice deepfake", pressure: 41, delta: "rising", tone: "amber" },
-  { id: "w9", label: "Task / investment scam", pressure: 94, delta: "critical", tone: "red" },
-  { id: "w10", label: "Fake job / interview fee", pressure: 64, delta: "moderate", tone: "amber" }
+  { id: "w1", label: "UPI payment fraud", pressure: 86, delta: "high", tone: "red", lane: "confirmed", detail: "Doctored screenshots and collect-request scams confirmed across multiple banks.", action: "Never approve unexpected collect requests. Verify in your bank app." },
+  { id: "w2", label: "Courier phishing", pressure: 62, delta: "moderate", tone: "amber", lane: "reported", detail: "Redelivery-fee SMS with shortened links reported in major metros.", action: "Open the official courier app directly. Do not click SMS links." },
+  { id: "w3", label: "Bank impersonation", pressure: 73, delta: "high", tone: "red", lane: "confirmed", detail: "Calls impersonating SBI, HDFC, ICICI asking for OTP or card details.", action: "Banks never ask for OTP over phone. Hang up and call the number on your card." },
+  { id: "w4", label: "QR traps", pressure: 58, delta: "moderate", tone: "amber", lane: "reported", detail: "QR codes claiming to send money but actually requesting payment.", action: "You never need to scan a QR to receive money." },
+  { id: "w5", label: "Fake news / media panic", pressure: 41, delta: "low", tone: "violet", lane: "signal", detail: "Forwarded WhatsApp messages creating panic about policy changes.", action: "Check official government or news sources before forwarding." },
+  { id: "w6", label: "Digital arrest", pressure: 82, delta: "high", tone: "amber", lane: "reported", detail: "Video calls from fake CBI/police officers demanding money to clear charges.", action: "Police never call to demand money. Hang up immediately." },
+  { id: "w7", label: "KYC update fraud", pressure: 68, delta: "high", tone: "red", lane: "confirmed", detail: "SMS claiming bank KYC expiring with links to credential-harvesting portals.", action: "Banks never send KYC links via SMS. Visit your branch directly." },
+  { id: "w8", label: "Voice deepfake", pressure: 41, delta: "rising", tone: "amber", lane: "signal", detail: "AI-cloned voice calls imitating family members asking for urgent transfers.", action: "Call back on a known number before sending any money." },
+  { id: "w9", label: "Task / investment scam", pressure: 94, delta: "critical", tone: "red", lane: "confirmed", detail: "Telegram/WhatsApp groups offering guaranteed returns. 75% of cybercrime losses in India.", action: "No legitimate investment guarantees returns. Leave the group." },
+  { id: "w10", label: "Fake job / interview fee", pressure: 64, delta: "moderate", tone: "amber", lane: "reported", detail: "Fraudulent recruiters demanding fees before interviews. Often impersonates IT companies.", action: "No legitimate employer charges for interviews." }
 ];
 
 export const graphNodes: GraphNode[] = [

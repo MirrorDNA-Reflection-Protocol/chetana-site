@@ -33,6 +33,9 @@ export interface WeatherSignal {
   pressure: number;
   delta: string;
   tone: "red" | "amber" | "green" | "violet";
+  lane: "confirmed" | "reported" | "signal";
+  detail?: string;
+  action?: string;
 }
 
 export interface GraphNode { data: { id: string; label: string; kind: string; score?: number; }; }

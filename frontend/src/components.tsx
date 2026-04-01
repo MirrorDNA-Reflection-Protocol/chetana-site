@@ -273,11 +273,9 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
           <PastePromptMorph />
         </motion.div>
         <motion.div className="hero-rail" {...fadeInDelay(0.24)}>
-          <span className="hero-rail-item"><MessageCircle size={16} /> Message</span>
-          <span className="hero-rail-item"><ImageIcon size={16} /> Screenshot</span>
-          <span className="hero-rail-item"><Link2 size={16} /> Link</span>
-          <span className="hero-rail-item"><QrCode size={16} /> QR</span>
-          <span className="hero-rail-item"><Mic size={16} /> Voice</span>
+          <span className="hero-rail-item"><MessageCircle size={16} /> Messages</span>
+          <span className="hero-rail-item"><ImageIcon size={16} /> Screenshots</span>
+          <span className="hero-rail-item"><Link2 size={16} /> Links</span>
         </motion.div>
         <motion.div className="hero-actions" {...fadeInDelay(0.28)}>
           <button className="hero-primary-btn" onClick={jumpToScanner}>
@@ -539,7 +537,7 @@ export function ScanGuideRail({ signals, onNavigate }: { signals: WeatherSignal[
 export function StatsStrip() {
   const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
   const personalScans = parseInt(localStorage.getItem("chetana_scan_count") || "0");
-  const trustLevel = personalScans >= 50 ? "Sentinel" : personalScans >= 20 ? "Guardian" : personalScans >= 5 ? "Vigilant" : personalScans >= 1 ? "Aware" : "New";
+  const trustLevel = personalScans >= 50 ? "Helping many" : personalScans >= 20 ? "Regular helper" : personalScans >= 5 ? "Getting started" : personalScans >= 1 ? "First check done" : "New here";
   const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#3b82f6" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "var(--muted)";
 
   useEffect(() => {

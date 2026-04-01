@@ -444,7 +444,7 @@ main {
   min-width: 190px;
   padding: 14px 18px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--line-bright);
   cursor: pointer;
   font-size: 0.98rem;
   font-weight: 600;
@@ -454,15 +454,17 @@ main {
   color: #f8fafc;
   background: linear-gradient(135deg, rgba(30,64,175,0.9), rgba(59,130,246,0.92));
   box-shadow: 0 14px 30px rgba(37,99,235,0.22);
+  border-color: transparent;
 }
 .hero-secondary-btn {
-  color: rgba(255,255,255,0.86);
-  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--line-bright);
 }
 .hero-primary-btn:hover,
 .hero-secondary-btn:hover {
   transform: translateY(-1px);
-  border-color: rgba(255,255,255,0.22);
+  border-color: var(--primary-bright, #3b82f6);
 }
 .hero-meta {
   display: flex;
@@ -3684,7 +3686,7 @@ select { appearance: none; cursor: pointer; }
 }
 .hero-reassurance {
   display: block;
-  text-align: center;
+  text-align: center !important;
   width: 100%;
   font-size: 13px;
   color: var(--muted);

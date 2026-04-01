@@ -287,9 +287,11 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
             Need help?
           </button>
         </motion.div>
-        <motion.p className="hero-reassurance" {...fadeInDelay(0.32)}>
-          Nothing happens automatically. You're just checking.
-        </motion.p>
+        <motion.div className="hero-reassurance-strip" {...fadeInDelay(0.32)}>
+          <span className="hero-reassurance-pill">Just checking</span>
+          <span className="hero-reassurance-pill">Nothing sent automatically</span>
+          <span className="hero-reassurance-pill">You decide what to do next</span>
+        </motion.div>
       </div>
     </section>
   );

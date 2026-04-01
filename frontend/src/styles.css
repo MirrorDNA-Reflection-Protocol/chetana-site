@@ -3685,14 +3685,28 @@ select { appearance: none; cursor: pointer; }
   border-radius: 20px;
   border: 1px solid var(--line);
 }
-.hero-reassurance {
-  display: block;
-  text-align: center !important;
+.hero-reassurance-strip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   width: 100%;
-  font-size: 13px;
-  color: var(--muted);
   margin-top: 16px;
-  font-style: italic;
+}
+.hero-reassurance-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.05);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 /* ── Example Chips ─────────────────────────────────────────── */
@@ -4350,4 +4364,3 @@ body { top: 0 !important; }
   .panel { padding: 16px 12px; }
   h1 { font-size: 28px !important; }
 }
-

@@ -22,11 +22,20 @@ from pathlib import Path
 
 # Load shared Chetana soul, gates, prompt from canonical location
 _CHETANA_DIR = Path.home() / ".mirrordna" / "chetana"
-if str(_CHETANA_DIR) not in sys.path:
+if _CHETANA_DIR.is_dir() and str(_CHETANA_DIR) not in sys.path:
     sys.path.insert(0, str(_CHETANA_DIR))
 
-from prompt import build_system_prompt  # noqa: E402
-from gates import gate_output, enforce_disclaimer  # noqa: E402
+try:
+    from prompt import build_system_prompt  # noqa: E402
+    from gates import gate_output, enforce_disclaimer  # noqa: E402
+except ModuleNotFoundError as exc:  # pragma: no cover - runtime resilience
+    if exc.name not in {"prompt", "gates"}:
+        raise
+    from app.chetana_runtime_fallback import (  # noqa: E402
+        build_system_prompt,
+        enforce_disclaimer,
+        gate_output,
+    )
 
 logger = logging.getLogger("chetana.showcase")
 

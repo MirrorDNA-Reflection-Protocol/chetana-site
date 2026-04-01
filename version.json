@@ -1,6 +1,6 @@
 {
   "schema_version": "edge-truth.v1",
-  "generated_at": "2026-03-26T07:42:36.453418+00:00",
+  "generated_at": "2026-04-01T06:29:55.813629+00:00",
   "surface": {
     "id": "chetana-public-edge",
     "product": "Chetana",
@@ -16,13 +16,18 @@
   "source": {
     "repo": "chetana-site",
     "branch": "main",
-    "commit": "57179ba74e26450ecacb28669f3f9a537a9f5e0e",
-    "committed_at": "2026-03-25T13:54:40+05:30",
+    "commit": "e603d7c02b379aac3c5c4a3a5a7f1ffaecde5a44",
+    "committed_at": "2026-03-31T15:37:58+05:30",
     "remote": "https://github.com/MirrorDNA-Reflection-Protocol/chetana-site.git",
     "dirty": true,
-    "dirty_file_count": 1,
+    "dirty_file_count": 6,
     "dirty_files_sample": [
-      "frontend/src/components.tsx"
+      "frontend/src/App.tsx",
+      "frontend/src/components.tsx",
+      "frontend/src/styles.css",
+      "AGENTS.md",
+      "frontend/test-results/",
+      "public/"
     ]
   },
   "content": {
@@ -35,9 +40,9 @@
     ],
     "watch_file_count": 56,
     "missing_paths": [],
-    "watch_fingerprint": "78ce5752e217003ee1ae45f91dd36d0879b797eda3a5cb997df44b38651456ac",
-    "newest_path": "frontend/src/components.tsx",
-    "newest_mtime": "2026-03-26T07:42:31.853807+00:00"
+    "watch_fingerprint": "749c980c3fa4964b826afe351dc77a7c153b146632b135ecbed6a4a23c8eb337",
+    "newest_path": "frontend/src/styles.css",
+    "newest_mtime": "2026-04-01T06:26:31.313404+00:00"
   },
   "notes": [
     "Frontend assets are served by the FastAPI edge."

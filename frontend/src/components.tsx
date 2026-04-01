@@ -3505,6 +3505,12 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             </form>
           </div>
         </div>
+        <div className="footer-social">
+          <a href="https://t.me/chetnaShieldBot" target="_blank" rel="noopener">Telegram</a>
+          <a href="https://www.youtube.com/@ActiveMirror-1" target="_blank" rel="noopener">YouTube</a>
+          <a href="https://x.com/pauldesai123" target="_blank" rel="noopener">X</a>
+          <a href="https://www.instagram.com/pauldesai1/" target="_blank" rel="noopener">Instagram</a>
+        </div>
         <div className="footer-bottom">
           <div className="footer-powered">
             <span>Powered by</span>

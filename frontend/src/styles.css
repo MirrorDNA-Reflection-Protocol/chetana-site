@@ -1235,6 +1235,9 @@ select { appearance: none; cursor: pointer; }
 .builder-socials { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .builder-socials a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color .2s; }
 .builder-socials a:hover { color: var(--text-bright); }
+.footer-social { display: flex; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); margin-bottom: 12px; }
+.footer-social a { font-size: 13px; color: var(--muted); text-decoration: none; font-weight: 600; transition: color .2s; }
+.footer-social a:hover { color: var(--text-bright); }
 .footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
 .footer-powered { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .powered-brand {

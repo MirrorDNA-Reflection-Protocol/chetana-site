@@ -4,7 +4,7 @@ import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
   ConsumerSection, SafetyRadar, Atlas, TrustPage, PanicPage,
-  IncidentStepper, FamilyPage, Footer, FrontDoorSection, ShareInstallSection, ScanGuideRail
+  IncidentStepper, FamilyPage, Footer, FrontDoorSection, ShareInstallSection, ShareCTA, ScanGuideRail
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -204,6 +204,8 @@ export default function App() {
                 initialInput={sharedContent}
                 initialFile={sharedAttachment}
               />
+              <StatsStrip />
+              <ShareCTA />
               <ShareInstallSection onNavigate={setPage} />
             </>}
 

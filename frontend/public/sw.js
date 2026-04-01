@@ -8,7 +8,7 @@
  * Handles Web Share Target API for receiving shared content
  * from other apps (WhatsApp, Messages, Gallery, etc).
  */
-const CACHE_NAME = "chetana-v4";
+const CACHE_NAME = "chetana-v5";
 const OFFLINE_URLS = [
   "/",
   "/index.html",

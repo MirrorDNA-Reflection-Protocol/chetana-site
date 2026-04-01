@@ -349,6 +349,7 @@ main {
   box-shadow: 0 30px 80px rgba(0,0,0,0.15);
   transition: var(--theme-transition);
   box-sizing: border-box;
+  text-align: center;
 }
 @media (max-width: 480px) {
   .hero-copy-shell { padding: 24px 16px; border-radius: 20px; }

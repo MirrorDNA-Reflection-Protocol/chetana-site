@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chetana Event Schema",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_name",
+    "timestamp_utc",
+    "session_id"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "event_name": {
+      "type": "string",
+      "enum": [
+        "app_open",
+        "scan_started",
+        "scan_completed",
+        "verdict_safe",
+        "verdict_risky",
+        "verdict_unclear",
+        "share_tapped",
+        "share_completed",
+        "report_tapped",
+        "evidence_saved",
+        "first_scan",
+        "repeat_scan_7d"
+      ]
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "user_id_hash": {
+      "type": "string"
+    },
+    "scan_id": {
+      "type": "string"
+    },
+    "input_type": {
+      "type": "string",
+      "enum": [
+        "screenshot",
+        "text",
+        "qr_image",
+        "payment_screenshot",
+        "mixed"
+      ]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "safe",
+        "risky",
+        "unclear"
+      ]
+    },
+    "scam_type": {
+      "type": "string"
+    },
+    "confidence_band": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "share_channel": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "sms",
+        "telegram",
+        "copy_link",
+        "other"
+      ]
+    },
+    "report_target": {
+      "type": "string",
+      "enum": [
+        "block_only",
+        "family_only",
+        "manual_report",
+        "other"
+      ]
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "device_class": {
+      "type": "string",
+      "enum": [
+        "android_phone",
+        "ios_phone",
+        "web",
+        "desktop",
+        "unknown"
+      ]
+    },
+    "language_hint": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

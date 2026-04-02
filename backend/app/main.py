@@ -2,8 +2,8 @@
 Chetana Showcase Site — Backend API.
 
 Proxies to the live Kavach API at :8790 for real scan results.
-Serves Scam Weather and Atlas from live threat intelligence.
-Chat assistant with keyword-matched FAQ and KB article lookup.
+Serves the web app, recent scam patterns, and helper routes.
+Includes a simple keyword-matched assistant for common questions.
 """
 from __future__ import annotations
 
@@ -38,6 +38,15 @@ except ModuleNotFoundError as exc:  # pragma: no cover - runtime resilience
     )
 
 logger = logging.getLogger("chetana.showcase")
+
+from app.v0_runtime import (  # noqa: E402
+    V0EvidenceRequest,
+    V0EventInput,
+    V0ScanInput,
+    analyze_scan as analyze_v0_scan,
+    build_evidence_pack,
+    log_event as log_v0_event,
+)
 
 KAVACH_URL = "http://127.0.0.1:8791"
 TELEGRAM_API = "https://api.telegram.org"
@@ -87,7 +96,7 @@ async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
 
 app = FastAPI(
     title="Chetana API",
-    description="India's free AI scam detection API. Check messages, links, UPI IDs, phone numbers, deepfakes, and voice clones against live threat intelligence.",
+    description="Advisory API for checking suspicious messages, QR requests, and payment proofs, with clear next steps for users in India.",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -1319,7 +1328,7 @@ async def radar_rss():
   <channel>
     <title>Chetana Scam Radar — India Live Threat Feed</title>
     <link>https://chetana.activemirror.ai</link>
-    <description>Live scam and fraud threat intelligence for India. UPI fraud, phishing, deepfakes, digital arrest scams — updated daily. Free AI scam checker at chetana.activemirror.ai</description>
+    <description>Recent scam patterns, safety prompts, and reporting steps from Chetana.</description>
     <language>en-in</language>
     <lastBuildDate>{now}</lastBuildDate>
     <atom:link href="https://chetana.activemirror.ai/api/radar/rss" rel="self" type="application/rss+xml"/>
@@ -1351,12 +1360,12 @@ async def feeds_status():
 FAQ_ENTRIES = [
     {
         "keywords": ["scan", "check", "message", "link", "how does", "scanning", "analyze", "paste", "verify"],
-        "reply": "Chetana scans messages, links, payment proofs, QR codes, and media against live threat intelligence. Just paste the suspicious content into the scan box and we analyze it in real time. Works in 12 Indian languages (22 planned — all scheduled languages).",
+        "reply": "Chetana helps you check suspicious messages, screenshots, QR requests, and payment proofs. Paste or upload what you received and it returns a simple call: safe, risky, or unclear, with the safest next step.",
         "topic": "scanning",
     },
     {
         "keywords": ["consumer", "protect me", "personal", "individual", "user"],
-        "reply": "The Consumer layer lets you check messages, links, payment proofs, and QR codes. It works in 12 Indian languages (22 planned — all scheduled languages) with family-safe explanations and emergency guidance. Just paste any suspicious content to get an instant trust verdict.",
+        "reply": "For personal use, Chetana is a quick second opinion before you reply, pay, click, or hand over goods. It explains the risk in plain language and keeps official help steps visible if money already moved.",
         "topic": "consumer",
     },
     {
@@ -1366,17 +1375,17 @@ FAQ_ENTRIES = [
     },
     {
         "keywords": ["nexus", "enterprise", "bank", "fintech", "institution", "analyst", "campaign"],
-        "reply": "Chetana Nexus is the enterprise trust layer. It provides campaign graph analysis, analyst replay (showing exactly what fired and why), action eligibility framework, and live threat feeds for banks, fintechs, and fraud teams.",
+        "reply": "There is a partner lane for merchants and teams that want to add Chetana checks into support, payment, or checkout flows. The current public build is focused on the everyday user and the fake-payment-proof lane for shops.",
         "topic": "nexus",
     },
     {
         "keywords": ["weather", "pressure", "threat", "intelligence", "phishtank", "openphish", "urlhaus", "cert-in", "rbi"],
-        "reply": "Scam Weather shows live pressure signals aggregated from PhishTank, OpenPhish, URLhaus, CERT-IN advisories, and RBI alerts. It tracks which scam types are rising or cooling in real time.",
+        "reply": "Recent scam patterns show the kinds of fraud Chetana is watching closely, so people can spot the same tricks before they get caught off guard.",
         "topic": "weather",
     },
     {
         "keywords": ["atlas", "wiki", "scam type", "threat type", "red flag", "what scam", "types of scam", "scam types"],
-        "reply": "The Scam Atlas is a living threat wiki. Each entry shows the scam type, active languages, red flags to watch for, and safe next actions. It covers UPI fraud, QR traps, KYC fraud, digital arrest, courier phishing, voice deepfakes, task scams, lottery scams, and fake job scams.",
+        "reply": "The scam guide breaks common fraud patterns into simple red flags and safer next actions. It covers things like fake KYC alerts, QR payment tricks, fake payment screenshots, parcel scams, job scams, and authority-pressure scams.",
         "topic": "atlas",
     },
     {
@@ -1411,7 +1420,7 @@ FAQ_ENTRIES = [
     },
     {
         "keywords": ["india", "privacy", "data", "consent", "made in"],
-        "reply": "Chetana is made in India, privacy-conscious. Your data is transmitted securely and used only for analysis — never sold or shared. We use cloud-based AI and threat intelligence APIs to deliver accurate results. Built for Indian digital life.",
+        "reply": "Chetana is built in India. Content is sent securely for analysis when needed, and the goal is to give you a plain-language answer without building profiles around you. It is an advisory tool, not a government service.",
         "topic": "privacy",
     },
     {
@@ -2025,6 +2034,27 @@ async def live_stats():
 
     return {"total_scans": total_scans, "scams_caught": scams_caught, "scan_types_used": max(types_used, 8), "languages": 12}
 
+
+@app.post("/api/v0/scan")
+async def v0_scan(req: V0ScanInput):
+    """Bounded Chetana v0 scan loop: scan -> explain -> share -> report -> learn."""
+    result = analyze_v0_scan(req)
+    return result.model_dump()
+
+
+@app.post("/api/v0/evidence")
+async def v0_evidence(req: V0EvidenceRequest):
+    """Generate the compact evidence pack defined by the Chetana v0 build spec."""
+    pack = build_evidence_pack(req)
+    return {"evidence_pack": pack.model_dump()}
+
+
+@app.post("/api/v0/events")
+async def v0_events(req: V0EventInput):
+    """Append an anonymous v0 analytics event to the Chetana event log."""
+    event = log_v0_event(req)
+    return {"ok": True, "event": event.model_dump()}
+
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
 
@@ -2068,7 +2098,7 @@ async def privacy_policy():
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Chetana</title>
-  <meta name="description" content="Chetana privacy policy. Free scam detection for India. No data sold. No personal data stored.">
+  <meta name="description" content="Chetana privacy policy for the web app and scam-check flows.">
   <style>
     body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; line-height: 1.7; }
     h1 { font-size: 2rem; margin-bottom: .25rem; }
@@ -2083,32 +2113,25 @@ async def privacy_policy():
   <span class="badge">No data sold. No profiles built.</span>
 
   <h2>What Chetana is</h2>
-  <p>Chetana is a free AI-powered scam detection service for India. It checks links, phone numbers, UPI IDs, and messages for fraud signals — in 12 Indian languages. It includes a web interface, Telegram bot, and browser extension.</p>
+  <p>Chetana is a private advisory tool for checking suspicious messages, QR requests, and payment proofs. It is built to help people in India slow down and choose a safer next step.</p>
 
   <h2>Data we process</h2>
-  <p>When you submit content for scanning (a URL, phone number, UPI ID, text, image, or audio clip), that content is transmitted to our API at <code>chetana.activemirror.ai</code> over HTTPS. We process it to produce a trust verdict and return it to you.</p>
+  <p>When you submit content for scanning, that content is transmitted to our API at <code>chetana.activemirror.ai</code> over HTTPS. We process it to produce an advisory verdict and return it to you.</p>
   <ul>
     <li>We do <strong>not</strong> store your submissions after analysis completes.</li>
     <li>We do <strong>not</strong> link submissions to your identity, IP address, or device.</li>
     <li>We do <strong>not</strong> sell, share, or transfer your data to third parties.</li>
-    <li>Deepfake image/audio uploads are processed in memory and discarded immediately.</li>
+    <li>Submitted media is processed only for the scan flow and is not kept longer than needed for the response.</li>
   </ul>
-
-  <h2>Chetana Browser Guard extension</h2>
-  <p>The browser extension performs passive trust scoring on pages you visit. It sends page URLs and selected text to the Chetana API for analysis. No browsing history is stored on our servers. Domain scan results are cached locally in your browser's <code>chrome.storage.local</code> for up to 24 hours to reduce API calls — this data never leaves your device.</p>
-  <p>The extension can operate fully offline using a local pattern gate that requires no network access. When Ollama is installed locally, analysis happens entirely on-device.</p>
-
-  <h2>WhatsApp Web scanning</h2>
-  <p>When enabled on <code>web.whatsapp.com</code>, the extension reads visible message text from your open WhatsApp Web tab to check for scam signals. This text is sent to the Chetana API only when a suspicion threshold is exceeded. We do not read, store, or log message content beyond the analysis request.</p>
 
   <h2>Telemetry</h2>
   <p>We collect aggregate, non-identifiable usage metrics (e.g., scan counts by type and language) to understand how Chetana is used and improve it. No personal identifiers are included.</p>
 
   <h2>Data residency</h2>
-  <p>Chetana servers are operated in India. Your data does not leave India when you use the standard API. The sovereign AI stack (Ollama + local models) keeps all processing on your own device.</p>
+  <p>Chetana servers are operated in India. We aim to keep processing close to the user and avoid collecting more than is needed for the scan result.</p>
 
   <h2>Third-party services</h2>
-  <p>Chetana uses external threat intelligence feeds (e.g., Safe Browsing APIs, PhishTank, TRAI DND registry) to verify phone numbers and URLs. These services receive only the specific identifier being checked — no other context.</p>
+  <p>Some checks may use external reputation or safety feeds for URLs or identifiers. Those services receive only the specific value being checked, not your broader conversation context.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>

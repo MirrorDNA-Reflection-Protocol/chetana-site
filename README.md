@@ -1,80 +1,78 @@
-# Chetana — India's Free AI Scam Checker
+# Chetana v0
 
 **Live:** [chetana.activemirror.ai](https://chetana.activemirror.ai)
 
-Paste any suspicious SMS, WhatsApp message, link, UPI ID, or phone number. Get an instant risk verdict — free, in seconds, in 12 Indian languages.
+Chetana v0 is a simple check-before-you-act tool for suspicious digital messages and payment requests in India.
 
----
+It is intentionally narrow:
 
-## What it checks
+- scan
+- explain
+- share
+- report
+- learn
 
-| Input | What Chetana does |
-|-------|-------------------|
-| SMS / WhatsApp message | Pattern match against 25+ scam types, urgency detection, impersonation signals |
-| URL / link | Phishing database lookup, domain age, redirect chains, VirusTotal |
-| UPI ID | Fraud database match, known scam UPI patterns |
-| Phone number | Scam report lookup, telemarketer flags |
-| Image / video | Deepfake detection (AI-powered) |
-| Voice clip | AI voice clone detection |
-| QR code | Decode + destination safety check |
+The goal is simple: turn suspicious content into a clear next step for a real person, without pretending to be a full fraud platform.
 
-**12 Indian languages:** English, Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Urdu
+## What v0 handles first
 
----
+- suspicious text from WhatsApp, SMS, email, Telegram, or social media
+- screenshots of suspicious messages
+- QR or UPI payment requests
+- payment confirmation screenshots that may be fake
 
-## API
+## Core output
 
-Public REST API — no auth required for basic checks.
+Each scan returns:
 
-```
-GET  /api/docs              # Interactive API docs (Swagger)
-POST /api/scan/full         # Full text scan (message, SMS, forward)
-POST /api/link/check        # URL / phishing check
-POST /api/upi/check         # UPI ID fraud lookup
-POST /api/phone/check       # Phone number scam lookup
-POST /api/chat              # Conversational assistant
-GET  /api/radar/public      # Live scam weather (India threat feed)
+- verdict: `safe`, `risky`, or `unclear`
+- scam type
+- plain-language reasons
+- confidence band
+- safest next action
+- optional share shield
+- optional evidence pack
+
+## v0 principles
+
+- only three verdict states
+- if evidence is weak, default to `unclear`
+- show reasons, not just labels
+- keep official recovery rails visible
+- do not fake certainty
+- do not imply government affiliation
+
+## v0 API
+
+Public `v0` endpoints added in this build:
+
+```bash
+POST /api/v0/scan
+POST /api/v0/evidence
+POST /api/v0/events
 ```
 
 Example:
+
 ```bash
-curl -X POST https://chetana.activemirror.ai/api/scan/full \
+curl -X POST https://chetana.activemirror.ai/api/v0/scan \
   -H "Content-Type: application/json" \
-  -d '{"text": "Your KYC is expiring. Click here to update: bit.ly/xyz", "lang": "en"}'
+  -d '{
+    "input_type": "text",
+    "text": "Urgent: your bank account will be blocked today. Pay Rs 500 now to reactivate it.",
+    "language_hint": "en",
+    "session_id": "example-session"
+  }'
 ```
 
-Response:
-```json
-{
-  "verdict": "SUSPICIOUS",
-  "risk_score": 87,
-  "why_flagged": ["KYC urgency trigger", "URL shortener redirect", "financial impersonation"],
-  "action_eligibility": "WARN",
-  "explanation": "..."
-}
-```
-
----
-
-## Telegram Bot
-
-[@chetnaShieldBot](https://t.me/chetnaShieldBot) — paste any message directly into Telegram.
-
-Commands: `/check`, `/weather`, `/atlas`, `/help`
-
----
-
-## Stack
+## Build surfaces
 
 - **Frontend:** Vite 5 + React 18 + TypeScript + Framer Motion
 - **Backend:** FastAPI + Python 3.11
-- **Intelligence:** Kavach — live threat feeds (PhishTank, URLhaus, OTX, VirusTotal, CERT-IN)
-- **AI:** ActiveMirror MirrorDNA — scam pattern models, deepfake detection, voice clone analysis
-- **Infra:** Cloudflare Tunnel → local FastAPI
+- **v0 runtime:** deterministic verdict engine plus evidence and event logging
+- **Infra:** FastAPI serves the built frontend
 
----
-
-## Self-host
+## Local dev
 
 ```bash
 git clone https://github.com/MirrorDNA-Reflection-Protocol/chetana-site.git
@@ -83,11 +81,7 @@ cd ../backend && pip install -r requirements.txt
 uvicorn app.main:app --port 8093
 ```
 
-The frontend dev server proxies API calls to `localhost:8093`.
-
----
-
-## Emergency helplines
+## Recovery rails
 
 If you've been scammed:
 - **National Cybercrime Helpline: 1930**
@@ -96,10 +90,8 @@ If you've been scammed:
 
 Act within the first hour for the best chance of recovery.
 
----
-
 ## Legal
 
 Advisory tool only. Verdicts are automated assessments — not legal determinations.
 Not affiliated with Government of India, RBI, UIDAI, CERT-IN, or any law enforcement agency.
-Built by [ActiveMirror](https://activemirror.ai) (N1 Intelligence) · Bengaluru, India.
+Built by [ActiveMirror](https://activemirror.ai).

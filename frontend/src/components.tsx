@@ -51,7 +51,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
     { id: "scan", label: "Check" },
     { id: "panic", label: "Need Help?", urgent: true },
     { id: "merchant", label: "For Shops" },
-    { id: "trust", label: "Trust" },
+    { id: "trust", label: "How It Works" },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
@@ -60,7 +60,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         <div className="brand-glyph"><img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 6 }} /></div>
         <div>
           <div className="brand-title">Chetana</div>
-          <div className="brand-sub">check karo, safe raho</div>
+          <div className="brand-sub">check before you act</div>
         </div>
       </div>
       <div className={`nav-links${open ? " open" : ""}`}>
@@ -80,7 +80,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         </button>
       </div>
       <div className="nav-right">
-        <div className="not-govt-badge" title="Chetana is a private AI tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Not a govt service</div>
+        <div className="not-govt-badge" title="Chetana is a private advisory tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Private tool</div>
         <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
         </button>
@@ -95,7 +95,7 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
   const [selected, setSelected] = useState<string | null>(null);
 
   const steps = [
-    { title: "Welcome to Chetana", subtitle: "India's trust layer against scams and fraud", options: null },
+    { title: "Welcome to Chetana", subtitle: "A simple way to check a suspicious message or payment request", options: null },
     {
       title: "What brought you here?",
       subtitle: "We'll personalize your experience",
@@ -148,11 +148,11 @@ export function OnboardingFlow({ onComplete }: { onComplete: (target: PageId) =>
 
 /* ── Ticker Banner (Live from MirrorRadar) ───────────────────── */
 const FALLBACK_TICKER = [
-  { icon: "🔴", text: "Rs 22,495 crore lost to cyber fraud in India (2025) — I4C/NCRP data" },
-  { icon: "⚡", text: "24 lakh+ fraud complaints filed in 2025 — I4C/NCRP data" },
-  { icon: "🟠", text: "1 in 5 UPI users affected by fraud in last 3 years — LocalCircles/NPCI survey" },
-  { icon: "🔴", text: "51% of scam victims never report — I4C survey. Screenshot suspicious messages before they disappear" },
-  { icon: "⚡", text: "Got a suspicious message? Screenshot it and check on Chetana — free, instant, 12+ languages" },
+  { icon: "🔴", text: "Fake KYC and account-update messages still try to rush people into clicking unknown links." },
+  { icon: "⚡", text: "If money already moved, call 1930 first and contact your bank right away." },
+  { icon: "🟠", text: "Shopkeepers still get fake payment screenshots. Check before handing over goods." },
+  { icon: "🔴", text: "Do not use the phone number or link inside a threatening message to verify it." },
+  { icon: "⚡", text: "Pause on random QR requests. A sent QR can be a payment request, not proof of payment." },
 ];
 
 export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => void }) {
@@ -185,7 +185,7 @@ export function AlertBanner({ onNavigate }: { onNavigate: (target: PageId) => vo
     <div className="ticker-banner">
       <div className="ticker-label">
         <span className="ticker-dot" />
-        LIVE
+        RECENT
       </div>
       <div className="ticker-track-wrap">
         <div className="ticker-track">
@@ -258,7 +258,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
       <div className="hero-copy-shell">
         <motion.div className="kicker kicker-glow" {...fadeInDelay(0.05)}>
           <ShieldCheck size={14} />
-          Free. No sign-up. Check anything.
+          Private tool. No sign-up. Start here.
         </motion.div>
         <motion.h1 {...fadeInDelay(0.12)}>
           Not sure if this is safe?
@@ -267,7 +267,7 @@ export function Hero({ onNavigate }: { onNavigate: (target: PageId) => void }) {
         </motion.h1>
         <motion.p className="hero-lede" {...fadeInDelay(0.18)}>
           Paste a suspicious message, payment screenshot, link, QR, or voice note.
-          Chetana helps you figure out the safest next step for India.
+          Chetana helps you slow down and choose the safest next step.
         </motion.p>
         <motion.div {...fadeInDelay(0.22)}>
           <PastePromptMorph />
@@ -1213,7 +1213,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           const d = new Date(h.ts);
           return `${h.verdict} (${h.score}/100) — ${h.type} — ${d.toLocaleDateString()}`;
         }).join("\n");
-        addMsg({ role: "bot", text: `**Your last ${Math.min(history.length, 10)} scans:**\n${summary}\n\nTotal: ${history.length} scans. _check karo, safe raho._` });
+        addMsg({ role: "bot", text: `**Your last ${Math.min(history.length, 10)} scans:**\n${summary}\n\nTotal: ${history.length} scans. Check before you act.` });
       }
       return;
     }
@@ -1386,7 +1386,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
           <img src="/logo.png" alt="Chetana" style={{ width: 28, height: 28, borderRadius: 8 }} />
           <div>
             <div className="tool-brand-name">Chetana</div>
-            <div className="tool-brand-tag">check karo, safe raho</div>
+            <div className="tool-brand-tag">check before you act</div>
           </div>
         </div>
         <div className="tool-header-right">
@@ -1402,7 +1402,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
         {/* Left panel — identity + input */}
         <div className={`tool-input-panel${dragging ? " tool-dragging" : ""}`}>
           <div className="tool-hero">
-            <h1 className="tool-tagline">check karo,<br />safe raho</h1>
+            <h1 className="tool-tagline">check first,<br />act after</h1>
             <p className="tool-desc">
               Screenshot it, upload it, or just paste it.
               Text, link, UPI ID, phone number, screenshot, or voice note all work.
@@ -2187,7 +2187,7 @@ export function TelegramCTA() {
 /* ── Share Chetana ──────────────────────────────────────────── */
 export function ShareCTA() {
   const url = "https://chetana.activemirror.ai";
-  const msg = "check karo, safe raho — Free scam check for India. Paste suspicious messages, links, UPI IDs, and phone numbers for a calm next step.";
+  const msg = "Check suspicious messages, links, QR requests, and payment proofs before you act.";
   const [copied, setCopied] = useState(false);
   const share = (platform: string) => {
     const links: Record<string, string> = {
@@ -2252,7 +2252,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
   ];
   const [messages, setMessages] = useState<ChatMsg[]>([{
     id: 0, role: "bot",
-    text: "**Paste or upload** anything suspicious.\n\nWhatsApp, SMS, UPI request, QR, parcel message, KYC alert, voice note, or payment screenshot — just drop it here.\nChetana checks here first when it can, and asks for deeper help only when needed.\n\n_check karo, safe raho._",
+    text: "**Paste or upload** anything suspicious.\n\nWhatsApp, SMS, UPI request, QR, parcel message, KYC alert, voice note, or payment screenshot — just drop it here.\nChetana checks here first when it can, and asks for deeper help only when needed.\n\nCheck before you act.",
     suggestions: EXAMPLE_LABELS,
   }]);
   const [listening, setListening] = useState(false);
@@ -2419,7 +2419,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
           const icon = h.verdict === "SUSPICIOUS" || h.verdict === "HIGH" ? "🔴" : h.verdict === "UNCLEAR" || h.verdict === "MEDIUM" ? "🟡" : "🟢";
           return `${icon} ${verdictSummary(h.verdict, h.trust_state)} — ${friendlyScanType(h.type)} — ${d.toLocaleDateString()}`;
         }).join("\n");
-        addMsg({ role: "bot", text: `**Your Safety Dashboard**\n\n**${history.length}** total checks · **${safe}** okay · **${caution}** verify · **${risky}** stop and verify\n\n**Recent:**\n${recent}\n\n_check karo, safe raho._`, suggestions: ["What scams are trending?", "Check something else"] });
+        addMsg({ role: "bot", text: `**Your Safety Dashboard**\n\n**${history.length}** total checks · **${safe}** okay · **${caution}** verify · **${risky}** stop and verify\n\n**Recent:**\n${recent}\n\nCheck before you act.`, suggestions: ["What scams are trending?", "Check something else"] });
       }
       return;
     }
@@ -2631,7 +2631,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                 <div className="sw-avatar"><Shield size={16} /></div>
                 <div>
                   <div className="sw-title">Chetana</div>
-                  <div className="sw-subtitle">check karo, safe raho</div>
+                  <div className="sw-subtitle">check before you act</div>
                 </div>
               </div>
               <div className="sw-header-right">
@@ -3461,48 +3461,32 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <div className="brand-glyph" style={{ width: 36, height: 36 }}><Shield size={16} /></div>
             <div>
               <div className="brand-title" style={{ fontSize: 17 }}>Chetana</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>check karo, safe raho</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>check before you act</div>
             </div>
           </div>
-          <p className="footer-desc">Paste suspicious messages, links, payment screenshots, or voice notes. Chetana tells you the next safe step.</p>
+          <p className="footer-desc">Check suspicious messages, QR requests, and payment screenshots. Chetana explains the risk and shows the safest next step.</p>
         </div>
         <div className="footer-links">
           <div className="footer-col">
-            <h4>Product</h4>
-            <button onClick={() => onNavigate("consumer")}>Everyday checks</button>
+            <h4>Start</h4>
+            <button onClick={() => onNavigate("scan")}>Check now</button>
             <button onClick={() => onNavigate("merchant")}>For shops</button>
-            <button onClick={() => onNavigate("nexus")}>Merchant API</button>
-            <button onClick={() => { window.open("https://t.me/chetnaShieldBot", "_blank"); }}>Telegram Bot</button>
-          </div>
-          <div className="footer-col">
-            <h4>Intelligence</h4>
-            <button onClick={() => onNavigate("weather")}>Safety Radar</button>
+            <button onClick={() => onNavigate("panic")}>Need help?</button>
             <button onClick={() => onNavigate("atlas")}>Common scams</button>
-            <button onClick={() => onNavigate("trust")}>Trust & data</button>
-            <button onClick={() => onNavigate("family")}>Family help</button>
           </div>
           <div className="footer-col">
-            <h4>Emergency</h4>
+            <h4>Learn</h4>
+            <button onClick={() => onNavigate("trust")}>How Chetana works</button>
+            <button onClick={() => onNavigate("weather")}>Recent scam patterns</button>
+            <button onClick={() => onNavigate("family")}>Family help</button>
+            <button onClick={() => { window.open("https://t.me/chetnaShieldBot", "_blank"); }}>Telegram help</button>
+          </div>
+          <div className="footer-col">
+            <h4>Official help</h4>
             <span className="footer-static">Cybercrime: 1930</span>
             <span className="footer-static">Women helpline: 181</span>
             <span className="footer-static">cybercrime.gov.in</span>
-            <button onClick={() => onNavigate("proof")}>Terms & Disclaimer</button>
-          </div>
-          <div className="footer-col">
-            <h4>Stay Updated</h4>
-            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>Get weekly scam alerts</p>
-            <form onSubmit={e => {
-              e.preventDefault();
-              const email = (e.currentTarget.elements.namedItem("email") as HTMLInputElement)?.value;
-              if (email) {
-                fetch("/api/analytics/event", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ event: "subscribe", email }) }).catch(() => {});
-                (e.currentTarget.elements.namedItem("email") as HTMLInputElement).value = "";
-                alert("Subscribed! You'll get weekly scam alerts.");
-              }
-            }} style={{ display: 'flex', gap: 4 }}>
-              <input name="email" type="email" placeholder="your@email.com" required style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }} />
-              <button type="submit" style={{ padding: '6px 12px', borderRadius: 8, background: '#3b82f6', color: '#fff', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Subscribe</button>
-            </form>
+            <button onClick={() => onNavigate("proof")}>Privacy & terms</button>
           </div>
         </div>
         <div className="footer-social">
@@ -3513,17 +3497,15 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
         </div>
         <div className="footer-bottom">
           <div className="footer-powered">
-            <span>Powered by</span>
+            <span>Built by</span>
             <a href="https://activemirror.ai" target="_blank" rel="noopener" className="powered-brand">ActiveMirror</a>
-            <span className="powered-sep">|</span>
-            <span className="powered-brand">MirrorDNA</span>
-            <span className="powered-sep">|</span>
-            <span className="powered-link">Built in India</span>
+            <span className="powered-sep">in</span>
+            <span className="powered-brand">India</span>
           </div>
-          <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror (N1 Intelligence). All rights reserved.</div>
+          <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror. Advisory tool only.</div>
         </div>
         <div className="footer-disclaimer">
-          <Info size={11} /> Advisory tool only. Not affiliated with Government of India, RBI, UIDAI, CERT-IN, or any law enforcement agency. Automated verdicts are not legal determinations. Jurisdiction: Bengaluru, Karnataka, India.
+          <Info size={11} /> Advisory tool only. Not affiliated with Government of India, RBI, UIDAI, CERT-IN, or any law enforcement agency. Automated verdicts are not legal determinations.
         </div>
       </div>
     </footer>

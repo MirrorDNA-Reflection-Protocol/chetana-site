@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Chetana Verdict Schema",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "timestamp_utc",
+    "input_type",
+    "verdict",
+    "scam_type",
+    "confidence_band",
+    "reasons",
+    "recommended_actions"
+  ],
+  "properties": {
+    "scan_id": {
+      "type": "string",
+      "description": "Unique scan identifier"
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "input_type": {
+      "type": "string",
+      "enum": [
+        "screenshot",
+        "text",
+        "qr_image",
+        "payment_screenshot",
+        "mixed"
+      ]
+    },
+    "language_hint": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "safe",
+        "risky",
+        "unclear"
+      ]
+    },
+    "scam_type": {
+      "type": "string",
+      "enum": [
+        "investment_scam",
+        "fake_kyc",
+        "upi_qr_scam",
+        "fake_payment_proof",
+        "parcel_customs_scam",
+        "job_scam",
+        "impersonation_pressure_scam",
+        "unknown_suspicious_pattern"
+      ]
+    },
+    "confidence_band": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "explanation"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "urgency_pressure",
+              "asks_for_money",
+              "suspicious_return_claim",
+              "impersonates_authority",
+              "identity_mismatch",
+              "suspicious_url",
+              "qr_payload_mismatch",
+              "payment_screenshot_anomaly",
+              "move_off_platform",
+              "threat_language",
+              "language_inconsistency",
+              "hidden_or_shortened_link",
+              "unverifiable_contact"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "entities": {
+      "type": "object",
+      "properties": {
+        "phone_numbers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "upi_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "amounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "merchant_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "person_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary_plain_language": {
+      "type": "string"
+    },
+    "recommended_actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "string",
+        "enum": [
+          "do_not_pay",
+          "verify_with_official_source",
+          "share_with_family",
+          "save_evidence",
+          "report_and_block",
+          "scan_again_with_more_context",
+          "treat_as_unclear"
+        ]
+      }
+    },
+    "share_shield_eligible": {
+      "type": "boolean"
+    },
+    "evidence_pack_eligible": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

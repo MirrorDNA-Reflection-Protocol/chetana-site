@@ -2,14 +2,14 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  BackgroundMesh, Nav, Hero, StatsStrip, AlertBanner, ScanWidget,
-  ConsumerSection, SafetyRadar, Atlas, TrustPage, PanicPage,
-  IncidentStepper, FamilyPage, Footer, FrontDoorSection, ShareInstallSection, ShareCTA, ScanGuideRail
+  BackgroundMesh, Nav, AlertBanner, SafetyRadar, Atlas, TrustPage, PanicPage,
+  IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
 import StoryPage from "./StoryPage";
 import { threats, weather } from "./data";
+import ChetanaV0Experience from "./ChetanaV0Experience";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 export default function App() {
@@ -197,28 +197,19 @@ export default function App() {
           <motion.div key={page} {...pageAnim}>
 
             {page === "home" && <>
-              <Hero onNavigate={setPage as any} />
-              <FrontDoorSection
+              <ChetanaV0Experience
                 onNavigate={setPage}
-                onRequireProof={() => setPage("proof")}
                 initialInput={sharedContent}
                 initialFile={sharedAttachment}
               />
-              <StatsStrip />
-              <ShareCTA />
-              <ShareInstallSection onNavigate={setPage} />
             </>}
 
             {page === "consumer" && <>
-              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
-                <div>
-                  <div className="kicker">Everyday checks</div>
-                  <h1>Check suspicious messages, links, and payment requests</h1>
-                  <p>Paste a message, link, UPI ID, or phone number and get the next safe step.</p>
-                </div>
-              </section>
-              <SafetyRadar signals={weather.slice(0, 5)} />
-              <Atlas threats={threats} />
+              <ChetanaV0Experience
+                onNavigate={setPage}
+                initialInput={sharedContent}
+                initialFile={sharedAttachment}
+              />
             </>}
 
             {page === "atlas" && <>
@@ -231,15 +222,11 @@ export default function App() {
             </>}
 
             {page === "merchant" && <>
-              <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
-                <div>
-                  <div className="kicker">Merchant</div>
-                  <h1>Check payment proof before you hand over goods</h1>
-                  <p>For shopkeepers, sellers, and delivery staff checking fake payment screenshots, impersonation, and UPI fraud.</p>
-                </div>
-              </section>
-              <SafetyRadar signals={weather.slice(0, 5)} />
-              <Atlas threats={threats} />
+              <ChetanaV0Experience
+                onNavigate={setPage}
+                presetMode="payment_screenshot"
+                showHero={false}
+              />
             </>}
 
             {page === "nexus" && <>
@@ -255,20 +242,12 @@ export default function App() {
             </>}
 
             {page === "scan" && <>
-              <section className="scan-page-grid">
-                <div className="scan-page-sidebar">
-                  <ScanGuideRail signals={weather.slice(0, 4)} onNavigate={setPage} />
-                </div>
-                <div className="scan-page-main">
-                  <ScanWidget
-                    onRequireProof={() => setPage("proof")}
-                    inline
-                    initialInput={sharedContent}
-                    initialFile={sharedAttachment}
-                  />
-                </div>
-              </section>
-              <StatsStrip />
+              <ChetanaV0Experience
+                onNavigate={setPage}
+                showHero={false}
+                initialInput={sharedContent}
+                initialFile={sharedAttachment}
+              />
             </>}
 
             {page === "weather" && <SafetyRadar signals={weather} />}

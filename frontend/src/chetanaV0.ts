@@ -108,9 +108,9 @@ export const V0_MODE_CARDS: Array<{
 }> = [
   {
     mode: "text",
-    label: "Paste text",
-    title: "Paste the message",
-    description: "WhatsApp, SMS, Telegram, email, job offer, KYC alert, or investment pitch.",
+    label: "Paste message",
+    title: "Paste a message, link, or UPI ID",
+    description: "WhatsApp, SMS, Telegram, email, suspicious link, or payment request.",
   },
   {
     mode: "screenshot",
@@ -121,8 +121,8 @@ export const V0_MODE_CARDS: Array<{
   {
     mode: "qr_image",
     label: "Scan QR",
-    title: "Check a QR or UPI request",
-    description: "Upload a QR screenshot or paste the UPI or payment payload you can see.",
+    title: "Check a QR request",
+    description: "Upload a QR screenshot or paste the payment payload you can read.",
   },
   {
     mode: "payment_screenshot",

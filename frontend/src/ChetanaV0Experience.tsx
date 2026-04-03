@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -29,7 +29,6 @@ import {
   entitySections,
   extractTextForMode,
   getOrCreateV0SessionId,
-  inputTypeLabel,
   reportScript,
   scamTypeLabel,
   shareShieldText,
@@ -40,34 +39,50 @@ import {
 } from "./chetanaV0";
 
 const DEFAULT_PROMPTS: Record<V0Mode, string> = {
-  text: "Paste the full message here.",
+  text: "Paste the suspicious message, link, or UPI request here.",
   screenshot: "Upload the screenshot. Add a note only if it helps.",
-  qr_image: "Upload the QR screenshot or paste the UPI or payment payload you can see.",
+  qr_image: "Upload the QR screenshot or paste the payment payload you can read.",
   payment_screenshot: "Upload the payment screenshot. Add any note that explains the context.",
 };
 
 const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }> = {
   text: {
-    kicker: "Private safety check",
-    title: "Check the message before you reply, pay, or click.",
-    body: "Paste the suspicious message and get a plain-language call: risky, unclear, or looks okay so far.",
+    kicker: "Paste message or link",
+    title: "Paste the suspicious message, link, or UPI request.",
+    body: "Links, UPI IDs, and payment requests can all go in the same box.",
   },
   screenshot: {
-    kicker: "Private safety check",
-    title: "Upload the screenshot. Chetana will read the visible text.",
+    kicker: "Upload screenshot",
+    title: "Upload the screenshot and add context only if it helps.",
     body: "Useful when the message is already on your phone screen or came through WhatsApp, SMS, or email.",
   },
   qr_image: {
-    kicker: "Private safety check",
+    kicker: "Check QR request",
     title: "Check the QR or payment payload before you scan and pay.",
-    body: "If something feels rushed, confusing, or mismatched, pause here first.",
+    body: "Upload the QR image or paste the payment payload you can read.",
   },
   payment_screenshot: {
-    kicker: "Private safety check",
+    kicker: "Check payment proof",
     title: "Check payment proof before you hand over goods.",
     body: "Built for shopkeepers, delivery staff, and sellers who need a fast second opinion.",
   },
 };
+
+const FRONT_DOOR_TRUST = [
+  "Free",
+  "Privacy-first",
+  "Built for India",
+  "No signup to start",
+];
+
+const SAMPLE_SCAM_TEXT =
+  "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
+
+const RESULT_PREVIEW_REASONS = [
+  "Suspicious payment request",
+  "Urgency language",
+  "Unknown sender",
+];
 
 function eventNameForVerdict(verdict: V0Verdict["verdict"]): V0EventName {
   if (verdict === "risky") return "verdict_risky";
@@ -92,6 +107,7 @@ export default function ChetanaV0Experience({
   presetMode?: V0Mode;
   showHero?: boolean;
 }) {
+  const composerRef = useRef<HTMLDivElement | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
   const [mode, setMode] = useState<V0Mode>(presetMode || (initialFile ? "screenshot" : "text"));
   const [text, setText] = useState(initialInput || "");
@@ -134,12 +150,38 @@ export default function ChetanaV0Experience({
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
 
-  const runScan = async () => {
-    setLoading(true);
-    setError(null);
+  const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
     setEvidence(null);
+    setError(null);
+    setDetailsOpen(false);
     setShareCopied(false);
+    setStatus(nextStatus);
+  };
+
+  const selectMode = (nextMode: V0Mode) => {
+    setMode(nextMode);
+    if (nextMode === "text") {
+      setFile(null);
+    }
+    resetScanState();
+  };
+
+  const scrollToComposer = () => {
+    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const loadSample = () => {
+    setMode("text");
+    setText(SAMPLE_SCAM_TEXT);
+    setFile(null);
+    resetScanState("Sample loaded. Edit it if you want, then scan.");
+    window.requestAnimationFrame(scrollToComposer);
+  };
+
+  const runScan = async () => {
+    setLoading(true);
+    resetScanState();
     const started = performance.now();
 
     try {
@@ -347,19 +389,25 @@ export default function ChetanaV0Experience({
     <section className="v0-shell">
       {showHero && (
         <div className="v0-hero">
-          <div className="v0-kicker">{hero.kicker}</div>
-          <h1>{hero.title}</h1>
-          <p>{hero.body}</p>
+          <div className="v0-kicker">India-first scam check</div>
+          <h1>
+            <span className="v0-hero-line">Got something suspicious?</span>
+            <span className="v0-hero-line v0-hero-accent">Just scan it.</span>
+          </h1>
+          <p>Check suspicious messages, links, QR codes, UPI/payment requests, and screenshots in seconds.</p>
+          <div className="v0-hero-actions">
+            <button className="v0-submit" onClick={scrollToComposer}>
+              Scan now
+              <ArrowRight size={16} />
+            </button>
+            <button className="v0-ghost-button" onClick={loadSample}>
+              Try a sample scam
+            </button>
+          </div>
           <div className="v0-trust-strip">
-            <span>
-              <Shield size={14} /> Only three answers: safe, risky, or unclear.
-            </span>
-            <span>
-              <AlertTriangle size={14} /> If the signal is weak, Chetana stays unclear.
-            </span>
-            <span>
-              <Phone size={14} /> If money already moved, call 1930 first.
-            </span>
+            {FRONT_DOOR_TRUST.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
           </div>
         </div>
       )}
@@ -381,12 +429,7 @@ export default function ChetanaV0Experience({
                 <button
                   key={card.mode}
                   className={`v0-mode-card${active ? " active" : ""}`}
-                  onClick={() => {
-                    setMode(card.mode);
-                    setResult(null);
-                    setEvidence(null);
-                    setError(null);
-                  }}
+                  onClick={() => selectMode(card.mode)}
                 >
                   <div className="v0-mode-top">
                     <span className="v0-mode-icon">{icon}</span>
@@ -399,13 +442,23 @@ export default function ChetanaV0Experience({
             })}
           </div>
 
-          <div className="v0-composer">
+          <div className="v0-composer" id="chetana-scan-box" ref={composerRef}>
             <div className="v0-composer-head">
               <div>
-                <div className="v0-section-label">Check now</div>
-                <h2>{HERO_COPY[mode].title}</h2>
+                <div className="v0-section-label">Scan box</div>
+                <h2>{hero.title}</h2>
+                <p className="v0-composer-copy">{hero.body}</p>
               </div>
               <div className="v0-status">{status}</div>
+            </div>
+
+            <div className="v0-quick-row">
+              <button className="v0-quick-chip" onClick={loadSample}>
+                Try a sample scam
+              </button>
+              {mode === "text" && (
+                <span className="v0-quick-note">You can paste a link, UPI ID, or payment request here too.</span>
+              )}
             </div>
 
             <label className="v0-input-label">
@@ -438,15 +491,37 @@ export default function ChetanaV0Experience({
 
             <div className="v0-composer-foot">
               <div className="v0-limit-note">
-                Private advisory tool. Not a government service. If money moved, use the official help steps below.
+                Private advisory tool. Not a government service. If money moved already, call 1930 first and contact your bank right away.
               </div>
               <button className="v0-submit" onClick={runScan} disabled={loading}>
-                {loading ? "Checking..." : "Check this now"}
+                {loading ? "Scanning..." : "Scan now"}
                 <ArrowRight size={16} />
               </button>
             </div>
             {error && <div className="v0-error">{error}</div>}
           </div>
+
+          {showHero && !result && (
+            <div className="v0-founder-card">
+              <div className="v0-section-label">Founder quick intro</div>
+              <div className="v0-founder-media">
+                <video
+                  className="v0-founder-video"
+                  src="/founder-intro.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <div className="v0-founder-copy">
+                  <strong>Don&apos;t guess. Don&apos;t click. Don&apos;t pay.</strong>
+                  <p>Just scan it with Chetana. Check karo, safe raho.</p>
+                  <span>Built for families, workers, and shopkeepers who need a fast second opinion.</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {result && (
             <div className={`v0-result-card ${result.verdict}`}>
@@ -569,6 +644,23 @@ export default function ChetanaV0Experience({
         </div>
 
         <aside className="v0-side">
+          {!result && (
+            <div className="v0-side-card v0-preview-card">
+              <div className="v0-section-label">Result preview</div>
+              <strong>What a risky result looks like</strong>
+              <div className="v0-badge risky">
+                <ShieldAlert size={14} />
+                Risky
+              </div>
+              <div className="v0-preview-chips">
+                {RESULT_PREVIEW_REASONS.map((reason) => (
+                  <span key={reason} className="v0-preview-chip">{reason}</span>
+                ))}
+              </div>
+              <p>Next safe step: share with family before anyone clicks or pays.</p>
+            </div>
+          )}
+
           <div className="v0-side-card danger">
             <div className="v0-section-label">If money already went</div>
             <strong>Do not waste time proving the scammer wrong.</strong>
@@ -588,29 +680,42 @@ export default function ChetanaV0Experience({
           </div>
 
           <div className="v0-side-card">
-            <div className="v0-section-label">What this does</div>
-            <strong>One quick check, then a calmer next step.</strong>
+            <div className="v0-section-label">What Chetana checks</div>
+            <strong>Messages, links, QR requests, UPI payment requests, screenshots, and payment proof.</strong>
             <ul>
-              <li>Scan the suspicious thing.</li>
-              <li>Explain the result in plain language.</li>
-              <li>Show the safest next action.</li>
-              <li>Help you share the warning or save the evidence.</li>
+              <li>WhatsApp, SMS, Telegram, email, and suspicious links.</li>
+              <li>QR screenshots and payment requests before you scan.</li>
+              <li>Payment screenshots before you hand over goods.</li>
+              <li>Common India-facing scam patterns that pressure people to act fast.</li>
             </ul>
           </div>
 
           <div className="v0-side-card">
-            <div className="v0-section-label">What it checks today</div>
-            <strong>Common scam patterns that catch people off guard.</strong>
+            <div className="v0-section-label">How it works</div>
+            <strong>Rules first. Model help only when the input is messy or visual.</strong>
             <ul>
-              <li>Fake KYC or bank alerts</li>
-              <li>UPI or QR payment tricks</li>
-              <li>Fake payment screenshots</li>
-              <li>Parcel and customs fee messages</li>
-              <li>Job scams and authority pressure</li>
+              <li>Chetana returns only three answers: safe, risky, or unclear.</li>
+              <li>If the signal is weak, it stays unclear instead of pretending certainty.</li>
+              <li>The result explains why and gives the next safest action.</li>
+              <li>You can share a warning or save the evidence while details are fresh.</li>
             </ul>
+            {onNavigate && (
+              <div className="v0-inline-actions">
+                <button onClick={() => onNavigate("trust")}>
+                  <FileText size={14} /> How it works
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       </div>
+
+      {showHero && !result && (
+        <button className="v0-mobile-cta" onClick={scrollToComposer}>
+          Scan now
+          <ArrowRight size={16} />
+        </button>
+      )}
     </section>
   );
 }

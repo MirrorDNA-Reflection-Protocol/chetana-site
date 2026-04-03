@@ -46,12 +46,10 @@ export function BackgroundMesh() {
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false);
-  const items: { id: PageId; label: string; restricted?: boolean; urgent?: boolean }[] = [
-    { id: "home", label: "Home" },
-    { id: "scan", label: "Check" },
-    { id: "panic", label: "Need Help?", urgent: true },
-    { id: "merchant", label: "For Shops" },
-    { id: "trust", label: "How It Works" },
+  const items: { id: PageId; label: string; activeOn: PageId[]; urgent?: boolean }[] = [
+    { id: "scan", label: "Check now", activeOn: ["home", "scan", "consumer"] },
+    { id: "merchant", label: "For shops", activeOn: ["merchant"] },
+    { id: "panic", label: "Help now", activeOn: ["panic", "incident"], urgent: true },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
@@ -67,7 +65,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         {items.map((item) => (
           <button
             key={item.id}
-            className={`nav-btn${page === item.id ? " active" : ""}${item.urgent ? " nav-urgent" : ""}`}
+            className={`nav-btn${item.activeOn.includes(page) ? " active" : ""}${item.urgent ? " nav-urgent" : ""}`}
             onClick={() => navigate(item.id)}
           >
             {item.label}
@@ -3468,32 +3466,24 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
         </div>
         <div className="footer-links">
           <div className="footer-col">
-            <h4>Start</h4>
-            <button onClick={() => onNavigate("scan")}>Check now</button>
+            <h4>Start here</h4>
+            <button onClick={() => onNavigate("home")}>Scan now</button>
+            <button onClick={() => onNavigate("family")}>For family</button>
             <button onClick={() => onNavigate("merchant")}>For shops</button>
-            <button onClick={() => onNavigate("panic")}>Need help?</button>
-            <button onClick={() => onNavigate("atlas")}>Common scams</button>
           </div>
           <div className="footer-col">
-            <h4>Learn</h4>
+            <h4>Understand</h4>
+            <button onClick={() => onNavigate("panic")}>Need help now?</button>
             <button onClick={() => onNavigate("trust")}>How Chetana works</button>
-            <button onClick={() => onNavigate("weather")}>Recent scam patterns</button>
-            <button onClick={() => onNavigate("family")}>Family help</button>
-            <button onClick={() => { window.open("https://t.me/chetnaShieldBot", "_blank"); }}>Telegram help</button>
+            <button onClick={() => onNavigate("atlas")}>Common scams</button>
+            <button onClick={() => onNavigate("proof")}>Privacy & terms</button>
           </div>
           <div className="footer-col">
             <h4>Official help</h4>
             <span className="footer-static">Cybercrime: 1930</span>
             <span className="footer-static">Women helpline: 181</span>
             <span className="footer-static">cybercrime.gov.in</span>
-            <button onClick={() => onNavigate("proof")}>Privacy & terms</button>
           </div>
-        </div>
-        <div className="footer-social">
-          <a href="https://t.me/chetnaShieldBot" target="_blank" rel="noopener">Telegram</a>
-          <a href="https://www.youtube.com/@ActiveMirror-1" target="_blank" rel="noopener">YouTube</a>
-          <a href="https://x.com/pauldesai123" target="_blank" rel="noopener">X</a>
-          <a href="https://www.instagram.com/pauldesai1/" target="_blank" rel="noopener">Instagram</a>
         </div>
         <div className="footer-bottom">
           <div className="footer-powered">

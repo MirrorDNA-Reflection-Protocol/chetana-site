@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  BackgroundMesh, Nav, AlertBanner, SafetyRadar, Atlas, TrustPage, PanicPage,
+  BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
+  ShareCTA,
   IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
@@ -179,7 +180,6 @@ export default function App() {
   return (
     <div className="app-shell">
       <BackgroundMesh />
-      <AlertBanner onNavigate={setPage as any} />
       <Nav page={page} setPage={setPage} />
       {updateReady && (
         <div className="app-update-banner">
@@ -202,6 +202,7 @@ export default function App() {
                 initialInput={sharedContent}
                 initialFile={sharedAttachment}
               />
+              <ShareCTA />
             </>}
 
             {page === "consumer" && <>
@@ -265,10 +266,10 @@ export default function App() {
       <Footer onNavigate={setPage} />
 
       {/* FAB — goes to scan page (with proof gate) */}
-      {page !== "scan" && page !== "proof" && (
+      {page !== "home" && page !== "scan" && page !== "proof" && (
         <button className="sw-fab" onClick={() => setPage("scan")}>
           <span style={{ fontSize: 20 }}>🛡️</span>
-          <span className="sw-fab-label">Check</span>
+          <span className="sw-fab-label">Scan now</span>
         </button>
       )}
     </div>

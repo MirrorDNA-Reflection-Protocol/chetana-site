@@ -358,6 +358,74 @@
     .skiptranslate { display: none !important; }
     body { top: 0 !important; }
     #google_translate_element { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
+
+    /* ---- FILE UPLOAD ---- */
+    .upload-strip {
+      max-width: 680px; width: 100%; display: flex; gap: 8px;
+      margin: -16px 0 20px; flex-wrap: wrap; justify-content: center;
+    }
+    .upload-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      background: var(--surface); border: 1.5px solid var(--border);
+      padding: 7px 14px; border-radius: 100px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .upload-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .upload-btn input[type=file] { display: none; }
+    .upload-btn svg { width: 14px; height: 14px; }
+
+    /* ---- CHAT ---- */
+    .chat-section { max-width: 680px; width: 100%; margin-bottom: 28px; }
+    .chat-box {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+    }
+    .chat-messages {
+      max-height: 300px; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .chat-msg {
+      max-width: 85%; padding: 10px 14px; border-radius: 12px;
+      font-size: 15px; line-height: 1.5;
+    }
+    .chat-msg.user {
+      align-self: flex-end; background: var(--accent); color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-msg.bot {
+      align-self: flex-start; background: var(--surface-2); color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .chat-input-row {
+      display: flex; border-top: 1.5px solid var(--border);
+    }
+    .chat-input {
+      flex: 1; border: none; background: transparent; padding: 12px 16px;
+      font-family: inherit; font-size: 15px; color: var(--text); outline: none;
+    }
+    .chat-send {
+      background: var(--accent); color: #fff; border: none;
+      padding: 12px 20px; font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+    .chat-send:hover { background: var(--accent-hover); }
+
+    /* ---- RADAR ---- */
+    .radar-section { max-width: 680px; width: 100%; margin-bottom: 28px; }
+    .radar-list { display: flex; flex-direction: column; gap: 8px; }
+    .radar-item {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .radar-item .ri-name { font-size: 15px; font-weight: 600; color: var(--text); }
+    .radar-item .ri-status {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      padding: 3px 10px; border-radius: 100px;
+    }
+    .ri-status.rising { background: #fef2f2; color: #dc2626; }
+    .ri-status.active { background: #fffbeb; color: #d97706; }
+    .ri-status.declining { background: #f0fdf4; color: #16a34a; }
   </style>
 
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I check if a message is a scam?","acceptedAnswer":{"@type":"Answer","text":"Paste the message into Chetana at chetana.activemirror.ai. It checks for scam patterns and tells you the safe next step."}},{"@type":"Question","name":"How do I check if a UPI ID is fraudulent?","acceptedAnswer":{"@type":"Answer","text":"Paste the UPI ID into Chetana before you pay. It checks for common fraud patterns."}},{"@type":"Question","name":"What should I do if I have been scammed in India?","acceptedAnswer":{"@type":"Answer","text":"Call the National Cybercrime Helpline 1930 immediately. File at cybercrime.gov.in. Contact your bank fraud helpline. Act within the first hour."}},{"@type":"Question","name":"Is Chetana free?","acceptedAnswer":{"@type":"Answer","text":"Yes. Chetana is free for consumers in India."}}]}</script>
@@ -414,15 +482,35 @@
         placeholder="Yahan paste karo &#8212; message, link, ya UPI ID..."></textarea>
       <div class="scanner-toolbar">
         <div class="scanner-hints">
-          <span class="hint-chip" data-example="payment">Payment screenshot</span>
-          <span class="hint-chip" data-example="qr">QR code</span>
-          <span class="hint-chip" data-example="kyc">KYC / PAN message</span>
-          <span class="hint-chip" data-example="link">Suspicious link</span>
+          <span class="hint-chip" data-example="payment">Payment message</span>
+          <span class="hint-chip" data-example="qr">QR / cashback</span>
+          <span class="hint-chip" data-example="kyc">KYC / PAN</span>
+          <span class="hint-chip" data-example="link">Link / URL</span>
+          <span class="hint-chip" data-example="upi">UPI ID</span>
+          <span class="hint-chip" data-example="phone">Phone number</span>
         </div>
         <button class="check-btn" id="checkBtn" disabled>Check it</button>
       </div>
     </div>
   </section>
+
+  <div class="upload-strip">
+    <label class="upload-btn" title="Upload screenshot or image">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      Screenshot
+      <input type="file" accept="image/*" id="imgUpload">
+    </label>
+    <label class="upload-btn" title="Upload voice recording">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+      Voice memo
+      <input type="file" accept="audio/*" id="voiceUpload">
+    </label>
+    <label class="upload-btn" title="Upload APK file to check">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+      APK file
+      <input type="file" accept=".apk" id="apkUpload">
+    </label>
+  </div>
 
   <div class="loading" id="loading">
     <div class="spinner"></div>
@@ -475,6 +563,26 @@
     </div>
   </section>
 
+
+  <section class="chat-section">
+    <p class="section-label">Ask Chetana anything</p>
+    <div class="chat-box">
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-msg bot">Hi! I'm Chetana. Ask me anything about scams, fraud, or online safety in India.</div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Type your question...">
+        <button class="chat-send" id="chatSend">Ask</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="radar-section">
+    <p class="section-label">Live scam radar</p>
+    <div class="radar-list" id="radarList">
+      <div class="radar-item"><span class="ri-name">Loading threats...</span></div>
+    </div>
+  </section>
   <div class="scam-stats">
     <h3>Why this matters</h3>
     <p>Indians lost <span class="stat-highlight">Rs 11,333 crore</span> to digital fraud in 2024. The most common scams start with a simple message that looks real. One check here can save you from sending money to a scammer.</p>
@@ -518,7 +626,9 @@
       payment: '\u201cRs 4,999 received from HDFC Bank. Click to confirm deposit: bit.ly/hdfc-verify-payment\u201d',
       kyc: '\u201cDear customer, your PAN card is expiring soon. Update KYC immediately or your Paytm account will be frozen. Visit: paytm-kyc.in/urgent-update\u201d',
       qr: '\u201cScan this QR code to receive Rs 500 cashback on your last Flipkart order. Offer expires in 2 hours!\u201d',
-      link: '\u201cCongratulations! You have been selected for an iPhone 16 Pro giveaway. Claim now: amaz0n-prize.com/claim-reward\u201d'
+      link: '\u201cCongratulations! You have been selected for an iPhone 16 Pro giveaway. Claim now: amaz0n-prize.com/claim-reward\u201d',
+      upi: 'scammer@ybl',
+      phone: '9876543210'
     };
 
     var results = {
@@ -636,22 +746,70 @@
       return { level: level, icon: icon, verdict: verdict, explanation: explanation, steps: steps };
     }
 
-    btn.addEventListener('click', function() {
+    // Detect current language from Google Translate cookie
+    function detectLang() {
+      var m = document.cookie.match(/googtrans=\/en\/([a-z]+)/);
+      return m ? m[1] : 'en';
+    }
+
+    // Load live stats on page load
+    (function() {
+      fetch(API_BASE + '/api/stats/live').then(function(r) { return r.json(); }).then(function(d) {
+        var el = document.querySelector('.social-proof span:last-child');
+        if (el && d.total_scans) {
+          var n = d.total_scans;
+          if (n > 1000) el.textContent = Math.floor(n/1000).toLocaleString() + ',000+ checks';
+          else el.textContent = n + ' checks';
+        }
+      }).catch(function(){});
+    })();
+
+        btn.addEventListener('click', function() {
       var text = input.value.trim();
       btn.disabled = true;
       loading.classList.add('visible');
       resultEl.classList.remove('visible');
 
-      fetch(API_BASE + '/api/scan', {
+      // Smart input detection — route to the right API
+      var endpoint = '/api/scan/full';
+      var payload = { text: text, lang: detectLang() };
+      var mode = 'text';
+
+      // UPI ID pattern: something@bank
+      if (/^[a-zA-Z0-9._-]+@[a-zA-Z]{2,}$/.test(text.trim())) {
+        endpoint = '/api/upi/check';
+        payload = { upi_id: text.trim(), lang: detectLang() };
+        mode = 'upi';
+      }
+      // Phone number: 10+ digits
+      else if (/^\+?[\d\s-]{10,15}$/.test(text.trim().replace(/[\s-]/g, ''))) {
+        endpoint = '/api/phone/check';
+        payload = { phone: text.trim(), lang: detectLang() };
+        mode = 'phone';
+      }
+      // URL/link pattern
+      else if (/^https?:\/\//i.test(text.trim()) || /\.[a-z]{2,}\//i.test(text.trim()) || /bit\.ly|goo\.gl|tinyurl/i.test(text)) {
+        endpoint = '/api/link/check';
+        payload = { url: text.trim(), lang: detectLang() };
+        mode = 'link';
+      }
+
+      fetch(API_BASE + endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text, lang: 'en' })
+        body: JSON.stringify(payload)
       })
       .then(function(resp) { if (!resp.ok) throw new Error('API ' + resp.status); return resp.json(); })
       .then(function(data) {
         loading.classList.remove('visible');
         renderResult(parseApiResult(data));
         btn.disabled = false;
+        // Fire analytics (best-effort)
+        fetch(API_BASE + '/api/analytics/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'scan', scan_type: mode, verdict: data.verdict, score: data.risk_score })
+        }).catch(function(){});
       })
       .catch(function(err) {
         console.warn('API unavailable, using demo:', err.message);
@@ -702,7 +860,25 @@
     langMenu.addEventListener('click', function(e) { e.stopPropagation(); });
 
     document.querySelectorAll('.lang-menu button').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+      // Detect current language from Google Translate cookie
+    function detectLang() {
+      var m = document.cookie.match(/googtrans=\/en\/([a-z]+)/);
+      return m ? m[1] : 'en';
+    }
+
+    // Load live stats on page load
+    (function() {
+      fetch(API_BASE + '/api/stats/live').then(function(r) { return r.json(); }).then(function(d) {
+        var el = document.querySelector('.social-proof span:last-child');
+        if (el && d.total_scans) {
+          var n = d.total_scans;
+          if (n > 1000) el.textContent = Math.floor(n/1000).toLocaleString() + ',000+ checks';
+          else el.textContent = n + ' checks';
+        }
+      }).catch(function(){});
+    })();
+
+        btn.addEventListener('click', function() {
         var lang = btn.dataset.lang;
         // Update UI
         document.querySelectorAll('.lang-menu button').forEach(function(b) { b.classList.remove('active'); });
@@ -744,5 +920,128 @@
       <p><strong>Need help now?</strong> Cybercrime Helpline: <strong>1930</strong> | cybercrime.gov.in | Women helpline: <strong>181</strong></p>
     </div>
   </noscript>
+
+  <script>
+    // ── File Upload Handlers ──
+    function handleFileUpload(inputId, endpoint, fileMode) {
+      var fileInput = document.getElementById(inputId);
+      fileInput.addEventListener('change', function() {
+        if (!fileInput.files.length) return;
+        var fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        loading.classList.add('visible');
+        resultEl.classList.remove('visible');
+        fetch(API_BASE + endpoint, { method: 'POST', body: fd })
+          .then(function(r) { if (!r.ok) throw new Error('Upload failed'); return r.json(); })
+          .then(function(data) {
+            loading.classList.remove('visible');
+            // If OCR extracted text, auto-scan it
+            if (data.extractedText || data.text) {
+              input.value = data.extractedText || data.text;
+              renderResult(parseApiResult(data));
+            } else {
+              renderResult(parseApiResult(data));
+            }
+          })
+          .catch(function(err) {
+            loading.classList.remove('visible');
+            renderResult({ level: 'warning', icon: '\u26a0\ufe0f', verdict: 'Upload failed', explanation: 'Could not analyze the file. Try pasting the text instead.', steps: ['Copy the text from the message','Paste it in the scanner above','Click Check it'] });
+          });
+        fileInput.value = '';
+      });
+    }
+    handleFileUpload('imgUpload', '/api/media/ocr', 'image');
+    handleFileUpload('voiceUpload', '/api/voice/analyze', 'voice');
+    handleFileUpload('apkUpload', '/api/apk/check', 'apk');
+
+    // ── Chat ──
+    var chatMessages = document.getElementById('chatMessages');
+    var chatInput = document.getElementById('chatInput');
+    var chatSend = document.getElementById('chatSend');
+
+    function addChatMsg(text, who) {
+      var div = document.createElement('div');
+      div.className = 'chat-msg ' + who;
+      div.textContent = text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function sendChat() {
+      var text = chatInput.value.trim();
+      if (!text) return;
+      addChatMsg(text, 'user');
+      chatInput.value = '';
+      chatSend.disabled = true;
+
+      fetch(API_BASE + '/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, lang: detectLang() })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        addChatMsg(d.reply || d.response || d.message || 'I could not process that. Try again.', 'bot');
+        chatSend.disabled = false;
+      })
+      .catch(function() {
+        addChatMsg('Sorry, I am offline right now. Try scanning your message above instead.', 'bot');
+        chatSend.disabled = false;
+      });
+    }
+
+    chatSend.addEventListener('click', sendChat);
+    chatInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendChat(); });
+
+    // ── Live Radar ──
+    (function() {
+      fetch(API_BASE + '/api/radar/public')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var list = document.getElementById('radarList');
+          var threats = data.threats || data.patterns || data;
+          if (!Array.isArray(threats)) threats = Object.values(threats);
+          if (!threats.length) return;
+          list.innerHTML = '';
+          threats.slice(0, 6).forEach(function(t) {
+            var name = t.name || t.pattern || t.title || 'Unknown threat';
+            var status = (t.status || t.trend || 'active').toLowerCase();
+            var cls = status === 'rising' ? 'rising' : status === 'declining' ? 'declining' : 'active';
+            list.innerHTML += '<div class="radar-item"><span class="ri-name">' + name + '</span><span class="ri-status ' + cls + '">' + status + '</span></div>';
+          });
+        })
+        .catch(function() {
+          document.getElementById('radarList').innerHTML = '<div class="radar-item"><span class="ri-name">Radar offline</span></div>';
+        });
+    })();
+
+    // ── Evidence Bundle (on result, add download button) ──
+    var origRender = renderResult;
+    renderResult = function(r) {
+      origRender(r);
+      var actions = resultEl.querySelector('.result-actions');
+      if (actions) {
+        var dlBtn = document.createElement('button');
+        dlBtn.className = 'share-btn';
+        dlBtn.textContent = '\ud83d\udcc4 Save evidence';
+        dlBtn.onclick = function() {
+          fetch(API_BASE + '/api/evidence/bundle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: input.value, verdict: r.verdict, explanation: r.explanation, steps: r.steps })
+          })
+          .then(function(resp) { return resp.blob(); })
+          .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'chetana-evidence.pdf'; a.click();
+            URL.revokeObjectURL(url);
+          })
+          .catch(function() { alert('Evidence download unavailable right now.'); });
+        };
+        actions.appendChild(dlBtn);
+      }
+    };
+  </script>
 </body>
 </html>

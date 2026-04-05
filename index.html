@@ -436,7 +436,7 @@
     <a href="/" class="logo"><img src="img/logo.png" alt="Chetana logo"> Chetana<span>.</span></a>
     <div class="nav-links">
       <a href="#examples-section">Examples</a>
-      <a href="/mirrorprod-india">For brands</a>
+      
       <a href="#trust-strip">Trust</a>
     </div>
     <div class="lang-wrap">
@@ -583,6 +583,13 @@
       <div class="radar-item"><span class="ri-name">Loading threats...</span></div>
     </div>
   </section>
+
+  <section class="examples" style="margin-bottom:28px">
+    <p class="section-label">Learn about scams</p>
+    <div class="example-grid" id="kbArticles">
+      <div class="example-card" style="cursor:default"><p class="ex-type">Loading...</p><p class="ex-text">Fetching latest articles</p></div>
+    </div>
+  </section>
   <div class="scam-stats">
     <h3>Why this matters</h3>
     <p>Indians lost <span class="stat-highlight">Rs 11,333 crore</span> to digital fraud in 2024. The most common scams start with a simple message that looks real. One check here can save you from sending money to a scammer.</p>
@@ -608,9 +615,17 @@
       <h3>Need videos for your brand?</h3>
       <p>Turn product photos into ready-to-post reels, WhatsApp promos, and founder videos.</p>
     </div>
-    <a href="/mirrorprod-india">See packages</a>
+    <a href="https://activemirror.ai" target="_blank" rel="noopener">See packages</a>
   </div>
 
+
+  <div style="max-width:680px;width:100%;background:#dc2626;color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:14px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;opacity:0.9">Already sent money?</div>
+      <div style="font-size:18px;font-weight:800;margin-top:2px">Call 1930 — National Cybercrime Helpline</div>
+    </div>
+    <a href="tel:1930" style="background:#fff;color:#dc2626;font-size:16px;font-weight:800;padding:10px 24px;border-radius:100px;text-decoration:none">Call 1930</a>
+  </div>
   <footer>
     <p>&copy; 2026 Active Mirror</p>
     <a href="#trust-strip">How this works</a>
@@ -714,6 +729,7 @@
           '</div></div>';
       resultEl.classList.add('visible');
       resultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      try { document.getElementById('tingSfx').play(); } catch(e) {}
     }
 
     function demoFallback(text) {
@@ -730,6 +746,8 @@
       if (v === 'LOW_RISK' || v === 'SAFE' || v === 'CLEAN') { level = 'safe'; icon = '\u2705'; verdict = 'Looks safe'; }
       else if (v === 'MEDIUM_RISK' || v === 'SUSPICIOUS' || v === 'CAUTION') { level = 'warning'; icon = '\u26a0\ufe0f'; verdict = 'Dhyan se — be careful'; }
       else if (v === 'HIGH_RISK' || v === 'SCAM' || v === 'DANGER') { level = 'danger'; icon = '\ud83d\udea8'; verdict = 'Yeh scam hai'; }
+      else if (v === 'SERVICE_UNAVAILABLE') { level = 'warning'; icon = '\u26a0\ufe0f'; verdict = 'Service busy — try again'; explanation = 'Our scan engine is temporarily busy. Please try again in a few seconds.'; }
+      else if (v === 'UNCLEAR') { level = 'warning'; icon = '\ud83e\uddd0'; verdict = 'Not clear — be careful'; }
       // Build explanation from why_flagged or surface
       var explanation = '';
       if (data.why_flagged && data.why_flagged.length) { explanation = data.why_flagged.join('. ') + '.'; }
@@ -1015,6 +1033,29 @@
         });
     })();
 
+
+    // ── Knowledge Base Articles ──
+    (function() {
+      fetch(API_BASE + '/api/kb/articles')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var articles = data.articles || data;
+          if (!Array.isArray(articles) || !articles.length) return;
+          var el = document.getElementById('kbArticles');
+          el.innerHTML = '';
+          articles.slice(0, 4).forEach(function(a) {
+            var title = a.title || a.name || 'Article';
+            var summary = a.summary || a.description || '';
+            var id = a.id || a.article_id || '';
+            el.innerHTML += '<div class="example-card" onclick="window.open(API_BASE+\'/api/kb/article/' + id + '\',\'_blank\')" style="cursor:pointer"><p class="ex-type">Guide</p><p class="ex-text">' + title + '</p></div>';
+          });
+        })
+        .catch(function() {
+          var el = document.getElementById('kbArticles');
+          el.innerHTML = '<div class="example-card" style="cursor:default"><p class="ex-type">Tip</p><p class="ex-text">Never scan a QR code to receive money. QR = pay only.</p></div><div class="example-card" style="cursor:default"><p class="ex-type">Tip</p><p class="ex-text">PAN cards do not expire. Any message saying so is a scam.</p></div><div class="example-card" style="cursor:default"><p class="ex-type">Tip</p><p class="ex-text">Real banks never ask for OTP or CVV over phone or text.</p></div><div class="example-card" style="cursor:default"><p class="ex-type">Tip</p><p class="ex-text">If you sent money to a scammer, call 1930 within 1 hour.</p></div>';
+        });
+    })();
+
     // ── Evidence Bundle (on result, add download button) ──
     var origRender = renderResult;
     renderResult = function(r) {
@@ -1043,5 +1084,6 @@
       }
     };
   </script>
+  <audio id="tingSfx" src="/ting.wav" preload="auto"></audio>
 </body>
 </html>

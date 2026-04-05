@@ -1,13 +1,13 @@
 {
-  "name": "Chetana — scam help for India",
+  "name": "Chetana — Check karo. Safe raho.",
   "short_name": "Chetana",
   "description": "Paste a suspicious message, screenshot, link, or payment request and get the next safe step.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#060610",
-  "theme_color": "#3b82f6",
+  "background_color": "#fafaf8",
+  "theme_color": "#16a34a",
   "lang": "en-IN",
   "categories": ["security", "utilities"],
   "icons": [
@@ -23,18 +23,13 @@
       "title": "title",
       "text": "text",
       "url": "url",
-      "files": [
-        {
-          "name": "media",
-          "accept": ["image/*", "audio/*", "video/*", "application/pdf"]
-        }
-      ]
+      "files": [{ "name": "media", "accept": ["image/*"] }]
     }
   },
   "shortcuts": [
     {
-      "name": "Scan Message",
-      "short_name": "Scan",
+      "name": "Check something",
+      "short_name": "Check",
       "description": "Check a suspicious message now",
       "url": "/?action=scan",
       "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]

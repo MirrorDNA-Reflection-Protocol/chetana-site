@@ -1,9 +1,3 @@
 User-agent: *
 Allow: /
-
-# Priority pages
-Allow: /
-Allow: /favicon.svg
-Allow: /og-image.svg
-
 Sitemap: https://chetana.activemirror.ai/sitemap.xml

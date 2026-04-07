@@ -47,22 +47,22 @@ const DEFAULT_PROMPTS: Record<V0Mode, string> = {
 
 const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }> = {
   text: {
-    kicker: "Paste message or link",
-    title: "Paste the suspicious message, link, or UPI request.",
-    body: "Links, UPI IDs, and payment requests can all go in the same box.",
+    kicker: "FREE SCAM CHECKER FOR INDIA",
+    title: "Got a suspicious message? Check it now.",
+    body: "Paste any SMS, WhatsApp forward, link, UPI ID, phone number, or upload a screenshot. Chetana helps you check what looks safe and what looks suspicious.",
   },
   screenshot: {
-    kicker: "Upload screenshot",
-    title: "Upload the screenshot and add context only if it helps.",
+    kicker: "FREE SCAM CHECKER FOR INDIA",
+    title: "Upload the screenshot and check if it looks safe.",
     body: "Useful when the message is already on your phone screen or came through WhatsApp, SMS, or email.",
   },
   qr_image: {
-    kicker: "Check QR request",
+    kicker: "FREE SCAM CHECKER FOR INDIA",
     title: "Check the QR or payment payload before you scan and pay.",
     body: "Upload the QR image or paste the payment payload you can read.",
   },
   payment_screenshot: {
-    kicker: "Check payment proof",
+    kicker: "FREE SCAM CHECKER FOR INDIA",
     title: "Check payment proof before you hand over goods.",
     body: "Built for shopkeepers, delivery staff, and sellers who need a fast second opinion.",
   },
@@ -70,9 +70,8 @@ const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }>
 
 const FRONT_DOOR_TRUST = [
   "Free",
-  "Privacy-first",
+  "No login",
   "Built for India",
-  "No signup to start",
 ];
 
 const SAMPLE_SCAM_TEXT =
@@ -389,19 +388,18 @@ export default function ChetanaV0Experience({
     <section className="v0-shell">
       {showHero && (
         <div className="v0-hero">
-          <div className="v0-kicker">India-first scam check</div>
+          <div className="v0-kicker">{hero.kicker}</div>
           <h1>
-            <span className="v0-hero-line">Got something suspicious?</span>
-            <span className="v0-hero-line v0-hero-accent">Just scan it.</span>
+            <span className="v0-hero-line">{hero.title}</span>
           </h1>
-          <p>Check suspicious messages, links, QR codes, UPI/payment requests, and screenshots in seconds.</p>
+          <p>{hero.body}</p>
           <div className="v0-hero-actions">
             <button className="v0-submit" onClick={scrollToComposer}>
-              Scan now
+              Check a message
               <ArrowRight size={16} />
             </button>
             <button className="v0-ghost-button" onClick={loadSample}>
-              Try a sample scam
+              Try an example
             </button>
           </div>
           <div className="v0-trust-strip">
@@ -454,7 +452,7 @@ export default function ChetanaV0Experience({
 
             <div className="v0-quick-row">
               <button className="v0-quick-chip" onClick={loadSample}>
-                Try a sample scam
+                Try an example
               </button>
               {mode === "text" && (
                 <span className="v0-quick-note">You can paste a link, UPI ID, or payment request here too.</span>
@@ -494,7 +492,7 @@ export default function ChetanaV0Experience({
                 Private advisory tool. Not a government service. If money moved already, call 1930 first and contact your bank right away.
               </div>
               <button className="v0-submit" onClick={runScan} disabled={loading}>
-                {loading ? "Scanning..." : "Scan now"}
+                {loading ? "Checking..." : "Check now"}
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -712,7 +710,7 @@ export default function ChetanaV0Experience({
 
       {showHero && !result && (
         <button className="v0-mobile-cta" onClick={scrollToComposer}>
-          Scan now
+          Check a message
           <ArrowRight size={16} />
         </button>
       )}

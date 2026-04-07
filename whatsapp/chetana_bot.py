@@ -134,7 +134,12 @@ class ChetanaFSM(AbstractFSM):
         try:
             resp = httpx.post(
                 f"{CHETANA_URL}/api/scan/full",
-                json={"text": self.variables.user_text, "lang": "en"},
+                json={
+                    "text": self.variables.user_text,
+                    "channel": "whatsapp",
+                    "platform": "android",
+                    "language": "en",
+                },
                 timeout=15.0,
             )
             data = resp.json()
@@ -142,7 +147,8 @@ class ChetanaFSM(AbstractFSM):
             self.variables.threat_score = data.get("threat_score", 0)
             self.variables.risk_level = data.get("risk_level", "UNKNOWN")
             self.variables.explanation = data.get(
-                "explanation", "No details available."
+                "consequence_summary",
+                data.get("explanation", "No details available."),
             )
         except Exception:
             self.variables.threat_score = 0
@@ -158,6 +164,7 @@ class ChetanaFSM(AbstractFSM):
         score = self.variables.threat_score or 0
         risk = self.variables.risk_level or "UNKNOWN"
         expl = self.variables.explanation or ""
+        data = self.variables.scan_result or {}
 
         indicators = {
             "SAFE": "SAFE",
@@ -169,7 +176,21 @@ class ChetanaFSM(AbstractFSM):
         }
         label = indicators.get(risk, "UNKNOWN")
 
+        # Build enriched result with next steps
         body = f"*{label}* (threat score: {score}/100)\n\n{expl}"
+
+        # Add action recommendation
+        action = data.get("action_recommendation", "")
+        if action:
+            body += f"\n\n*What to do:* {action}"
+
+        # Add next steps from playbook
+        next_steps = data.get("next_steps", [])
+        if next_steps and score >= 20:
+            body += "\n\n*Steps:*"
+            for i, step in enumerate(next_steps[:5], 1):
+                body += f"\n{i}. {step}"
+
         self.send_message(FSMOutput(
             intent=FSMIntent.SEND_MESSAGE,
             message=Message(

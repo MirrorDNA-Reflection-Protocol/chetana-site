@@ -127,7 +127,7 @@ export default function VigilancePage() {
     URL.revokeObjectURL(url);
   };
 
-  const progressColor = chain.score >= 60 ? "#22c55e" : chain.score >= 30 ? "#f59e0b" : "#60a5fa";
+  const progressColor = chain.score >= 60 ? "#22c55e" : chain.score >= 30 ? "#f59e0b" : "#ff8a50";
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 860, margin: "0 auto" }}>

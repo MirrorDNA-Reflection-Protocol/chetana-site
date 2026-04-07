@@ -4,7 +4,7 @@
  */
 export default function GridPattern({
   size = 32,
-  color = "rgba(59, 130, 246, 0.08)",
+  color = "rgba(245, 166, 35, 0.08)",
 }: {
   size?: number;
   color?: string;

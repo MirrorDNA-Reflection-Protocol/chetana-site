@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 export default function SpotlightCard({
   children,
   className = "",
-  spotlightColor = "rgba(59, 130, 246, 0.12)",
+  spotlightColor = "rgba(245, 166, 35, 0.12)",
 }: {
   children: React.ReactNode;
   className?: string;

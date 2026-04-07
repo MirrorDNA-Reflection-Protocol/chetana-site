@@ -26,8 +26,8 @@ const GlobeAnim: React.FC<GlobeAnimProps> = ({ size = 200 }) => {
         100% { r: 90; opacity: 0; }
       }
       @keyframes ${id}-shieldPulse {
-        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(59,130,246,0.3)); }
-        50% { transform: scale(1.03); filter: drop-shadow(0 0 10px rgba(59,130,246,0.5)); }
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(245,166,35,0.3)); }
+        50% { transform: scale(1.03); filter: drop-shadow(0 0 10px rgba(245,166,35,0.5)); }
       }
       @keyframes ${id}-mapGlow {
         0%, 100% { fill: #F97316; filter: none; }

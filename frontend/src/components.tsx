@@ -36,7 +36,7 @@ export function BackgroundMesh() {
     <>
       <AuroraBackground />
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
-        <GridPattern size={40} color="rgba(59, 130, 246, 0.06)" />
+        <GridPattern size={40} color="rgba(245, 166, 35, 0.06)" />
         <Meteors count={8} />
       </div>
     </>
@@ -538,7 +538,7 @@ export function StatsStrip() {
   const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
   const personalScans = parseInt(localStorage.getItem("chetana_scan_count") || "0");
   const trustLevel = personalScans >= 50 ? "Helping many" : personalScans >= 20 ? "Regular helper" : personalScans >= 5 ? "Getting started" : personalScans >= 1 ? "First check done" : "New here";
-  const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#3b82f6" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "var(--muted)";
+  const trustColor = personalScans >= 50 ? "#a78bfa" : personalScans >= 20 ? "#f5a623" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "#f59e0b" : "var(--muted)";
 
   useEffect(() => {
     let cancelled = false;
@@ -1864,7 +1864,7 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
       <div className="feature-grid">
         {features.map((f, i) => (
           <ScrollReveal key={f.title} delay={i * 0.08}>
-            <SpotlightCard className="feature-card spotlight-card" spotlightColor={f.color === "blue" ? "rgba(59,130,246,0.12)" : f.color === "teal" ? "rgba(20,184,166,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(139,92,246,0.12)"}>
+            <SpotlightCard className="feature-card spotlight-card" spotlightColor={f.color === "blue" ? "rgba(245,166,35,0.12)" : f.color === "teal" ? "rgba(20,184,166,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(255,138,80,0.12)"}>
               <div style={{ padding: 28, position: "relative", zIndex: 1 }} onClick={() => onNavigate(f.click)}>
                 <div className={`feature-icon ${f.color}`}>{f.icon}</div>
                 <h3>{f.title}</h3>
@@ -1896,7 +1896,7 @@ export function EnterpriseSection({ onNavigate }: { onNavigate: (p: PageId) => v
       <div className="feature-grid">
         {features.map((f, i) => (
           <ScrollReveal key={f.title} delay={i * 0.08}>
-            <SpotlightCard className={`feature-card spotlight-card${f.highlight ? " enterprise-highlight" : ""}`} spotlightColor={f.color === "blue" ? "rgba(59,130,246,0.12)" : f.color === "safe" ? "rgba(16,185,129,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(139,92,246,0.12)"}>
+            <SpotlightCard className={`feature-card spotlight-card${f.highlight ? " enterprise-highlight" : ""}`} spotlightColor={f.color === "blue" ? "rgba(245,166,35,0.12)" : f.color === "safe" ? "rgba(16,185,129,0.12)" : f.color === "saffron" ? "rgba(245,158,11,0.12)" : "rgba(255,138,80,0.12)"}>
               <div style={{ padding: 28, position: "relative", zIndex: 1 }} onClick={() => onNavigate(f.click)}>
                 <div className={`feature-icon ${f.color}`}>{f.icon}</div>
                 <h3>{f.title}</h3>
@@ -2029,9 +2029,9 @@ export function MirrorGraph({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
         { selector: "node", style: {
           "background-color": (ele: any) => {
             const k = ele.data("kind");
-            if (k === "core") return "#3b82f6";
+            if (k === "core") return "#f5a623";
             if (k === "campaign") return "#ef4444";
-            if (k === "enterprise") return "#8b5cf6";
+            if (k === "enterprise") return "#e65100";
             if (k === "surface") return "#f59e0b";
             return "#6B7280";
           },

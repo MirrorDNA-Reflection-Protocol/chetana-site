@@ -65,9 +65,9 @@ const ScanAnim: React.FC<ScanAnimProps> = ({ size = 200 }) => {
       <svg viewBox="0 0 200 200" width={size} height={size}>
         <defs>
           <linearGradient id={`${id}-scanLine`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(59,130,246,0)" />
-            <stop offset="40%" stopColor="rgba(59,130,246,0.4)" />
-            <stop offset="100%" stopColor="rgba(59,130,246,0.8)" />
+            <stop offset="0%" stopColor="rgba(245,166,35,0)" />
+            <stop offset="40%" stopColor="rgba(245,166,35,0.4)" />
+            <stop offset="100%" stopColor="rgba(245,166,35,0.8)" />
           </linearGradient>
           <clipPath id={`${id}-phoneClip`}>
             <rect x="55" y="20" width="90" height="160" rx="12" />

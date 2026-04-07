@@ -14,8 +14,8 @@ const ShieldAnim: React.FC<ShieldAnimProps> = ({ size = 120 }) => {
     style.id = styleId;
     style.textContent = `
       @keyframes ${id}-pulse {
-        0%, 100% { filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.3)); }
-        50% { filter: drop-shadow(0 0 18px rgba(59, 130, 246, 0.6)); }
+        0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.3)); }
+        50% { filter: drop-shadow(0 0 18px rgba(245, 166, 35, 0.6)); }
       }
       @keyframes ${id}-drawCheck {
         0% { stroke-dashoffset: 40; }

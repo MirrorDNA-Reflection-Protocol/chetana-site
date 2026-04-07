@@ -4995,6 +4995,41 @@ body { top: 0 !important; }
 }
 
 
+/* ── Language Picker ───────────────────────────────── */
+.lang-picker { position: relative; }
+.lang-picker-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 100px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-bright);
+  color: var(--text-soft);
+  font-family: var(--font-ui);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all 0.3s;
+}
+.lang-picker-btn:hover { border-color: var(--primary); color: var(--text-bright); }
+.lang-picker-caret { font-size: 8px; opacity: 0.5; }
+.lang-picker-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 200;
+  min-width: 180px; padding: 6px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-bright);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+}
+.lang-picker-option {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: 10px 14px; border: none; border-radius: 10px;
+  background: transparent; color: var(--text-soft);
+  font-family: var(--font-ui);
+  font-size: 13px; cursor: pointer; transition: all 0.2s;
+}
+.lang-picker-option:hover { background: rgba(255,255,255,0.04); color: var(--text-bright); }
+.lang-picker-option.active { color: var(--primary); }
+.lang-picker-native { font-weight: 600; }
+.lang-picker-label { font-size: 11px; opacity: 0.5; }
+
 /* ── Theme Toggle & Mobile Overrides ─────────────────────────── */
 .theme-toggle {
   position: fixed;

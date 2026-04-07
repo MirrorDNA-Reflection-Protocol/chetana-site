@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import cytoscape from "cytoscape";
+import { useI18n } from "./i18n";
+import LanguagePicker from "./LanguagePicker";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -46,10 +48,11 @@ export function BackgroundMesh() {
 /* ── Nav ─────────────────────────────────────────────────────── */
 export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => void }) {
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
   const items: { id: PageId; label: string; activeOn: PageId[]; urgent?: boolean }[] = [
-    { id: "scan", label: "Check now", activeOn: ["home", "scan", "consumer"] },
-    { id: "merchant", label: "For shops", activeOn: ["merchant"] },
-    { id: "panic", label: "Help now", activeOn: ["panic", "incident"], urgent: true },
+    { id: "scan", label: t("nav_check"), activeOn: ["home", "scan", "consumer"] },
+    { id: "merchant", label: t("nav_shops"), activeOn: ["merchant"] },
+    { id: "panic", label: t("nav_help"), activeOn: ["panic", "incident"], urgent: true },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
   return (
@@ -71,6 +74,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
             {item.label}
           </button>
         ))}
+        <LanguagePicker />
         <button className="theme-toggle" onClick={() => {
           document.documentElement.classList.toggle("theme-light");
         }}>
@@ -78,7 +82,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         </button>
       </div>
       <div className="nav-right">
-        <div className="not-govt-badge" title="Chetana is a private advisory tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">Private tool</div>
+        <div className="not-govt-badge" title="Chetana is a private advisory tool. Not affiliated with Government of India, RBI, UIDAI, or any law enforcement.">{t("private_tool")}</div>
         <button className="nav-hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
           <span /><span /><span />
         </button>

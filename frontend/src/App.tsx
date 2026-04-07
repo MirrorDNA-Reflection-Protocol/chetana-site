@@ -11,6 +11,7 @@ import VigilancePage from "./VigilancePage";
 import StoryPage from "./StoryPage";
 import { threats, weather } from "./data";
 import ChetanaV0Experience from "./ChetanaV0Experience";
+import { I18nProvider } from "./i18n";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 export default function App() {
@@ -178,6 +179,7 @@ export default function App() {
   };
 
   return (
+    <I18nProvider>
     <div className="app-shell">
       <BackgroundMesh />
       <Nav page={page} setPage={setPage} />
@@ -273,5 +275,6 @@ export default function App() {
         </button>
       )}
     </div>
+    </I18nProvider>
   );
 }

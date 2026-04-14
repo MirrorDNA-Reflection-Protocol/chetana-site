@@ -3480,7 +3480,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <button onClick={() => onNavigate("panic")}>Need help now?</button>
             <button onClick={() => onNavigate("trust")}>How Chetana works</button>
             <button onClick={() => onNavigate("atlas")}>Common scams</button>
-            <button onClick={() => onNavigate("proof")}>Privacy & terms</button>
+            <button onClick={() => window.open("/privacy", "_blank", "noopener")}>Privacy policy</button>
           </div>
           <div className="footer-col">
             <h4>Official help</h4>

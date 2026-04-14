@@ -16,6 +16,7 @@ const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }
 export default function App() {
   const [page, _setPage] = useState<PageId>("home");
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
+  const [pendingPage, setPendingPage] = useState<PageId>("scan");
   const [sharedContent, setSharedContent] = useState<string | null>(null);
   const [sharedAttachment, setSharedAttachment] = useState<File | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
@@ -23,6 +24,7 @@ export default function App() {
 
   const setPage = (p: PageId) => {
     if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic") {
+      setPendingPage(p);
       _setPage("proof");
     } else {
       _setPage(p);
@@ -253,7 +255,14 @@ export default function App() {
 
             {page === "weather" && <SafetyRadar signals={weather} />}
             {page === "trust" && <TrustPage />}
-            {page === "proof" && <ProofPage onAccepted={() => { setTermsAccepted(true); setPage("scan"); }} />}
+            {page === "proof" && (
+              <ProofPage
+                onAccepted={() => {
+                  setTermsAccepted(true);
+                  _setPage(pendingPage);
+                }}
+              />
+            )}
             {page === "panic" && <PanicPage />}
             {page === "incident" && <IncidentStepper onNavigate={setPage} />}
             {page === "vigilance" && <VigilancePage />}

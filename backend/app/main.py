@@ -43,8 +43,13 @@ from app.v0_runtime import (  # noqa: E402
     V0EvidenceRequest,
     V0EventInput,
     V0ScanInput,
+    V0TrustRuntimeRequest,
     analyze_scan as analyze_v0_scan,
+    assess_send_guard,
+    build_merchant_release_assessment,
     build_evidence_pack,
+    build_recovery_packet,
+    build_trust_bundle,
     log_event as log_v0_event,
 )
 
@@ -237,6 +242,11 @@ def _load_council_keys() -> dict:
     return keys
 
 _COUNCIL_KEYS = _load_council_keys()
+_COUNCIL_BUDGET_SEC = 4.0
+_COUNCIL_LOCAL_MODELS: tuple[tuple[str, float], ...] = (
+    ("chetana-guard-fast", 3.0),
+    ("phi4-mini", 2.0),
+)
 
 
 async def _vote_deepseek(text: str) -> dict | None:
@@ -303,16 +313,15 @@ async def _vote_groq(text: str) -> dict | None:
 
 
 async def _vote_india(text: str) -> dict | None:
-    """India council vote — local Ollama model (vajra-shield or whatever is loaded)."""
+    """India council vote — prefer the fast local model and keep latency bounded."""
     try:
         client = await get_client()
-        # Try vajra-shield first (likely loaded), then chetana-guard-fast, then phi4-mini
-        for model in ["vajra-shield", "chetana-guard-fast", "phi4-mini"]:
+        for model, timeout_s in _COUNCIL_LOCAL_MODELS:
             try:
                 resp = await client.post(
                     f"{OLLAMA_URL}/api/generate",
                     json={"model": model, "prompt": _council_prompt(text), "stream": False, "keep_alive": "5m"},
-                    timeout=12.0,
+                    timeout=timeout_s,
                 )
                 if resp.status_code == 200:
                     raw = resp.json().get("response", "").strip()
@@ -320,7 +329,8 @@ async def _vote_india(text: str) -> dict | None:
                         vote = _parse_vote(raw, model, "India")
                         if vote:
                             return vote
-            except Exception:
+            except Exception as e:
+                logger.debug("India vote failed for %s: %s", model, e)
                 continue
     except Exception as e:
         logger.debug("India vote failed: %s", e)
@@ -351,14 +361,45 @@ async def scam_council(text: str) -> dict:
     DeepSeek (China) + Mistral (EU) + Groq/Llama (US) + Sarvam (India).
     Returns {council_score, council_verdict, council_votes, agreement}."""
     import asyncio
+
+    def _consume_task_result(task: asyncio.Task) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.debug("Council vote task failed: %s", e)
+
     tasks = [
-        _vote_deepseek(text),
-        _vote_mistral(text),
-        _vote_groq(text),
-        _vote_india(text),
+        asyncio.create_task(_vote_deepseek(text), name="deepseek"),
+        asyncio.create_task(_vote_mistral(text), name="mistral"),
+        asyncio.create_task(_vote_groq(text), name="groq"),
+        asyncio.create_task(_vote_india(text), name="india"),
     ]
-    results = await asyncio.gather(*tasks)
-    votes = [v for v in results if v is not None]
+    for task in tasks:
+        task.add_done_callback(_consume_task_result)
+    done, pending = await asyncio.wait(tasks, timeout=_COUNCIL_BUDGET_SEC)
+
+    if pending:
+        skipped = ", ".join(task.get_name() for task in pending)
+        logger.warning(
+            "Council budget exceeded after %.1fs; skipping: %s",
+            _COUNCIL_BUDGET_SEC,
+            skipped,
+        )
+        for task in pending:
+            task.cancel()
+
+    votes = []
+    for task in done:
+        try:
+            vote = task.result()
+        except asyncio.CancelledError:
+            continue
+        except Exception:
+            continue
+        if vote is not None:
+            votes.append(vote)
 
     if not votes:
         return {"council_score": None, "council_verdict": None, "council_votes": [], "agreement": 0, "models_voted": 0}
@@ -1360,7 +1401,7 @@ async def feeds_status():
 FAQ_ENTRIES = [
     {
         "keywords": ["scan", "check", "message", "link", "how does", "scanning", "analyze", "paste", "verify"],
-        "reply": "Chetana helps you check suspicious messages, screenshots, QR requests, and payment proofs. Paste or upload what you received and it returns a simple call: safe, risky, or unclear, with the safest next step.",
+        "reply": "Chetana helps you check suspicious messages, screenshots, QR requests, and payment proofs. Paste or upload what you received and it returns one of four evidence states: high risk, caution, needs review, or low signal, plus the safest next step.",
         "topic": "scanning",
     },
     {
@@ -1405,12 +1446,12 @@ FAQ_ENTRIES = [
     },
     {
         "keywords": ["whatsapp", "bot", "forward", "message forward"],
-        "reply": "The WhatsApp Bot lets you forward suspicious messages directly to Chetana on WhatsApp. It analyzes the content and sends back a trust verdict with safe next steps.",
+        "reply": "The WhatsApp Bot lets you forward suspicious messages directly to Chetana on WhatsApp. It analyzes the content and sends back an evidence state with the safest next step.",
         "topic": "whatsapp",
     },
     {
         "keywords": ["telegram", "telegram bot", "t.me", "chetna", "shield bot"],
-        "reply": "You can check suspicious messages on Telegram via @chetnaShieldBot. Just forward any message, link, or screenshot and get an instant scam verdict. Use /check to scan text, /scam for deep AI analysis, and /lang to switch between English and Hindi.",
+        "reply": "You can check suspicious messages on Telegram via @chetnaShieldBot. Just forward any message, link, or screenshot and get an instant evidence state with the next safest move. Use /check to scan text, /scam for deep AI analysis, and /lang to switch between English and Hindi.",
         "topic": "telegram",
     },
     {
@@ -2054,6 +2095,34 @@ async def v0_events(req: V0EventInput):
     """Append an anonymous v0 analytics event to the Chetana event log."""
     event = log_v0_event(req)
     return {"ok": True, "event": event.model_dump()}
+
+
+@app.post("/api/v0/trust/send-guard")
+async def v0_send_guard(req: V0TrustRuntimeRequest):
+    """Return the trust-runtime send decision for the current scan context."""
+    assessment = assess_send_guard(req)
+    return {"send_guard": assessment.model_dump()}
+
+
+@app.post("/api/v0/trust/recovery")
+async def v0_recovery(req: V0TrustRuntimeRequest):
+    """Return the structured recovery contract for the current scan context."""
+    packet = build_recovery_packet(req)
+    return {"recovery_packet": packet.model_dump()}
+
+
+@app.post("/api/v0/trust/merchant")
+async def v0_merchant_release(req: V0TrustRuntimeRequest):
+    """Return a merchant release decision for payment-proof or QR-driven disputes."""
+    assessment = build_merchant_release_assessment(req)
+    return {"merchant_release": assessment.model_dump() if assessment else None}
+
+
+@app.post("/api/v0/trust/bundle")
+async def v0_trust_bundle(req: V0TrustRuntimeRequest):
+    """Return the promoted trust-runtime bundle: send guard, merchant guard, and recovery."""
+    bundle = build_trust_bundle(req)
+    return {"trust_bundle": bundle.model_dump()}
 
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse

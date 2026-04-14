@@ -37,9 +37,10 @@
     "verdict": {
       "type": "string",
       "enum": [
-        "safe",
-        "risky",
-        "unclear"
+        "high_risk",
+        "caution",
+        "needs_review",
+        "low_signal"
       ]
     },
     "scam_type": {

@@ -150,6 +150,7 @@ export default function ChetanaV0Experience({
   showHero?: boolean;
 }) {
   const composerRef = useRef<HTMLDivElement | null>(null);
+  const resultRef = useRef<HTMLDivElement | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
   const [mode, setMode] = useState<V0Mode>(presetMode || (initialFile ? "screenshot" : "text"));
   const [text, setText] = useState(initialInput || "");
@@ -161,6 +162,7 @@ export default function ChetanaV0Experience({
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [showFullBreakdown, setShowFullBreakdown] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
@@ -192,6 +194,7 @@ export default function ChetanaV0Experience({
   const hero = useMemo(() => HERO_COPY[mode], [mode]);
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
+  const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
 
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
@@ -199,6 +202,7 @@ export default function ChetanaV0Experience({
     setTrustBundle(null);
     setError(null);
     setDetailsOpen(false);
+    setShowFullBreakdown(false);
     setShareCopied(false);
     setStatus(nextStatus);
   };
@@ -219,6 +223,13 @@ export default function ChetanaV0Experience({
   const scrollToComposer = () => {
     composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  useEffect(() => {
+    if (!result) return;
+    window.requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [result]);
 
   const loadSample = () => {
     setMode("text");
@@ -452,6 +463,13 @@ export default function ChetanaV0Experience({
     }).catch(() => {});
   };
 
+  const clearResult = () => {
+    setText("");
+    setFile(null);
+    resetScanState();
+    window.requestAnimationFrame(scrollToComposer);
+  };
+
   return (
     <section className="v0-shell">
       {showHero && (
@@ -529,7 +547,7 @@ export default function ChetanaV0Experience({
         </div>
       )}
 
-      <div className="v0-grid">
+      <div className={`v0-grid${result ? " v0-grid-result" : ""}`}>
         <div className="v0-main">
           <div className="v0-mode-grid">
             {V0_MODE_CARDS.map((card) => {
@@ -652,171 +670,163 @@ export default function ChetanaV0Experience({
           )}
 
           {result && (
-            <div className={`v0-result-card ${result.verdict}`}>
+            <div ref={resultRef} className={`v0-result-card ${result.verdict}`}>
               <ChetanaResultScreen
                 risk={riskFromVerdict(result.verdict)}
                 summary={verdictSummary(result)}
                 reasons={result.reasons.map((r) => r.label)}
                 onEmergencyHelp={openReportRail}
-                onCheckAnother={() => {
-                  setResult(null);
-                  setEvidence(null);
-                  setTrustBundle(null);
-                  setText("");
-                  setFile(null);
-                }}
-                onCreateMirrorSeed={() =>
-                  window.open("https://id.activemirror.ai/", "_blank", "noopener,noreferrer")
-                }
+                onCheckAnother={clearResult}
+                onToggleBreakdown={() => setShowFullBreakdown((current) => !current)}
+                showFullBreakdown={showFullBreakdown}
               />
 
-              {trustBundle && (
-                <div className="v0-trust-grid">
-                  <div className="v0-trust-card">
-                    <div className="v0-section-label">Send Guard</div>
-                    <div className={`v0-decision-chip ${trustBundle.send_guard.decision.toLowerCase()}`}>
-                      {sendGuardDecisionLabel(trustBundle.send_guard.decision)}
-                    </div>
-                    <p>
-                      Risk score: <strong>{trustBundle.send_guard.risk_score}</strong>
-                    </p>
-                    <ul className="v0-mini-list">
-                      {trustBundle.send_guard.decision_reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                    {trustBundle.send_guard.manipulation_signals.length > 0 && (
-                      <>
-                        <strong>Manipulation signals</strong>
-                        <div className="v0-preview-chips">
-                          {trustBundle.send_guard.manipulation_signals.map((signal) => (
-                            <span key={signal} className="v0-preview-chip">{signal}</span>
-                          ))}
-                        </div>
-                      </>
-                    )}
+              {result.verdict !== "low_signal" && (
+                <div className="v0-report-card v0-primary-support-card">
+                  <div className="v0-section-label">Official help</div>
+                  <strong>If money moved already, call 1930 first.</strong>
+                  <p>Then contact your bank and finish the report on cybercrime.gov.in. Do not keep arguing with the scammer.</p>
+                  <p className="v0-report-script">{reportScript(result)}</p>
+                  <div className="v0-inline-actions">
+                    <a href="tel:1930">
+                      <Phone size={14} /> Call 1930
+                    </a>
+                    <a href="https://cybercrime.gov.in" target="_blank" rel="noreferrer">
+                      <ExternalLink size={14} /> Open cybercrime.gov.in
+                    </a>
                   </div>
-
-                  {trustBundle.merchant_release && (
-                    <div className="v0-trust-card">
-                      <div className="v0-section-label">Merchant Guard</div>
-                      <div className={`v0-decision-chip ${trustBundle.merchant_release.decision.toLowerCase()}`}>
-                        {merchantDecisionLabel(trustBundle.merchant_release.decision)}
-                      </div>
-                      <p>
-                        Proof score: <strong>{trustBundle.merchant_release.proof_score}</strong> · Risk score:{" "}
-                        <strong>{trustBundle.merchant_release.risk_score}</strong>
-                      </p>
-                      {trustBundle.merchant_release.hold_until_utc && (
-                        <p>Hold until: {new Date(trustBundle.merchant_release.hold_until_utc).toLocaleString()}</p>
-                      )}
-                      <ul className="v0-mini-list">
-                        {trustBundle.merchant_release.decision_reasons.map((reason) => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {trustBundle.recovery_packet && (
-                    <div className="v0-trust-card">
-                      <div className="v0-section-label">Recovery Contract</div>
-                      <strong>{incidentTypeLabel(trustBundle.recovery_packet.incident_type)}</strong>
-                      <p>{trustBundle.recovery_packet.summary}</p>
-                      <ul className="v0-mini-list">
-                        {trustBundle.recovery_packet.immediate_actions.map((action) => (
-                          <li key={action}>{action}</li>
-                        ))}
-                      </ul>
-                      <div className="v0-rail-list">
-                        {trustBundle.recovery_packet.official_rails.map((rail) => {
-                          const href = rail.contact?.startsWith("http")
-                            ? rail.contact
-                            : rail.contact
-                              ? `tel:${rail.contact}`
-                              : rail.official_url;
-                          return (
-                            <div className="v0-rail-item" key={rail.rail_id}>
-                              <strong>{rail.name}</strong>
-                              <span>{rail.channel.replace(/_/g, " ")}</span>
-                              <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
-                                {rail.contact || rail.official_url}
-                              </a>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="v0-report-script">{trustBundle.recovery_packet.handoff_script}</p>
-                    </div>
-                  )}
                 </div>
               )}
-
-              {(result.share_shield_eligible || evidence) && (
-                <div className="v0-secondary-grid">
-                  {result.share_shield_eligible && (
-                    <div className="v0-share-card">
-                      <div className="v0-section-label">Warn someone else</div>
-                      <strong>
-                        {result.verdict === "high_risk"
-                          ? "High-risk warning ready"
-                          : result.verdict === "caution"
-                            ? "Caution note ready"
-                            : "Needs review note ready"}
-                      </strong>
-                      <p className="v0-share-preview">{shareText}</p>
-                      <div className="v0-inline-actions">
-                        <button onClick={copyShareShield}>
-                          <Copy size={14} /> {shareCopied ? "Copied" : "Copy warning"}
-                        </button>
-                        <button onClick={shareOnWhatsApp}>
-                          <Phone size={14} /> WhatsApp
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {evidence && (
-                    <div className="v0-evidence-card">
-                      <div className="v0-section-label">Save details</div>
-                      <strong>Download the basic report while the trail is still fresh.</strong>
-                      <p>{evidence.scan_summary}</p>
-                      <div className="v0-inline-actions">
-                        <button onClick={saveEvidence}>
-                          <Download size={14} /> Download report
-                        </button>
-                        <button onClick={openReportRail}>
-                          <ExternalLink size={14} /> Report or block
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="v0-report-card">
-                <div className="v0-section-label">Official help</div>
-                <strong>If money moved already, call 1930 first.</strong>
-                <p>Then contact your bank and finish the report on cybercrime.gov.in. Do not keep arguing with the scammer.</p>
-                <p className="v0-report-script">{reportScript(result)}</p>
-                <div className="v0-inline-actions">
-                  <a href="tel:1930">
-                    <Phone size={14} /> Call 1930
-                  </a>
-                  <a href="https://cybercrime.gov.in" target="_blank" rel="noreferrer">
-                    <ExternalLink size={14} /> Open cybercrime.gov.in
-                  </a>
-                </div>
-              </div>
 
               <button className="v0-details-toggle" onClick={() => setDetailsOpen((current) => !current)}>
                 <FileText size={14} />
-                {detailsOpen ? "Hide details" : "Why did Chetana say this?"}
+                {detailsOpen ? "Hide share, save, and proof details" : "Show share, save, and proof details"}
               </button>
               {detailsOpen && (
                 <div className="v0-details">
-                  {entitySections(result.entities).length > 0 && (
+                  {(result.share_shield_eligible || evidence) && (
+                    <div className="v0-secondary-grid">
+                      {result.share_shield_eligible && (
+                        <div className="v0-share-card">
+                          <div className="v0-section-label">Share this warning</div>
+                          <strong>
+                            {result.verdict === "high_risk"
+                              ? "High-risk warning ready"
+                              : result.verdict === "caution"
+                                ? "Caution note ready"
+                                : "Needs review note ready"}
+                          </strong>
+                          <p className="v0-share-preview">{shareText}</p>
+                          <div className="v0-inline-actions">
+                            <button onClick={copyShareShield}>
+                              <Copy size={14} /> {shareCopied ? "Copied" : "Copy warning"}
+                            </button>
+                            <button onClick={shareOnWhatsApp}>
+                              <Phone size={14} /> WhatsApp
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {evidence && (
+                        <div className="v0-evidence-card">
+                          <div className="v0-section-label">Save details</div>
+                          <strong>Download the basic report while the trail is still fresh.</strong>
+                          <p>{evidence.scan_summary}</p>
+                          <div className="v0-inline-actions">
+                            <button onClick={saveEvidence}>
+                              <Download size={14} /> Download report
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {trustBundle && (
+                    <div className="v0-trust-grid">
+                      <div className="v0-trust-card">
+                        <div className="v0-section-label">Send Guard</div>
+                        <div className={`v0-decision-chip ${trustBundle.send_guard.decision.toLowerCase()}`}>
+                          {sendGuardDecisionLabel(trustBundle.send_guard.decision)}
+                        </div>
+                        <p>
+                          Risk score: <strong>{trustBundle.send_guard.risk_score}</strong>
+                        </p>
+                        <ul className="v0-mini-list">
+                          {trustBundle.send_guard.decision_reasons.map((reason) => (
+                            <li key={reason}>{reason}</li>
+                          ))}
+                        </ul>
+                        {trustBundle.send_guard.manipulation_signals.length > 0 && (
+                          <>
+                            <strong>Manipulation signals</strong>
+                            <div className="v0-preview-chips">
+                              {trustBundle.send_guard.manipulation_signals.map((signal) => (
+                                <span key={signal} className="v0-preview-chip">{signal}</span>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {trustBundle.merchant_release && (
+                        <div className="v0-trust-card">
+                          <div className="v0-section-label">Merchant Guard</div>
+                          <div className={`v0-decision-chip ${trustBundle.merchant_release.decision.toLowerCase()}`}>
+                            {merchantDecisionLabel(trustBundle.merchant_release.decision)}
+                          </div>
+                          <p>
+                            Proof score: <strong>{trustBundle.merchant_release.proof_score}</strong> · Risk score:{" "}
+                            <strong>{trustBundle.merchant_release.risk_score}</strong>
+                          </p>
+                          {trustBundle.merchant_release.hold_until_utc && (
+                            <p>Hold until: {new Date(trustBundle.merchant_release.hold_until_utc).toLocaleString()}</p>
+                          )}
+                          <ul className="v0-mini-list">
+                            {trustBundle.merchant_release.decision_reasons.map((reason) => (
+                              <li key={reason}>{reason}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {trustBundle.recovery_packet && (
+                        <div className="v0-trust-card">
+                          <div className="v0-section-label">Recovery Contract</div>
+                          <strong>{incidentTypeLabel(trustBundle.recovery_packet.incident_type)}</strong>
+                          <p>{trustBundle.recovery_packet.summary}</p>
+                          <ul className="v0-mini-list">
+                            {trustBundle.recovery_packet.immediate_actions.map((action) => (
+                              <li key={action}>{action}</li>
+                            ))}
+                          </ul>
+                          <div className="v0-rail-list">
+                            {trustBundle.recovery_packet.official_rails.map((rail) => {
+                              const href = rail.contact?.startsWith("http")
+                                ? rail.contact
+                                : rail.contact
+                                  ? `tel:${rail.contact}`
+                                  : rail.official_url;
+                              return (
+                                <div className="v0-rail-item" key={rail.rail_id}>
+                                  <strong>{rail.name}</strong>
+                                  <span>{rail.channel.replace(/_/g, " ")}</span>
+                                  <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+                                    {rail.contact || rail.official_url}
+                                  </a>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="v0-report-script">{trustBundle.recovery_packet.handoff_script}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {resultEntitySections.length > 0 && (
                     <div className="v0-entity-grid">
-                      {entitySections(result.entities).map((section) => (
+                      {resultEntitySections.map((section) => (
                         <div key={section.label} className="v0-entity-card">
                           <strong>{section.label}</strong>
                           <ul>
@@ -829,14 +839,25 @@ export default function ChetanaV0Experience({
                     </div>
                   )}
                   {result.notes && <p className="v0-note">{result.notes}</p>}
+
+                  <div className="v0-evidence-card v0-context-card">
+                    <div className="v0-section-label">After the urgent part</div>
+                    <strong>Want stronger protection across tools?</strong>
+                    <p>Create a Mirror Seed after you have handled the immediate risk. It carries trusted context and safer defaults across future checks.</p>
+                    <div className="v0-inline-actions">
+                      <a href="https://id.activemirror.ai/" target="_blank" rel="noreferrer">
+                        <ExternalLink size={14} /> Create Mirror Seed
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <aside className="v0-side">
-          {!result && (
+        {!result && (
+          <aside className="v0-side">
             <div className="v0-side-card v0-preview-card">
               <div className="v0-section-label">Result preview</div>
               <strong>What a high-risk result looks like</strong>
@@ -851,7 +872,6 @@ export default function ChetanaV0Experience({
               </div>
               <p>Next step: warn family before anyone clicks or pays.</p>
             </div>
-          )}
 
           <div className="v0-side-card danger">
             <div className="v0-section-label">If money already went</div>
@@ -910,7 +930,8 @@ export default function ChetanaV0Experience({
               </div>
             )}
           </div>
-        </aside>
+          </aside>
+        )}
       </div>
 
       {showHero && !result && (
@@ -946,19 +967,20 @@ export default function ChetanaV0Experience({
         <a href="tel:181">Women Helpline 181</a>
       </div>
 
-      {/* Redesign 2026-04: WhatsApp share float */}
-      <a
-        href="https://wa.me/?text=Check%20suspicious%20messages%20free%20at%20chetana.activemirror.ai%20%F0%9F%9B%A1%EF%B8%8F%20Works%20in%2012%20Indian%20languages."
-        target="_blank"
-        rel="noopener noreferrer"
-        className="wa-float"
-        aria-label="Share on WhatsApp"
-      >
-        <svg viewBox="0 0 24 24">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.496A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.326-.735-6.012-1.978l-.42-.312-2.647.888.886-2.644-.343-.433A9.961 9.961 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
-        </svg>
-      </a>
+      {!result && (
+        <a
+          href="https://wa.me/?text=Check%20suspicious%20messages%20free%20at%20chetana.activemirror.ai%20%F0%9F%9B%A1%EF%B8%8F%20Works%20in%2012%20Indian%20languages."
+          target="_blank"
+          rel="noopener noreferrer"
+          className="wa-float"
+          aria-label="Share on WhatsApp"
+        >
+          <svg viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.496A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.326-.735-6.012-1.978l-.42-.312-2.647.888.886-2.644-.343-.433A9.961 9.961 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
+          </svg>
+        </a>
+      )}
 
       {/* Redesign 2026-04: Ambient glow */}
       <div className="glow-overlay" />

@@ -2,7 +2,7 @@ import { browserOCR } from "./localScanner";
 
 export type V0Mode = "text" | "screenshot" | "qr_image" | "payment_screenshot";
 export type V0InputType = "text" | "screenshot" | "qr_image" | "payment_screenshot" | "mixed";
-export type V0VerdictValue = "safe" | "risky" | "unclear";
+export type V0VerdictValue = "high_risk" | "caution" | "needs_review" | "low_signal";
 export type V0ScamType =
   | "investment_scam"
   | "fake_kyc"
@@ -25,9 +25,10 @@ export type V0EventName =
   | "app_open"
   | "scan_started"
   | "scan_completed"
-  | "verdict_safe"
-  | "verdict_risky"
-  | "verdict_unclear"
+  | "verdict_high_risk"
+  | "verdict_caution"
+  | "verdict_needs_review"
+  | "verdict_low_signal"
   | "share_tapped"
   | "share_completed"
   | "report_tapped"
@@ -83,6 +84,75 @@ export interface V0EvidencePack {
   user_notes?: string | null;
 }
 
+export interface V0OfficialRail {
+  rail_id: "BANK_APP_SUPPORT" | "CYBER_HELPLINE_1930" | "NCRP_PORTAL" | "RBI_CMS";
+  name: string;
+  channel: string;
+  contact?: string | null;
+  official_url: string;
+  verified_on: string;
+  use_when: string[];
+}
+
+export interface V0CasePacket {
+  amount_inr?: number | null;
+  transaction_reference?: string | null;
+  phone_numbers: string[];
+  urls: string[];
+  upi_ids: string[];
+  merchant_names: string[];
+  summary: string;
+}
+
+export interface V0RecoveryPacket {
+  packet_id: string;
+  generated_at_utc: string;
+  incident_type:
+    | "AUTHORIZED_PUSH_PAYMENT_FRAUD"
+    | "WRONG_RECIPIENT_TRANSFER"
+    | "MERCHANT_PAYMENT_DISPUTE"
+    | "IMPERSONATION_ATTEMPT_BLOCKED"
+    | "PAYMENT_DISPUTE";
+  summary: string;
+  immediate_actions: string[];
+  official_rails: V0OfficialRail[];
+  escalation_order: string[];
+  handoff_script: string;
+  case_packet: V0CasePacket;
+}
+
+export interface V0SendGuardAssessment {
+  assessment_id: string;
+  assessed_at_utc: string;
+  decision: "ALLOW" | "CONFIRM" | "COOLDOWN" | "HARD_STOP";
+  risk_score: number;
+  manipulation_signals: string[];
+  decision_reasons: string[];
+  interventions: string[];
+  recommended_actions: string[];
+  recovery_packet?: V0RecoveryPacket | null;
+}
+
+export interface V0MerchantReleaseAssessment {
+  session_id: string;
+  assessed_at_utc: string;
+  merchant_label?: string | null;
+  amount_inr?: number | null;
+  decision: "VERIFIED" | "PENDING" | "DO_NOT_RELEASE" | "EXPIRED";
+  proof_score: number;
+  risk_score: number;
+  hold_until_utc?: string | null;
+  decision_reasons: string[];
+  recommended_actions: string[];
+  recovery_packet?: V0RecoveryPacket | null;
+}
+
+export interface V0TrustBundle {
+  send_guard: V0SendGuardAssessment;
+  merchant_release?: V0MerchantReleaseAssessment | null;
+  recovery_packet?: V0RecoveryPacket | null;
+}
+
 export interface V0EventPayload {
   event_name: V0EventName;
   session_id: string;
@@ -97,6 +167,9 @@ export interface V0EventPayload {
   latency_ms?: number;
   device_class?: "android_phone" | "ios_phone" | "web" | "desktop" | "unknown";
   language_hint?: string;
+  consent_class?: "C0" | "C1" | "C2" | "C3" | "C4";
+  payload_class?: "derived_state" | "cross_surface_signal" | "save_intent" | "export_artifact";
+  persistence_class?: "P0" | "P1" | "P2" | "P3";
   metadata?: Record<string, unknown>;
 }
 
@@ -158,8 +231,8 @@ const ACTION_COPY: Record<V0RecommendedAction, { title: string; body: string }> 
     body: "A fuller screenshot, earlier messages, or the exact payment payload often makes the next call clearer.",
   },
   treat_as_unclear: {
-    title: "Treat it as unclear",
-    body: "If you are not sure, do not act like it is safe. Slow down and verify first.",
+    title: "Treat it as not cleared",
+    body: "If you are not sure, do not act like it is cleared. Slow down and verify first.",
   },
 };
 
@@ -184,9 +257,10 @@ export function getOrCreateV0SessionId(): string {
 }
 
 export function verdictLabel(verdict: V0VerdictValue): string {
-  if (verdict === "risky") return "This looks risky";
-  if (verdict === "unclear") return "Not enough proof yet";
-  return "Looks okay so far";
+  if (verdict === "high_risk") return "High risk";
+  if (verdict === "caution") return "Caution";
+  if (verdict === "needs_review") return "Needs review";
+  return "Low signal";
 }
 
 export function verdictSummary(verdict: V0Verdict): string {
@@ -221,7 +295,13 @@ export function shareShieldText(verdict: V0Verdict): string {
     ? `${actionCopy(verdict.recommended_actions[0]).title}.`
     : "";
   return [
-    verdict.verdict === "risky" ? "Possible scam. Pause before you pay or reply." : "Something feels off. Pause and verify.",
+    verdict.verdict === "high_risk"
+      ? "High-risk warning. Pause before you pay or reply."
+      : verdict.verdict === "caution"
+        ? "Caution. Multiple warning signs are present."
+        : verdict.verdict === "needs_review"
+          ? "Needs review. Pause and verify before you act."
+          : "Low signal. Get more proof before you trust it.",
     `${scamTypeLabel(verdict.scam_type)}.`,
     topReason,
     safestAction,
@@ -230,6 +310,28 @@ export function shareShieldText(verdict: V0Verdict): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function eventContract(eventName: V0EventName): Pick<V0EventPayload, "consent_class" | "payload_class" | "persistence_class"> {
+  if (eventName === "evidence_saved") {
+    return {
+      consent_class: "C3",
+      payload_class: "export_artifact",
+      persistence_class: "P3",
+    };
+  }
+  if (eventName === "share_completed" || eventName === "share_tapped" || eventName === "report_tapped") {
+    return {
+      consent_class: "C1",
+      payload_class: "cross_surface_signal",
+      persistence_class: eventName === "share_completed" ? "P3" : "P1",
+    };
+  }
+  return {
+    consent_class: "C0",
+    payload_class: "derived_state",
+    persistence_class: "P1",
+  };
 }
 
 export function reportScript(verdict: V0Verdict): string {
@@ -254,11 +356,37 @@ export function entitySections(entities?: V0Entities | null): Array<{ label: str
   return sections.filter((section) => section.values.length > 0);
 }
 
+export function sendGuardDecisionLabel(decision: V0SendGuardAssessment["decision"]): string {
+  if (decision === "HARD_STOP") return "Hard stop";
+  if (decision === "COOLDOWN") return "Cooldown";
+  if (decision === "CONFIRM") return "Confirm first";
+  return "Allow with verification";
+}
+
+export function merchantDecisionLabel(decision: V0MerchantReleaseAssessment["decision"]): string {
+  if (decision === "DO_NOT_RELEASE") return "Do not release";
+  if (decision === "PENDING") return "Pending";
+  if (decision === "VERIFIED") return "Verified";
+  return "Expired";
+}
+
+export function incidentTypeLabel(type: V0RecoveryPacket["incident_type"]): string {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export async function trackV0Event(payload: V0EventPayload): Promise<void> {
+  const contract = eventContract(payload.event_name);
   await fetch("/api/v0/events", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...contract,
+      ...payload,
+    }),
   });
 }
 

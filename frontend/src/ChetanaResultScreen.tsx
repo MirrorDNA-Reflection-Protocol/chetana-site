@@ -15,8 +15,6 @@ export type ChetanaResultProps = {
   reasons: ResultReason[];
   onEmergencyHelp?: () => void;
   onCheckAnother?: () => void;
-  onShare?: () => void;
-  onCreateMirrorSeed?: () => void;
   onToggleBreakdown?: () => void;
   showFullBreakdown?: boolean;
 };
@@ -70,8 +68,6 @@ export default function ChetanaResultScreen({
   reasons,
   onEmergencyHelp,
   onCheckAnother,
-  onShare,
-  onCreateMirrorSeed,
   onToggleBreakdown,
   showFullBreakdown = false,
 }: ChetanaResultProps) {
@@ -155,17 +151,12 @@ export default function ChetanaResultScreen({
             >
               Check another message
             </button>
-
-            {onShare && (
-              <button
-                type="button"
-                onClick={onShare}
-                className="rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-900"
-              >
-                Share with family
-              </button>
-            )}
           </div>
+          <p className="mt-3 text-sm text-zinc-600">
+            {risk === "high"
+              ? "If money already moved or you shared a code, stop here and use official help first."
+              : "If you already replied, paid, or shared a code, switch to official help next."}
+          </p>
         </div>
 
         <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4">
@@ -194,23 +185,6 @@ export default function ChetanaResultScreen({
             No login required. Paste only what is needed. Avoid sending full IDs,
             card numbers, passwords, or complete bank details.
           </p>
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4">
-          <p className="text-sm font-medium text-zinc-500">
-            Want stronger protection across tools?
-          </p>
-          <p className="mt-1 text-sm text-zinc-900">
-            Create a Mirror Seed to carry trusted context and safer defaults across
-            future checks.
-          </p>
-          <button
-            type="button"
-            onClick={onCreateMirrorSeed}
-            className="mt-3 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-900"
-          >
-            Create Mirror Seed
-          </button>
         </div>
 
         <div className="mt-5 text-xs text-zinc-500">

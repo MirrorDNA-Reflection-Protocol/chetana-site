@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
-  ShareCTA,
   IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
@@ -204,7 +203,6 @@ export default function App() {
                 initialInput={sharedContent}
                 initialFile={sharedAttachment}
               />
-              <ShareCTA />
             </>}
 
             {page === "consumer" && <>

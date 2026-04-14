@@ -13,7 +13,6 @@ import {
   QrCode,
   Shield,
   ShieldAlert,
-  ShieldCheck,
   Type,
   Upload,
 } from "lucide-react";
@@ -22,6 +21,7 @@ import {
   V0Mode,
   V0EvidencePack,
   V0EventName,
+  V0TrustBundle,
   V0Verdict,
   actionCopy,
   confidenceLabel,
@@ -29,14 +29,18 @@ import {
   entitySections,
   extractTextForMode,
   getOrCreateV0SessionId,
+  incidentTypeLabel,
+  merchantDecisionLabel,
   reportScript,
   scamTypeLabel,
+  sendGuardDecisionLabel,
   shareShieldText,
   trackV0Event,
   verdictLabel,
   verdictSummary,
   V0_MODE_CARDS,
 } from "./chetanaV0";
+import ChetanaResultScreen, { riskFromVerdict } from "./ChetanaResultScreen";
 
 const DEFAULT_PROMPTS: Record<V0Mode, string> = {
   text: "Paste the suspicious message, link, or UPI request here.",
@@ -49,11 +53,11 @@ const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }>
   text: {
     kicker: "FREE SCAM CHECKER FOR INDIA",
     title: "Got a suspicious message? Check it now.",
-    body: "Paste any SMS, WhatsApp forward, link, UPI ID, phone number, or upload a screenshot. Chetana helps you check what looks safe and what looks suspicious.",
+    body: "Paste any SMS, WhatsApp forward, link, UPI ID, phone number, or upload a screenshot. Chetana explains the risk and the safest next step without pretending certainty.",
   },
   screenshot: {
     kicker: "FREE SCAM CHECKER FOR INDIA",
-    title: "Upload the screenshot and check if it looks safe.",
+    title: "Upload the screenshot and see what risk signals show up.",
     body: "Useful when the message is already on your phone screen or came through WhatsApp, SMS, or email.",
   },
   qr_image: {
@@ -74,6 +78,44 @@ const FRONT_DOOR_TRUST = [
   "Built for India",
 ];
 
+const FRONT_DOOR_METRICS: Array<{ value: string; label: string }> = [
+  { value: "12", label: "Indian languages" },
+  { value: "4", label: "evidence states" },
+  { value: "1930", label: "recovery first step" },
+  { value: "0", label: "sign-up required" },
+];
+
+const HERO_CASES: Array<{
+  title: string;
+  body: string;
+  image: string;
+  actionLabel: string;
+  mode?: V0Mode;
+  href?: string;
+}> = [
+  {
+    title: "Suspicious message check",
+    body: "Paste the message, link, or bank scare text and get the safest next move.",
+    image: "/01-hero-grandmother.png",
+    actionLabel: "Start text check",
+    mode: "text",
+  },
+  {
+    title: "Payment proof lane",
+    body: "Use the merchant lane before you hand over goods or trust a screenshot.",
+    image: "/04-safe-hands.png",
+    actionLabel: "Check payment proof",
+    mode: "payment_screenshot",
+  },
+  {
+    title: "Demo short",
+    body: "Watch the live product reel instead of guessing from a static page.",
+    image: "/03-family-kitchen.png",
+    actionLabel: "Watch demo",
+    href: "/chetana_short_final.mp4",
+  },
+];
+
 const SAMPLE_SCAM_TEXT =
   "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
 
@@ -84,9 +126,10 @@ const RESULT_PREVIEW_REASONS = [
 ];
 
 function eventNameForVerdict(verdict: V0Verdict["verdict"]): V0EventName {
-  if (verdict === "risky") return "verdict_risky";
-  if (verdict === "unclear") return "verdict_unclear";
-  return "verdict_safe";
+  if (verdict === "high_risk") return "verdict_high_risk";
+  if (verdict === "caution") return "verdict_caution";
+  if (verdict === "needs_review") return "verdict_needs_review";
+  return "verdict_low_signal";
 }
 
 function deviceClass(): "web" | "desktop" {
@@ -115,6 +158,7 @@ export default function ChetanaV0Experience({
   const [status, setStatus] = useState("Ready when you are.");
   const [result, setResult] = useState<V0Verdict | null>(null);
   const [evidence, setEvidence] = useState<V0EvidencePack | null>(null);
+  const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -152,6 +196,7 @@ export default function ChetanaV0Experience({
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
     setEvidence(null);
+    setTrustBundle(null);
     setError(null);
     setDetailsOpen(false);
     setShareCopied(false);
@@ -164,6 +209,11 @@ export default function ChetanaV0Experience({
       setFile(null);
     }
     resetScanState();
+  };
+
+  const openModeLane = (nextMode: V0Mode) => {
+    selectMode(nextMode);
+    window.requestAnimationFrame(scrollToComposer);
   };
 
   const scrollToComposer = () => {
@@ -284,6 +334,24 @@ export default function ChetanaV0Experience({
         }
       }
 
+      try {
+        const trustResp = await fetch("/api/v0/trust/bundle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict: scanData,
+            input_text: extracted,
+            source_name: file?.name || null,
+          }),
+        });
+        if (trustResp.ok) {
+          const trustData = (await trustResp.json()) as { trust_bundle: V0TrustBundle };
+          setTrustBundle(trustData.trust_bundle);
+        }
+      } catch {
+        // The scan result is still useful even if the trust bundle request fails.
+      }
+
       setStatus("Done. Read this before you reply or pay.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Chetana could not complete the check right now.";
@@ -387,25 +455,76 @@ export default function ChetanaV0Experience({
   return (
     <section className="v0-shell">
       {showHero && (
-        <div className="v0-hero">
-          <div className="v0-kicker">{hero.kicker}</div>
-          <h1>
-            <span className="v0-hero-line">{hero.title}</span>
-          </h1>
-          <p>{hero.body}</p>
-          <div className="v0-hero-actions">
-            <button className="v0-submit" onClick={scrollToComposer}>
-              Check a message
-              <ArrowRight size={16} />
-            </button>
-            <button className="v0-ghost-button" onClick={loadSample}>
-              Try an example
-            </button>
+        <div className="v0-hero-shell">
+          <div className="v0-hero-panel">
+            <div className="v0-hero">
+              <div className="v0-kicker">{hero.kicker}</div>
+              <h1>
+                <span className="v0-hero-line">{hero.title}</span>
+              </h1>
+              <p>{hero.body}</p>
+              <div className="v0-hero-actions">
+                <button className="v0-submit" onClick={scrollToComposer}>
+                  Check a message
+                  <ArrowRight size={16} />
+                </button>
+                <button className="v0-ghost-button" onClick={loadSample}>
+                  Try an example
+                </button>
+              </div>
+              <div className="v0-trust-strip">
+                {FRONT_DOOR_TRUST.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="v0-metric-grid">
+              {FRONT_DOOR_METRICS.map((item) => (
+                <div key={item.label} className="v0-metric-card">
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="v0-trust-strip">
-            {FRONT_DOOR_TRUST.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
+
+          <div className="v0-hero-visual-stack">
+            <div className="v0-hero-photo-card">
+              <img
+                src="/01-hero-grandmother.png"
+                alt="Woman checking a suspicious message on her phone"
+                className="v0-hero-photo"
+              />
+              <div className="v0-hero-photo-copy">
+                <div className="v0-section-label">Built for real panic, not ideal users</div>
+                <strong>Messages, QR requests, screenshots, and fake payment proof.</strong>
+                <p>Start with the smallest safe move. Escalate fast if money already moved.</p>
+              </div>
+            </div>
+
+            <div className="v0-hero-proof-grid">
+              {HERO_CASES.map((item) => (
+                <article key={item.title} className="v0-hero-proof-card">
+                  <img src={item.image} alt={item.title} />
+                  <div className="v0-hero-proof-copy">
+                    <strong>{item.title}</strong>
+                    <p>{item.body}</p>
+                    {item.mode ? (
+                      <button onClick={() => openModeLane(item.mode!)}>
+                        {item.actionLabel}
+                        <ArrowRight size={14} />
+                      </button>
+                    ) : (
+                      <a href={item.href} target="_blank" rel="noreferrer">
+                        {item.actionLabel}
+                        <ArrowRight size={14} />
+                      </a>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -501,7 +620,7 @@ export default function ChetanaV0Experience({
 
           {showHero && !result && (
             <div className="v0-founder-card">
-              <div className="v0-section-label">Founder quick intro</div>
+              <div className="v0-section-label">Proof and demos</div>
               <div className="v0-founder-media">
                 <video
                   className="v0-founder-video"
@@ -514,8 +633,19 @@ export default function ChetanaV0Experience({
                 />
                 <div className="v0-founder-copy">
                   <strong>Don&apos;t guess. Don&apos;t click. Don&apos;t pay.</strong>
-                  <p>Just scan it with Chetana. Check karo, safe raho.</p>
+                  <p>Just scan it with Chetana. Check karo, pause karo.</p>
                   <span>Built for families, workers, and shopkeepers who need a fast second opinion.</span>
+                  <div className="v0-inline-actions">
+                    <a href="/founder-intro.mp4" target="_blank" rel="noreferrer">
+                      <ExternalLink size={14} /> Watch founder intro
+                    </a>
+                    <a href="/chetana_short_final.mp4" target="_blank" rel="noreferrer">
+                      <ExternalLink size={14} /> Watch demo short
+                    </a>
+                    <button onClick={() => openModeLane("payment_screenshot")}>
+                      <CreditCard size={14} /> Check payment proof
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -523,53 +653,117 @@ export default function ChetanaV0Experience({
 
           {result && (
             <div className={`v0-result-card ${result.verdict}`}>
-              <div className="v0-result-top">
-                <div>
-                  <div className={`v0-badge ${result.verdict}`}>
-                    {result.verdict === "risky" ? <ShieldAlert size={14} /> : result.verdict === "unclear" ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}
-                    {verdictLabel(result.verdict)}
-                  </div>
-                  <h3>{verdictSummary(result)}</h3>
-                </div>
-                <div className="v0-result-meta">
-                  <span>{scamTypeLabel(result.scam_type)}</span>
-                  <span>{confidenceLabel(result.confidence_band)}</span>
-                </div>
-              </div>
+              <ChetanaResultScreen
+                risk={riskFromVerdict(result.verdict)}
+                summary={verdictSummary(result)}
+                reasons={result.reasons.map((r) => r.label)}
+                onEmergencyHelp={openReportRail}
+                onCheckAnother={() => {
+                  setResult(null);
+                  setEvidence(null);
+                  setTrustBundle(null);
+                  setText("");
+                  setFile(null);
+                }}
+                onCreateMirrorSeed={() =>
+                  window.open("https://id.activemirror.ai/", "_blank", "noopener,noreferrer")
+                }
+              />
 
-              <div className="v0-reason-list">
-                {result.reasons.slice(0, 3).map((reason) => (
-                  <div key={reason.code} className="v0-reason-card">
-                    <strong>{reason.label}</strong>
-                    <p>{reason.explanation}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="v0-actions-panel">
-                <div className="v0-section-label">Safest next steps</div>
-                <div className="v0-step-list">
-                  {result.recommended_actions.map((action) => {
-                    const copy = actionCopy(action);
-                    return (
-                      <div key={action} className="v0-step-card">
-                        <div className="v0-step-icon"><Check size={14} /></div>
-                        <div>
-                          <strong>{copy.title}</strong>
-                          <p>{copy.body}</p>
+              {trustBundle && (
+                <div className="v0-trust-grid">
+                  <div className="v0-trust-card">
+                    <div className="v0-section-label">Send Guard</div>
+                    <div className={`v0-decision-chip ${trustBundle.send_guard.decision.toLowerCase()}`}>
+                      {sendGuardDecisionLabel(trustBundle.send_guard.decision)}
+                    </div>
+                    <p>
+                      Risk score: <strong>{trustBundle.send_guard.risk_score}</strong>
+                    </p>
+                    <ul className="v0-mini-list">
+                      {trustBundle.send_guard.decision_reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                    {trustBundle.send_guard.manipulation_signals.length > 0 && (
+                      <>
+                        <strong>Manipulation signals</strong>
+                        <div className="v0-preview-chips">
+                          {trustBundle.send_guard.manipulation_signals.map((signal) => (
+                            <span key={signal} className="v0-preview-chip">{signal}</span>
+                          ))}
                         </div>
+                      </>
+                    )}
+                  </div>
+
+                  {trustBundle.merchant_release && (
+                    <div className="v0-trust-card">
+                      <div className="v0-section-label">Merchant Guard</div>
+                      <div className={`v0-decision-chip ${trustBundle.merchant_release.decision.toLowerCase()}`}>
+                        {merchantDecisionLabel(trustBundle.merchant_release.decision)}
                       </div>
-                    );
-                  })}
+                      <p>
+                        Proof score: <strong>{trustBundle.merchant_release.proof_score}</strong> · Risk score:{" "}
+                        <strong>{trustBundle.merchant_release.risk_score}</strong>
+                      </p>
+                      {trustBundle.merchant_release.hold_until_utc && (
+                        <p>Hold until: {new Date(trustBundle.merchant_release.hold_until_utc).toLocaleString()}</p>
+                      )}
+                      <ul className="v0-mini-list">
+                        {trustBundle.merchant_release.decision_reasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {trustBundle.recovery_packet && (
+                    <div className="v0-trust-card">
+                      <div className="v0-section-label">Recovery Contract</div>
+                      <strong>{incidentTypeLabel(trustBundle.recovery_packet.incident_type)}</strong>
+                      <p>{trustBundle.recovery_packet.summary}</p>
+                      <ul className="v0-mini-list">
+                        {trustBundle.recovery_packet.immediate_actions.map((action) => (
+                          <li key={action}>{action}</li>
+                        ))}
+                      </ul>
+                      <div className="v0-rail-list">
+                        {trustBundle.recovery_packet.official_rails.map((rail) => {
+                          const href = rail.contact?.startsWith("http")
+                            ? rail.contact
+                            : rail.contact
+                              ? `tel:${rail.contact}`
+                              : rail.official_url;
+                          return (
+                            <div className="v0-rail-item" key={rail.rail_id}>
+                              <strong>{rail.name}</strong>
+                              <span>{rail.channel.replace(/_/g, " ")}</span>
+                              <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+                                {rail.contact || rail.official_url}
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="v0-report-script">{trustBundle.recovery_packet.handoff_script}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {(result.share_shield_eligible || evidence) && (
                 <div className="v0-secondary-grid">
                   {result.share_shield_eligible && (
                     <div className="v0-share-card">
                       <div className="v0-section-label">Warn someone else</div>
-                      <strong>{result.verdict === "risky" ? "Potential scam blocked" : "Pause and verify first"}</strong>
+                      <strong>
+                        {result.verdict === "high_risk"
+                          ? "High-risk warning ready"
+                          : result.verdict === "caution"
+                            ? "Caution note ready"
+                            : "Needs review note ready"}
+                      </strong>
                       <p className="v0-share-preview">{shareText}</p>
                       <div className="v0-inline-actions">
                         <button onClick={copyShareShield}>
@@ -645,17 +839,17 @@ export default function ChetanaV0Experience({
           {!result && (
             <div className="v0-side-card v0-preview-card">
               <div className="v0-section-label">Result preview</div>
-              <strong>What a risky result looks like</strong>
-              <div className="v0-badge risky">
+              <strong>What a high-risk result looks like</strong>
+              <div className="v0-badge high_risk">
                 <ShieldAlert size={14} />
-                Risky
+                High risk
               </div>
               <div className="v0-preview-chips">
                 {RESULT_PREVIEW_REASONS.map((reason) => (
                   <span key={reason} className="v0-preview-chip">{reason}</span>
                 ))}
               </div>
-              <p>Next safe step: share with family before anyone clicks or pays.</p>
+              <p>Next step: warn family before anyone clicks or pays.</p>
             </div>
           )}
 
@@ -686,14 +880,22 @@ export default function ChetanaV0Experience({
               <li>Payment screenshots before you hand over goods.</li>
               <li>Common India-facing scam patterns that pressure people to act fast.</li>
             </ul>
+            <div className="v0-inline-actions">
+              <button onClick={() => openModeLane("payment_screenshot")}>
+                <CreditCard size={14} /> Payment proof lane
+              </button>
+              <button onClick={() => openModeLane("qr_image")}>
+                <QrCode size={14} /> QR request check
+              </button>
+            </div>
           </div>
 
           <div className="v0-side-card">
             <div className="v0-section-label">How it works</div>
             <strong>Rules first. Model help only when the input is messy or visual.</strong>
             <ul>
-              <li>Chetana returns only three answers: safe, risky, or unclear.</li>
-              <li>If the signal is weak, it stays unclear instead of pretending certainty.</li>
+              <li>Chetana returns four evidence states: high risk, caution, needs review, or low signal.</li>
+              <li>Low signal does not mean safe. It means the current material was too thin for a stronger call.</li>
               <li>The result explains why and gives the next safest action.</li>
               <li>You can share a warning or save the evidence while details are fresh.</li>
             </ul>
@@ -702,6 +904,9 @@ export default function ChetanaV0Experience({
                 <button onClick={() => onNavigate("trust")}>
                   <FileText size={14} /> How it works
                 </button>
+                <a href="/chetana_short_final.mp4" target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} /> Watch demo
+                </a>
               </div>
             )}
           </div>
@@ -714,6 +919,49 @@ export default function ChetanaV0Experience({
           <ArrowRight size={16} />
         </button>
       )}
+
+      {/* Redesign 2026-04: Feature strip */}
+      {showHero && !result && (
+        <div className="feature-strip">
+          {[
+            { icon: "🆓", label: "Always free" },
+            { icon: "🔒", label: "Private" },
+            { icon: "🇮🇳", label: "12 Languages" },
+            { icon: "⚡", label: "Instant" },
+            { icon: "🤖", label: "AI-powered" },
+          ].map((f) => (
+            <div className="feature-strip-item" key={f.label}>
+              <div className="feature-strip-icon">{f.icon}</div>
+              <div className="feature-strip-text">{f.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Redesign 2026-04: Emergency helpline bar */}
+      <div className="emergency-bar">
+        Need help now?{" "}
+        <a href="tel:1930">Cybercrime Helpline 1930</a> ·{" "}
+        <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a> ·{" "}
+        <a href="tel:181">Women Helpline 181</a>
+      </div>
+
+      {/* Redesign 2026-04: WhatsApp share float */}
+      <a
+        href="https://wa.me/?text=Check%20suspicious%20messages%20free%20at%20chetana.activemirror.ai%20%F0%9F%9B%A1%EF%B8%8F%20Works%20in%2012%20Indian%20languages."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="wa-float"
+        aria-label="Share on WhatsApp"
+      >
+        <svg viewBox="0 0 24 24">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.496A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.326-.735-6.012-1.978l-.42-.312-2.647.888.886-2.644-.343-.433A9.961 9.961 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
+        </svg>
+      </a>
+
+      {/* Redesign 2026-04: Ambient glow */}
+      <div className="glow-overlay" />
     </section>
   );
 }

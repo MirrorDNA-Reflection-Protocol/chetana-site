@@ -5922,6 +5922,13 @@ body { top: 0 !important; }
   line-height: 1.7;
 }
 
+.pp-helper-line {
+  margin-top: 14px;
+  color: var(--primary-bright);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
 .pp-action-row,
 .pp-draft-actions {
   display: flex;
@@ -6052,6 +6059,35 @@ body { top: 0 !important; }
   border-color: rgba(232, 195, 114, 0.28);
   background: rgba(212, 162, 78, 0.12);
   color: var(--text);
+}
+
+.pp-check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.pp-check-pill {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pp-check-pill span {
+  color: var(--text-mid);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.pp-check-pill strong {
+  font-size: 18px;
+  line-height: 1.35;
 }
 
 .pp-meter-shell {
@@ -6309,6 +6345,7 @@ body { top: 0 !important; }
 
 @media (max-width: 920px) {
   .pp-signal-grid,
+  .pp-check-grid,
   .pp-route-grid,
   .pp-meta-grid {
     grid-template-columns: 1fr;
@@ -6339,6 +6376,10 @@ body { top: 0 !important; }
 
   .pp-lede {
     font-size: 16px;
+  }
+
+  .pp-helper-line {
+    font-size: 14px;
   }
 
   .pp-signal-card h2,

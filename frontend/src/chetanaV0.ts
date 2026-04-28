@@ -3,6 +3,7 @@ import { browserOCR } from "./localScanner";
 export type V0Mode = "text" | "screenshot" | "qr_image" | "payment_screenshot";
 export type V0InputType = "text" | "screenshot" | "qr_image" | "payment_screenshot" | "mixed";
 export type V0VerdictValue = "high_risk" | "caution" | "needs_review" | "low_signal";
+export type V0RiskLevel = "high" | "medium" | "low";
 export type V0ScamType =
   | "investment_scam"
   | "fake_kyc"
@@ -10,9 +11,17 @@ export type V0ScamType =
   | "fake_payment_proof"
   | "parcel_customs_scam"
   | "job_scam"
+  | "remote_support_scam"
   | "impersonation_pressure_scam"
   | "unknown_suspicious_pattern";
 export type V0ConfidenceBand = "low" | "medium" | "high";
+export type V0EvidenceState = "complete" | "partial" | "weak" | "conflicting";
+export type V0IncidentState =
+  | "suspected"
+  | "active_coercion"
+  | "payment_requested"
+  | "payment_attempted"
+  | "device_access_requested";
 export type V0RecommendedAction =
   | "do_not_pay"
   | "verify_with_official_source"
@@ -51,17 +60,34 @@ export interface V0Entities {
   person_names: string[];
 }
 
+export interface V0Guidance {
+  lead: string;
+  why_it_was_flagged: string[];
+  do_now: string[];
+  do_not_do: string[];
+  if_already_acted: string[];
+  verification_route: string;
+  false_positive_recovery: string;
+  calm_script: string;
+  source: "deterministic" | "ollama";
+}
+
 export interface V0Verdict {
   scan_id: string;
   timestamp_utc: string;
   input_type: V0InputType;
   language_hint?: string | null;
   verdict: V0VerdictValue;
+  risk_level: V0RiskLevel;
   scam_type: V0ScamType;
   confidence_band: V0ConfidenceBand;
+  evidence_state: V0EvidenceState;
+  incident_state: V0IncidentState;
   reasons: V0Reason[];
   entities?: V0Entities | null;
   summary_plain_language?: string | null;
+  safe_next_step?: string | null;
+  guidance: V0Guidance;
   recommended_actions: V0RecommendedAction[];
   share_shield_eligible: boolean;
   evidence_pack_eligible: boolean;
@@ -112,7 +138,12 @@ export interface V0RecoveryPacket {
     | "WRONG_RECIPIENT_TRANSFER"
     | "MERCHANT_PAYMENT_DISPUTE"
     | "IMPERSONATION_ATTEMPT_BLOCKED"
-    | "PAYMENT_DISPUTE";
+    | "PAYMENT_DISPUTE"
+    | "REMOTE_ACCESS_OR_DEVICE_COMPROMISE"
+    | "CREDENTIAL_THEFT_EXPOSURE";
+  urgency: "immediate" | "priority" | "monitor";
+  incident_state: V0IncidentState;
+  evidence_state: V0EvidenceState;
   summary: string;
   immediate_actions: string[];
   official_rails: V0OfficialRail[];
@@ -172,6 +203,89 @@ export interface V0EventPayload {
   persistence_class?: "P0" | "P1" | "P2" | "P3";
   metadata?: Record<string, unknown>;
 }
+
+const EVENT_SCHEMA_VERSION = "chetana.v0.analytics.v2";
+const LAUNCH_CONTEXT_KEY = "chetana_v0_launch_context";
+const EVENT_DEDUPE_CACHE_KEY = "chetana_v0_event_dedupe";
+const EVENT_QUEUE_KEY = "chetana_v0_event_queue";
+const MAX_EVENT_QUEUE_SIZE = 64;
+
+type LaunchContext = {
+  path: string;
+  search: string;
+  captured_at: string;
+};
+
+type TrackEventOptions = {
+  dedupeKey?: string;
+  dedupeTtlMs?: number;
+  keepalive?: boolean;
+};
+
+type TrackedEventPayload = Omit<V0EventPayload, "metadata"> & {
+  metadata: Record<string, unknown>;
+};
+
+let queueFlushPromise: Promise<void> | null = null;
+
+function snapshotLaunchContext(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: LaunchContext = {
+      path: window.location.pathname,
+      search: window.location.search,
+      captured_at: new Date().toISOString(),
+    };
+    window.sessionStorage?.setItem(LAUNCH_CONTEXT_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures. Events can still fall back to live location data.
+  }
+}
+
+function readLaunchContext(): LaunchContext | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage?.getItem(LAUNCH_CONTEXT_KEY);
+    if (!raw) return null;
+    const payload = JSON.parse(raw) as Partial<LaunchContext>;
+    if (typeof payload.path !== "string" || typeof payload.search !== "string") return null;
+    return {
+      path: payload.path,
+      search: payload.search,
+      captured_at: typeof payload.captured_at === "string" ? payload.captured_at : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function hasAttributionTokens(params: URLSearchParams): boolean {
+  if (params.has("share")) return true;
+  if (params.get("action") === "scan") return true;
+  if (params.get("source")) return true;
+  return ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].some((key) => params.has(key));
+}
+
+function attributionParams(): URLSearchParams {
+  const currentParams = new URLSearchParams(window.location.search);
+  if (hasAttributionTokens(currentParams)) return currentParams;
+  const launch = readLaunchContext();
+  if (!launch) return currentParams;
+  const launchParams = new URLSearchParams(launch.search);
+  return hasAttributionTokens(launchParams) ? launchParams : currentParams;
+}
+
+function pageVariant(params: URLSearchParams): string {
+  const queryPage = params.get("page");
+  if (queryPage) return queryPage;
+  if (params.has("share") || params.get("action") === "scan" || params.get("source") === "pwa") {
+    return "scan";
+  }
+  const path = window.location.pathname.replace(/^\/+/, "");
+  return path || "home";
+}
+
+snapshotLaunchContext();
 
 export const V0_MODE_CARDS: Array<{
   mode: V0Mode;
@@ -243,6 +357,7 @@ const SCAM_TYPE_COPY: Record<V0ScamType, string> = {
   fake_payment_proof: "Fake payment proof",
   parcel_customs_scam: "Parcel or customs fee scam",
   job_scam: "Job or recruitment scam",
+  remote_support_scam: "Remote support or app-install scam",
   impersonation_pressure_scam: "Impersonation or authority pressure scam",
   unknown_suspicious_pattern: "Unknown suspicious pattern",
 };
@@ -264,7 +379,7 @@ export function verdictLabel(verdict: V0VerdictValue): string {
 }
 
 export function verdictSummary(verdict: V0Verdict): string {
-  return verdict.summary_plain_language || verdictLabel(verdict.verdict);
+  return verdict.guidance?.lead || verdict.summary_plain_language || verdictLabel(verdict.verdict);
 }
 
 export function confidenceLabel(confidence: V0ConfidenceBand): string {
@@ -334,6 +449,214 @@ function eventContract(eventName: V0EventName): Pick<V0EventPayload, "consent_cl
   };
 }
 
+function currentDisplayMode(): string {
+  if (window.matchMedia?.("(display-mode: standalone)").matches) return "standalone";
+  if (window.matchMedia?.("(display-mode: minimal-ui)").matches) return "minimal-ui";
+  if (window.matchMedia?.("(display-mode: fullscreen)").matches) return "fullscreen";
+  return "browser";
+}
+
+function referrerHost(): string | null {
+  if (!document.referrer) return null;
+  try {
+    return new URL(document.referrer).hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+function entrySource(params: URLSearchParams): string {
+  if (params.has("share")) return "share_intent";
+  if (params.get("action") === "scan") return "pwa_scan_shortcut";
+  if (params.get("source") === "pwa") return "pwa_launch";
+  if (params.get("utm_source")) return "campaign";
+  if (document.referrer) return "referral";
+  if (currentDisplayMode() !== "browser") return "installed_app";
+  return "direct";
+}
+
+function buildEventContext(): Record<string, unknown> {
+  const params = attributionParams();
+  const launch = readLaunchContext();
+  const refHost = referrerHost();
+  return {
+    event_version: EVENT_SCHEMA_VERSION,
+    entry_source: entrySource(params),
+    page_path: window.location.pathname,
+    page_variant: pageVariant(params),
+    launch_path: launch?.path || window.location.pathname,
+    referrer_host: refHost,
+    utm_source: params.get("utm_source"),
+    utm_medium: params.get("utm_medium"),
+    utm_campaign: params.get("utm_campaign"),
+    utm_content: params.get("utm_content"),
+    utm_term: params.get("utm_term"),
+    source_param: params.get("source"),
+    action_param: params.get("action"),
+    display_mode: currentDisplayMode(),
+  };
+}
+
+function buildEventDedupeKey(payload: V0EventPayload): string {
+  const surface = typeof payload.metadata?.report_surface === "string" ? payload.metadata.report_surface : "";
+  const recoveryStep = typeof payload.metadata?.recovery_step === "string" ? payload.metadata.recovery_step : "";
+  return [
+    payload.event_name,
+    payload.session_id,
+    payload.scan_id || "",
+    payload.input_type || "",
+    payload.share_channel || "",
+    payload.report_target || "",
+    payload.verdict || "",
+    surface,
+    recoveryStep,
+  ].join(":");
+}
+
+function shouldTrackEventOnce(dedupeKey: string, dedupeTtlMs: number): boolean {
+  if (dedupeTtlMs <= 0) return true;
+  try {
+    const raw = window.sessionStorage?.getItem(EVENT_DEDUPE_CACHE_KEY);
+    const cache = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+    const now = Date.now();
+    for (const [key, seenAt] of Object.entries(cache)) {
+      if (typeof seenAt !== "number" || now - seenAt > Math.max(dedupeTtlMs, 30 * 60 * 1000)) {
+        delete cache[key];
+      }
+    }
+    const previous = cache[dedupeKey];
+    if (typeof previous === "number" && now - previous < dedupeTtlMs) {
+      return false;
+    }
+    cache[dedupeKey] = now;
+    window.sessionStorage?.setItem(EVENT_DEDUPE_CACHE_KEY, JSON.stringify(cache));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+function buildTrackedEventPayload(payload: V0EventPayload): TrackedEventPayload {
+  const contract = eventContract(payload.event_name);
+  const context = buildEventContext();
+  const metadata: Record<string, unknown> = {
+    ...context,
+    ...(payload.metadata || {}),
+  };
+  if (typeof metadata.client_event_id !== "string" || !metadata.client_event_id.trim()) {
+    metadata.client_event_id = `chetana-client-event-${crypto.randomUUID()}`;
+  }
+  if (typeof metadata.client_generated_at_utc !== "string" || !metadata.client_generated_at_utc.trim()) {
+    metadata.client_generated_at_utc = new Date().toISOString();
+  }
+  return {
+    ...contract,
+    ...payload,
+    metadata,
+  };
+}
+
+function readQueuedEvents(): TrackedEventPayload[] {
+  try {
+    const raw = window.localStorage?.getItem(EVENT_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as TrackedEventPayload[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeQueuedEvents(queue: TrackedEventPayload[]): void {
+  try {
+    if (!queue.length) {
+      window.localStorage?.removeItem(EVENT_QUEUE_KEY);
+      return;
+    }
+    window.localStorage?.setItem(EVENT_QUEUE_KEY, JSON.stringify(queue.slice(-MAX_EVENT_QUEUE_SIZE)));
+  } catch {
+    // Ignore storage failures. A best-effort event path is still better than dropping the UI flow.
+  }
+}
+
+function enqueueTrackedEvent(payload: TrackedEventPayload): void {
+  const clientEventId = typeof payload.metadata.client_event_id === "string" ? payload.metadata.client_event_id : "";
+  const queue = readQueuedEvents().filter((queued) => {
+    if (!clientEventId) return true;
+    return queued.metadata?.client_event_id !== clientEventId;
+  });
+  const metadata = {
+    ...payload.metadata,
+    queued_at_utc:
+      typeof payload.metadata.queued_at_utc === "string" ? payload.metadata.queued_at_utc : new Date().toISOString(),
+    delivery_status: "queued",
+  };
+  queue.push({ ...payload, metadata });
+  writeQueuedEvents(queue);
+}
+
+async function postTrackedEvent(payload: TrackedEventPayload, keepalive = true): Promise<boolean> {
+  if (typeof navigator !== "undefined" && "onLine" in navigator && navigator.onLine === false) {
+    return false;
+  }
+  try {
+    const response = await fetch("/api/v0/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive,
+      cache: "no-store",
+      body: JSON.stringify(payload),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function flushQueuedEvents(): Promise<void> {
+  if (queueFlushPromise) {
+    await queueFlushPromise;
+    return;
+  }
+  queueFlushPromise = (async () => {
+    const queue = readQueuedEvents();
+    if (!queue.length) return;
+
+    const remaining: TrackedEventPayload[] = [];
+    for (let index = 0; index < queue.length; index += 1) {
+      const payload = queue[index];
+      const ok = await postTrackedEvent(
+        {
+          ...payload,
+          metadata: {
+            ...payload.metadata,
+            delivery_status: "replayed",
+            replayed_at_utc: new Date().toISOString(),
+          },
+        },
+        true,
+      );
+      if (!ok) {
+        remaining.push(...queue.slice(index));
+        break;
+      }
+    }
+    writeQueuedEvents(remaining);
+  })();
+
+  try {
+    await queueFlushPromise;
+  } finally {
+    queueFlushPromise = null;
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => {
+    void flushQueuedEvents();
+  });
+}
+
 export function reportScript(verdict: V0Verdict): string {
   return [
     "Use this when you call 1930 or speak to your bank:",
@@ -378,16 +701,33 @@ export function incidentTypeLabel(type: V0RecoveryPacket["incident_type"]): stri
     .join(" ");
 }
 
-export async function trackV0Event(payload: V0EventPayload): Promise<void> {
-  const contract = eventContract(payload.event_name);
-  await fetch("/api/v0/events", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...contract,
-      ...payload,
-    }),
-  });
+export function incidentStateLabel(state: V0IncidentState): string {
+  if (state === "active_coercion") return "Active coercion";
+  if (state === "payment_requested") return "Payment requested";
+  if (state === "payment_attempted") return "Payment attempted";
+  if (state === "device_access_requested") return "Device access requested";
+  return "Suspicious contact";
+}
+
+export function evidenceStateLabel(state: V0EvidenceState): string {
+  if (state === "complete") return "Evidence: complete";
+  if (state === "partial") return "Evidence: partial";
+  if (state === "conflicting") return "Evidence: conflicting";
+  return "Evidence: weak";
+}
+
+export async function trackV0Event(payload: V0EventPayload, options: TrackEventOptions = {}): Promise<void> {
+  const dedupeTtlMs = options.dedupeTtlMs || 0;
+  const dedupeKey = options.dedupeKey || (dedupeTtlMs > 0 ? buildEventDedupeKey(payload) : "");
+  if (dedupeKey && !shouldTrackEventOnce(dedupeKey, dedupeTtlMs)) {
+    return;
+  }
+  const trackedPayload = buildTrackedEventPayload(payload);
+  await flushQueuedEvents();
+  const delivered = await postTrackedEvent(trackedPayload, options.keepalive ?? true);
+  if (!delivered) {
+    enqueueTrackedEvent(trackedPayload);
+  }
 }
 
 export function downloadJson(filename: string, payload: unknown): void {

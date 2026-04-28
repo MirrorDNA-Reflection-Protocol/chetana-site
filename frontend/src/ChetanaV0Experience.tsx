@@ -27,8 +27,10 @@ import {
   confidenceLabel,
   downloadJson,
   entitySections,
+  evidenceStateLabel,
   extractTextForMode,
   getOrCreateV0SessionId,
+  incidentStateLabel,
   incidentTypeLabel,
   merchantDecisionLabel,
   reportScript,
@@ -119,11 +121,81 @@ const HERO_CASES: Array<{
 const SAMPLE_SCAM_TEXT =
   "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
 
+const NCRP_SUSPECT_REPOSITORY_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx";
+const NCRP_SUSPECT_WEBSITES_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_websites.aspx";
+const NCRP_REPORT_SUSPECT_URL = "https://www.cybercrime.gov.in/Webform/cyber_suspect.aspx";
+const OFFICIAL_RAIL_EVENT_SURFACES: Record<string, string> = {
+  BANK_APP_SUPPORT: "bank_app_support",
+  CYBER_HELPLINE_1930: "call_1930",
+  NCRP_PORTAL: "cybercrime_portal",
+  RBI_CMS: "rbi_cms",
+};
+const RECOVERY_SURFACE_DEFAULTS: Record<string, {
+  recoveryStep: string;
+  recoveryChannel: string;
+  officialRailId?: string;
+  reportTarget?: "manual_report" | "other";
+}> = {
+  call_1930: {
+    recoveryStep: "hotline_call",
+    recoveryChannel: "phone",
+    officialRailId: "CYBER_HELPLINE_1930",
+    reportTarget: "manual_report",
+  },
+  cybercrime_portal: {
+    recoveryStep: "complaint_portal_open",
+    recoveryChannel: "web",
+    officialRailId: "NCRP_PORTAL",
+    reportTarget: "manual_report",
+  },
+  bank_app_support: {
+    recoveryStep: "bank_support_open",
+    recoveryChannel: "app_or_phone",
+    officialRailId: "BANK_APP_SUPPORT",
+    reportTarget: "manual_report",
+  },
+  rbi_cms: {
+    recoveryStep: "complaint_portal_open",
+    recoveryChannel: "web",
+    officialRailId: "RBI_CMS",
+    reportTarget: "manual_report",
+  },
+  ncrp_suspect_repository: {
+    recoveryStep: "suspect_lookup",
+    recoveryChannel: "web",
+    officialRailId: "NCRP_SUSPECT_REPOSITORY",
+    reportTarget: "other",
+  },
+  ncrp_suspect_websites: {
+    recoveryStep: "suspect_lookup",
+    recoveryChannel: "web",
+    officialRailId: "NCRP_SUSPECT_WEBSITES",
+    reportTarget: "other",
+  },
+  ncrp_report_suspect: {
+    recoveryStep: "complaint_portal_open",
+    recoveryChannel: "web",
+    officialRailId: "NCRP_REPORT_SUSPECT",
+    reportTarget: "manual_report",
+  },
+};
+
+type RecoveryActionOptions = {
+  reportTarget?: "manual_report" | "other";
+  recoveryStep?: string;
+  recoveryChannel?: string;
+  officialRailId?: string;
+  href?: string;
+};
+
 const RESULT_PREVIEW_REASONS = [
   "Suspicious payment request",
   "Urgency language",
   "Unknown sender",
 ];
+const APP_OPEN_TTL_MS = 30 * 60 * 1000;
+const TAP_EVENT_TTL_MS = 4_000;
+const EXPORT_EVENT_TTL_MS = 10_000;
 
 function eventNameForVerdict(verdict: V0Verdict["verdict"]): V0EventName {
   if (verdict === "high_risk") return "verdict_high_risk";
@@ -188,6 +260,10 @@ export default function ChetanaV0Experience({
       session_id: sessionId,
       device_class: deviceClass(),
       language_hint: navigator.language.slice(0, 2),
+    }, {
+      dedupeKey: `app_open:${sessionId}`,
+      dedupeTtlMs: APP_OPEN_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
   }, [sessionId]);
 
@@ -195,6 +271,18 @@ export default function ChetanaV0Experience({
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
+  const suspectLookupState = useMemo(() => {
+    const entities = result?.entities;
+    return {
+      hasDirectoryTargets: Boolean((entities?.phone_numbers.length || 0) > 0 || (entities?.upi_ids.length || 0) > 0),
+      hasWebsiteTargets: Boolean((entities?.urls.length || 0) > 0),
+      identifierCounts: {
+        phone_numbers: entities?.phone_numbers.length || 0,
+        upi_ids: entities?.upi_ids.length || 0,
+        urls: entities?.urls.length || 0,
+      },
+    };
+  }, [result?.entities]);
 
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
@@ -315,6 +403,8 @@ export default function ChetanaV0Experience({
           verdict: scanData.verdict,
           device_class: deviceClass(),
           language_hint: scanData.language_hint || navigator.language.slice(0, 2),
+        }, {
+          dedupeTtlMs: EXPORT_EVENT_TTL_MS,
         }).catch(() => {});
       } else if (Date.now() - previousTs <= 7 * 24 * 60 * 60 * 1000) {
         void trackV0Event({
@@ -325,6 +415,8 @@ export default function ChetanaV0Experience({
           verdict: scanData.verdict,
           device_class: deviceClass(),
           language_hint: scanData.language_hint || navigator.language.slice(0, 2),
+        }, {
+          dedupeTtlMs: EXPORT_EVENT_TTL_MS,
         }).catch(() => {});
       }
       localStorage.setItem("chetana_v0_scan_count", String(previousCount + 1));
@@ -384,6 +476,9 @@ export default function ChetanaV0Experience({
       share_channel: "copy_link",
       device_class: deviceClass(),
       language_hint: result.language_hint || navigator.language.slice(0, 2),
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
     await navigator.clipboard.writeText(shareText);
     setShareCopied(true);
@@ -397,6 +492,9 @@ export default function ChetanaV0Experience({
       share_channel: "copy_link",
       device_class: deviceClass(),
       language_hint: result.language_hint || navigator.language.slice(0, 2),
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
   };
 
@@ -411,6 +509,9 @@ export default function ChetanaV0Experience({
       share_channel: "whatsapp",
       device_class: deviceClass(),
       language_hint: result.language_hint || navigator.language.slice(0, 2),
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener");
     void trackV0Event({
@@ -422,6 +523,9 @@ export default function ChetanaV0Experience({
       share_channel: "whatsapp",
       device_class: deviceClass(),
       language_hint: result.language_hint || navigator.language.slice(0, 2),
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
   };
 
@@ -436,6 +540,40 @@ export default function ChetanaV0Experience({
       verdict: result.verdict,
       device_class: deviceClass(),
       language_hint: result.language_hint || navigator.language.slice(0, 2),
+      metadata: {
+        recovery_step: "evidence_download",
+        recovery_channel: "device_export",
+        artifact_kind: "json_report",
+      },
+    }, {
+      dedupeTtlMs: EXPORT_EVENT_TTL_MS,
+      keepalive: true,
+    }).catch(() => {});
+  };
+
+  const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
+    if (!result) return;
+    const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
+    void trackV0Event({
+      event_name: "report_tapped",
+      session_id: sessionId,
+      scan_id: result.scan_id,
+      input_type: result.input_type,
+      verdict: result.verdict,
+      report_target: options.reportTarget || defaults.reportTarget || "manual_report",
+      device_class: deviceClass(),
+      language_hint: result.language_hint || navigator.language.slice(0, 2),
+      metadata: {
+        report_surface: surface,
+        recovery_step: options.recoveryStep || defaults.recoveryStep,
+        recovery_channel: options.recoveryChannel || defaults.recoveryChannel,
+        official_rail_id: options.officialRailId || defaults.officialRailId,
+        href: options.href || null,
+        identifier_counts: suspectLookupState.identifierCounts,
+      },
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
     }).catch(() => {});
   };
 
@@ -448,19 +586,16 @@ export default function ChetanaV0Experience({
       result.scam_type === "fake_kyc";
     if (riskyMoneyCase) {
       window.open("tel:1930");
+      trackReportAction("call_1930", { href: "tel:1930" });
     } else {
       window.open("https://cybercrime.gov.in", "_blank", "noopener");
+      trackReportAction("cybercrime_portal", { href: "https://cybercrime.gov.in" });
     }
-    void trackV0Event({
-      event_name: "report_tapped",
-      session_id: sessionId,
-      scan_id: result.scan_id,
-      input_type: result.input_type,
-      verdict: result.verdict,
-      report_target: "manual_report",
-      device_class: deviceClass(),
-      language_hint: result.language_hint || navigator.language.slice(0, 2),
-    }).catch(() => {});
+  };
+
+  const openOfficialExternal = (href: string, surface: string, options: RecoveryActionOptions = {}) => {
+    window.open(href, href.startsWith("http") ? "_blank" : undefined, "noopener");
+    trackReportAction(surface, { ...options, href });
   };
 
   const clearResult = () => {
@@ -673,13 +808,49 @@ export default function ChetanaV0Experience({
             <div ref={resultRef} className={`v0-result-card ${result.verdict}`}>
               <ChetanaResultScreen
                 risk={riskFromVerdict(result.verdict)}
-                summary={verdictSummary(result)}
-                reasons={result.reasons.map((r) => r.label)}
+                summary={result.guidance?.lead || verdictSummary(result)}
+                nextStep={result.safe_next_step || result.guidance?.do_now?.[0]}
+                reasons={
+                  result.guidance?.why_it_was_flagged?.length
+                    ? result.guidance.why_it_was_flagged
+                    : result.reasons.map((r) => r.label)
+                }
+                doNotDo={result.guidance?.do_not_do || []}
+                verificationRoute={result.guidance?.verification_route}
+                contextChips={[
+                  incidentStateLabel(result.incident_state),
+                  evidenceStateLabel(result.evidence_state),
+                  confidenceLabel(result.confidence_band),
+                ]}
                 onEmergencyHelp={openReportRail}
                 onCheckAnother={clearResult}
                 onToggleBreakdown={() => setShowFullBreakdown((current) => !current)}
                 showFullBreakdown={showFullBreakdown}
               />
+
+              <div className="v0-report-card">
+                <div className="v0-section-label">Guided response</div>
+                <strong>{result.guidance.calm_script}</strong>
+                <div className="v0-secondary-grid">
+                  <div className="v0-evidence-card">
+                    <div className="v0-section-label">Do now</div>
+                    <ul className="v0-mini-list">
+                      {result.guidance.do_now.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="v0-evidence-card">
+                    <div className="v0-section-label">If you already acted</div>
+                    <ul className="v0-mini-list">
+                      {result.guidance.if_already_acted.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <p className="v0-note">{result.guidance.false_positive_recovery}</p>
+              </div>
 
               {result.verdict !== "low_signal" && (
                 <div className="v0-report-card v0-primary-support-card">
@@ -688,10 +859,18 @@ export default function ChetanaV0Experience({
                   <p>Then contact your bank and finish the report on cybercrime.gov.in. Do not keep arguing with the scammer.</p>
                   <p className="v0-report-script">{reportScript(result)}</p>
                   <div className="v0-inline-actions">
-                    <a href="tel:1930">
+                    <a
+                      href="tel:1930"
+                      onClick={() => trackReportAction("call_1930", { href: "tel:1930" })}
+                    >
                       <Phone size={14} /> Call 1930
                     </a>
-                    <a href="https://cybercrime.gov.in" target="_blank" rel="noreferrer">
+                    <a
+                      href="https://cybercrime.gov.in"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => trackReportAction("cybercrime_portal", { href: "https://cybercrime.gov.in" })}
+                    >
                       <ExternalLink size={14} /> Open cybercrime.gov.in
                     </a>
                   </div>
@@ -794,6 +973,9 @@ export default function ChetanaV0Experience({
                         <div className="v0-trust-card">
                           <div className="v0-section-label">Recovery Contract</div>
                           <strong>{incidentTypeLabel(trustBundle.recovery_packet.incident_type)}</strong>
+                          <p>
+                            Urgency: <strong>{trustBundle.recovery_packet.urgency}</strong> · {incidentStateLabel(trustBundle.recovery_packet.incident_state)} · {evidenceStateLabel(trustBundle.recovery_packet.evidence_state)}
+                          </p>
                           <p>{trustBundle.recovery_packet.summary}</p>
                           <ul className="v0-mini-list">
                             {trustBundle.recovery_packet.immediate_actions.map((action) => (
@@ -811,7 +993,18 @@ export default function ChetanaV0Experience({
                                 <div className="v0-rail-item" key={rail.rail_id}>
                                   <strong>{rail.name}</strong>
                                   <span>{rail.channel.replace(/_/g, " ")}</span>
-                                  <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+                                  <a
+                                    href={href}
+                                    target={href.startsWith("http") ? "_blank" : undefined}
+                                    rel="noreferrer"
+                                    onClick={() => trackReportAction(
+                                      OFFICIAL_RAIL_EVENT_SURFACES[rail.rail_id] || `official_${rail.rail_id.toLowerCase()}`,
+                                      {
+                                        href,
+                                        officialRailId: rail.rail_id,
+                                      },
+                                    )}
+                                  >
                                     {rail.contact || rail.official_url}
                                   </a>
                                 </div>
@@ -836,6 +1029,43 @@ export default function ChetanaV0Experience({
                           </ul>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {result.verdict !== "low_signal" && (suspectLookupState.hasDirectoryTargets || suspectLookupState.hasWebsiteTargets) && (
+                    <div className="v0-evidence-card v0-context-card">
+                      <div className="v0-section-label">Official suspect lookup</div>
+                      <strong>Cross-check the identifier in NCRP before you trust it or forward it.</strong>
+                      <p>
+                        The NCRP suspect repository is complaint-based, not definitive truth, but it is an official second check for phone numbers, UPI IDs, and suspicious websites.
+                      </p>
+                      <div className="v0-inline-actions">
+                        {suspectLookupState.hasDirectoryTargets && (
+                          <button
+                            onClick={() => openOfficialExternal(
+                              NCRP_SUSPECT_REPOSITORY_URL,
+                              "ncrp_suspect_repository",
+                              { reportTarget: "other" },
+                            )}
+                          >
+                            <ExternalLink size={14} /> Check mobile / UPI
+                          </button>
+                        )}
+                        {suspectLookupState.hasWebsiteTargets && (
+                          <button
+                            onClick={() => openOfficialExternal(
+                              NCRP_SUSPECT_WEBSITES_URL,
+                              "ncrp_suspect_websites",
+                              { reportTarget: "other" },
+                            )}
+                          >
+                            <ExternalLink size={14} /> Check website / app
+                          </button>
+                        )}
+                        <button onClick={() => openOfficialExternal(NCRP_REPORT_SUSPECT_URL, "ncrp_report_suspect")}>
+                          <ExternalLink size={14} /> Report suspect to I4C
+                        </button>
+                      </div>
                     </div>
                   )}
                   {result.notes && <p className="v0-note">{result.notes}</p>}

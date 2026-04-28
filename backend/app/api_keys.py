@@ -59,9 +59,14 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 # ── Database ──────────────────────────────────────────────────────────────
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.OperationalError:
+        # WAL can fail intermittently under launchd restarts or filesystem pressure.
+        # Fall back to the default journal mode instead of crashing import-time startup.
+        conn.execute("PRAGMA journal_mode=DELETE")
     return conn
 
 

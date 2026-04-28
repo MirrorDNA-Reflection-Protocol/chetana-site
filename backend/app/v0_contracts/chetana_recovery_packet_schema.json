@@ -6,6 +6,9 @@
     "packet_id",
     "generated_at_utc",
     "incident_type",
+    "urgency",
+    "incident_state",
+    "evidence_state",
     "summary",
     "immediate_actions",
     "official_rails",
@@ -23,8 +26,28 @@
         "WRONG_RECIPIENT_TRANSFER",
         "MERCHANT_PAYMENT_DISPUTE",
         "IMPERSONATION_ATTEMPT_BLOCKED",
-        "PAYMENT_DISPUTE"
+        "PAYMENT_DISPUTE",
+        "REMOTE_ACCESS_OR_DEVICE_COMPROMISE",
+        "CREDENTIAL_THEFT_EXPOSURE"
       ]
+    },
+    "urgency": {
+      "type": "string",
+      "enum": ["immediate", "priority", "monitor"]
+    },
+    "incident_state": {
+      "type": "string",
+      "enum": [
+        "suspected",
+        "active_coercion",
+        "payment_requested",
+        "payment_attempted",
+        "device_access_requested"
+      ]
+    },
+    "evidence_state": {
+      "type": "string",
+      "enum": ["complete", "partial", "weak", "conflicting"]
     },
     "summary": { "type": "string" },
     "immediate_actions": {

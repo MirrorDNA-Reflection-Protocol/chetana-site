@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chetana — Check Before You Act</title>
+<meta name="description" content="Free AI scam detection for India. Check suspicious messages, calls, UPI requests, and deepfakes in 12 Indian languages.">
+<meta name="theme-color" content="#08070c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08070c;--surface:rgba(255,255,255,0.025);--border:rgba(255,255,255,0.06);--text:#ede9e0;--sub:#8a8478;--dim:#3a3630;--amber:#d4a24e;--amber-l:#e8c372;--amber-g:rgba(212,162,78,0.08);--green:#5cb97a;--red:#c47a7a;--serif:'Instrument Serif',Georgia,serif;--sans:'Syne',sans-serif;--mono:'Geist Mono',monospace;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:0.3;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");}
+.glow{position:fixed;top:-20%;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(212,162,78,0.05) 0%,transparent 65%);pointer-events:none;z-index:0;}
+nav{padding:20px 24px;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:10;}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-shield{font-size:20px;}.nav-name{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:2px;color:var(--amber);}
+.nav-by{font-family:var(--mono);font-size:8px;color:var(--dim);}.nav-by a{color:var(--sub);text-decoration:none;}
+.nav-right{display:flex;gap:16px;align-items:center;}
+.nav-lang{font-family:var(--mono);font-size:9px;color:var(--sub);padding:4px 10px;border:1px solid var(--border);border-radius:3px;background:transparent;cursor:pointer;}
+.nav-help{font-family:var(--mono);font-size:8px;color:var(--dim);text-decoration:none;}.nav-help:hover{color:var(--amber);}main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px 40px;position:relative;z-index:1;text-align:center;}
+.lang-cycle{font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--amber);margin-bottom:16px;height:14px;opacity:0.7;transition:opacity 0.4s;}
+h1{font-family:var(--serif);font-size:clamp(32px,6vw,56px);font-weight:400;line-height:1.15;letter-spacing:-0.5px;margin-bottom:8px;}
+h1 em{font-style:italic;color:var(--amber);}
+.subtitle{font-size:14px;color:var(--sub);margin-bottom:36px;line-height:1.6;max-width:400px;}
+.check-box{width:100%;max-width:520px;position:relative;}
+.check-textarea{width:100%;min-height:120px;max-height:300px;padding:18px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(212,162,78,0.25);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.6;resize:vertical;outline:none;transition:border-color 0.3s,box-shadow 0.3s;}
+.check-textarea:focus{border-color:var(--amber);box-shadow:0 0 40px rgba(212,162,78,0.08);}
+.check-textarea::placeholder{color:var(--dim);font-size:14px;}
+.check-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;}
+.check-btn{padding:12px 24px;background:var(--amber);color:var(--bg);font-family:var(--sans);font-size:13px;font-weight:600;border:none;border-radius:6px;cursor:pointer;transition:all 0.3s;letter-spacing:0.5px;}
+.check-btn:hover{opacity:0.9;transform:translateY(-1px);}
+.check-alt{padding:12px 16px;background:transparent;color:var(--sub);font-family:var(--mono);font-size:10px;letter-spacing:1px;border:1px solid var(--border);border-radius:6px;cursor:pointer;transition:all 0.3s;}
+.check-alt:hover{color:var(--amber);border-color:rgba(212,162,78,0.2);}
+.check-hint{font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:12px;letter-spacing:0.5px;line-height:1.6;}
+.tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;justify-content:center;}
+.tab{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--sub);cursor:pointer;transition:all 0.3s;background:transparent;}
+.tab.active,.tab:hover{color:var(--amber);border-color:rgba(212,162,78,0.25);background:var(--amber-g);}
+.emergency{padding:10px 24px;background:rgba(196,122,122,0.06);border-top:1px solid rgba(196,122,122,0.1);text-align:center;font-family:var(--mono);font-size:8px;letter-spacing:0.5px;color:var(--sub);position:relative;z-index:10;}
+.emergency a{color:var(--red);text-decoration:none;font-weight:500;}.emergency a:hover{text-decoration:underline;}
+.features{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-top:40px;padding-top:32px;border-top:1px solid var(--border);max-width:520px;}
+.feat{text-align:center;}.feat-icon{font-size:18px;margin-bottom:4px;}.feat-text{font-family:var(--mono);font-size:8px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;}
+footer{padding:16px 24px;text-align:center;font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:0.5px;position:relative;z-index:10;}
+footer a{color:var(--sub);text-decoration:none;}.wa-float{position:fixed;bottom:20px;right:20px;width:48px;height:48px;background:#25d366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,211,102,0.3);z-index:100;text-decoration:none;transition:transform 0.3s;}
+.wa-float:hover{transform:scale(1.1);}.wa-float svg{width:24px;height:24px;fill:#fff;}
+@media(max-width:480px){.features{gap:16px;}.tabs{gap:3px;}.tab{padding:5px 10px;font-size:8px;}}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<nav>
+  <a href="/" class="nav-logo"><span class="nav-shield">🛡️</span><div><div class="nav-name">CHETANA</div><div class="nav-by">by <a href="https://activemirror.ai">Active Mirror</a></div></div></a>
+  <div class="nav-right"><button class="nav-lang" id="langToggle">EN</button><a href="#help" class="nav-help">How it works</a></div>
+</nav>
+<main>
+  <div class="lang-cycle" id="langCycle"></div>
+  <h1>Check before<br>you <em>act.</em></h1>
+  <p class="subtitle">Not sure if something is safe? Paste it here. Get a calm, clear answer — in your language, in seconds.</p>
+  <div class="tabs">
+    <button class="tab active">📝 Paste text</button><button class="tab">📸 Screenshot</button><button class="tab">🔗 Link / URL</button><button class="tab">💳 UPI / QR</button><button class="tab">🎤 Voice note</button>
+  </div>
+  <div class="check-box">
+    <textarea class="check-textarea" id="checkInput" placeholder="Paste a suspicious SMS, WhatsApp message, email, call detail, or link..."></textarea>
+    <div class="check-actions">
+      <button class="check-btn" id="checkBtn">🛡️ Check this message</button>
+      <button class="check-alt">📎 Upload file</button>
+      <button class="check-alt">📷 Take photo</button>
+    </div>
+    <div class="check-hint">Free · Private · No sign-up · No data stored · Works in 12 Indian languages<br>Quick checks are instant · Full AI scans take 5–20s · Voice/video 15–60s</div>
+  </div>
+  <div class="features">
+    <div class="feat"><div class="feat-icon">🆓</div><div class="feat-text">Always free</div></div>
+    <div class="feat"><div class="feat-icon">🔒</div><div class="feat-text">Private</div></div>
+    <div class="feat"><div class="feat-icon">🇮🇳</div><div class="feat-text">12 Languages</div></div>
+    <div class="feat"><div class="feat-icon">⚡</div><div class="feat-text">Instant</div></div>
+    <div class="feat"><div class="feat-icon">🤖</div><div class="feat-text">AI-powered</div></div>
+  </div>
+</main><div class="emergency">
+  Need help now? <a href="tel:1930">Cybercrime Helpline 1930</a> · <a href="https://cybercrime.gov.in" target="_blank">cybercrime.gov.in</a> · <a href="tel:181">Women Helpline 181</a>
+</div>
+<footer>
+  <a href="https://activemirror.ai">Active Mirror</a> · <a href="https://activemirror.ai/privacy">Privacy</a> · <a href="https://activemirror.ai/trust">Trust & Limits</a><br>
+  Mirror · Chetana — Reflective, not predictive.
+</footer>
+<a href="https://wa.me/?text=Check%20suspicious%20messages%20free%20at%20chetana.activemirror.ai%20%F0%9F%9B%A1%EF%B8%8F%20Works%20in%2012%20Indian%20languages." target="_blank" class="wa-float">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.496A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.326-.735-6.012-1.978l-.42-.312-2.647.888.886-2.644-.343-.433A9.961 9.961 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+<script>
+const langs=["जाँचें फिर कार्य करें","சரிபார்க்கவும் பின் செயல்படுங்கள்","తనిఖీ చేసి చర్య తీసుకోండి","যাচাই করুন তারপর পদক্ষেপ নিন","तपासा मग कृती करा","તપાસો પછી કાર્ય કરો","ಪರಿಶೀಲಿಸಿ ನಂತರ ಕ್ರಮ ತೆಗೆದುಕೊಳ್ಳಿ","പരിശോധിക്കുക പിന്നെ പ്രവർത്തിക്കുക","ଯାଞ୍ଚ କରନ୍ତୁ ତାପରେ କାର୍ଯ୍ୟ କରନ୍ତୁ","পৰীক্ষা কৰক তাৰ পিছত কাম কৰক","ਜਾਂਚੋ ਫਿਰ ਕੰਮ ਕਰੋ","Check before you act"];
+let li=0;const lc=document.getElementById('langCycle');
+function cyc(){lc.style.opacity='0';setTimeout(()=>{lc.textContent=langs[li];lc.style.opacity='0.7';li=(li+1)%langs.length;},300);}
+setInterval(cyc,2400);cyc();
+document.querySelectorAll('.tab').forEach(t=>{t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');});});
+</script>
+</body>
+</html>

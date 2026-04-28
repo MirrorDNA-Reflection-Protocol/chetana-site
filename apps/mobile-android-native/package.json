@@ -1,0 +1,16 @@
+{
+  "name": "chetana-mobile-android-native-track",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "react": "18.3.1",
+    "react-native": "0.76.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,58 +1,78 @@
 """
-Chetana B2B API Router — /api/v1/ endpoints with API key authentication.
+Chetana Partner API Router — /api/v1/ endpoints with API key authentication.
 
-Mount this onto the main FastAPI app:
-    from app.b2b_router import b2b_router
-    app.include_router(b2b_router)
-
-All endpoints mirror the public API but require X-API-Key header,
-enforce rate limits, and return structured JSON responses suitable
-for machine consumption.
+This is the institutional lane for banks, merchants, platforms, and public-sector
+teams that need machine-friendly scam detection plus recovery guidance.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Depends
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Any, List, Literal, Optional
+
 import httpx
-import time
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from app.api_keys import require_api_key
+from app.scan_guidance import enrich_v0_verdict
+from app.v0_runtime import (
+    V0ScanInput,
+    V0TrustRuntimeRequest,
+    analyze_scan,
+    build_recovery_packet,
+    build_trust_bundle,
+)
 
-b2b_router = APIRouter(prefix="/api/v1", tags=["B2B API"])
+b2b_router = APIRouter(prefix="/api/v1", tags=["Partner API"])
 
 KAVACH_URL = "http://127.0.0.1:8790"
 
 
-# ── Models ────────────────────────────────────────────────────────────────
-
 class ScanRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=10000, description="Message text to analyze")
-    lang: str = Field("en", description="Language code (en, hi, ta, te)")
+    text: str = Field(..., min_length=1, max_length=20000, description="Message, transcript, OCR text, or payment context to analyze")
+    lang: str = Field("en", description="Language hint (en, hi, ta, te, etc.)")
+    input_type: Literal["text", "payment_screenshot", "qr_image", "mixed", "screenshot"] = Field(
+        "text",
+        description="Observed surface for the intake payload",
+    )
+    source_name: Optional[str] = Field(None, description="Optional source system or channel name")
+    money_moved: bool = Field(False, description="Whether money has already moved")
+    goods_released: bool = Field(False, description="Whether goods or access were already released")
+
 
 class LinkRequest(BaseModel):
     url: str = Field(..., description="URL to check against threat feeds")
 
+
 class UPIRequest(BaseModel):
     upi_id: str = Field(..., description="UPI ID to validate (e.g. name@upi)")
+
 
 class PhoneRequest(BaseModel):
     phone: str = Field(..., description="Phone number to check")
 
-class ScanResponse(BaseModel):
-    scan_id: str = ""
-    verdict: str = Field(..., description="SAFE, SUSPICIOUS, or SCAM")
-    score: int = Field(..., ge=0, le=100, description="Threat score 0-100")
-    risk_level: str = ""
-    signals: List[str] = []
-    explanation: str = ""
-    disclaimer: str = "This is an AI-assisted assessment, not legal advice. When in doubt, verify independently."
 
+class PartnerScanResponse(BaseModel):
+    scan_id: str
+    verdict: str = Field(..., description="high_risk, caution, needs_review, or low_signal")
+    risk_level: str
+    confidence_band: str
+    evidence_state: str
+    incident_state: str
+    scam_type: str
+    score: int = Field(..., ge=0, le=100, description="Normalized risk score for routing and queueing")
+    reason_codes: List[str] = Field(default_factory=list)
+    reasons: List[str] = Field(default_factory=list)
+    recommended_actions: List[str] = Field(default_factory=list)
+    safe_next_step: Optional[str] = None
+    guidance: dict[str, Any] = Field(default_factory=dict)
+    disclaimer: str = (
+        "Automated trust assessment only. Use official institutional review and recovery processes for final action."
+    )
 
-# ── Shared client ─────────────────────────────────────────────────────────
 
 _client: httpx.AsyncClient | None = None
+
 
 async def _get_client() -> httpx.AsyncClient:
     global _client
@@ -61,40 +81,116 @@ async def _get_client() -> httpx.AsyncClient:
     return _client
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────
+def _normalized_score(verdict_value: str, confidence_band: str, incident_state: str) -> int:
+    base = {
+        "high_risk": 82,
+        "caution": 58,
+        "needs_review": 38,
+        "low_signal": 14,
+    }.get(verdict_value, 20)
+    confidence_adj = {"high": 6, "medium": 0, "low": -6}.get(confidence_band, 0)
+    incident_adj = {
+        "device_access_requested": 6,
+        "payment_attempted": 5,
+        "payment_requested": 3,
+        "active_coercion": 2,
+        "suspected": 0,
+    }.get(incident_state, 0)
+    return max(0, min(100, base + confidence_adj + incident_adj))
 
-@b2b_router.post("/scan", response_model=ScanResponse, summary="Scan text for scam indicators")
+
+async def _run_partner_scan(req: ScanRequest):
+    verdict = analyze_scan(
+        V0ScanInput(
+            input_type=req.input_type,
+            text=req.text,
+            language_hint=req.lang,
+            source_name=req.source_name,
+        )
+    )
+    verdict = await enrich_v0_verdict(verdict)
+    score = _normalized_score(verdict.verdict, verdict.confidence_band, verdict.incident_state)
+    response = PartnerScanResponse(
+        scan_id=verdict.scan_id,
+        verdict=verdict.verdict,
+        risk_level=verdict.risk_level,
+        confidence_band=verdict.confidence_band,
+        evidence_state=verdict.evidence_state,
+        incident_state=verdict.incident_state,
+        scam_type=verdict.scam_type,
+        score=score,
+        reason_codes=[reason.code for reason in verdict.reasons],
+        reasons=[reason.explanation for reason in verdict.reasons],
+        recommended_actions=verdict.recommended_actions,
+        safe_next_step=verdict.safe_next_step,
+        guidance=verdict.guidance.model_dump(),
+    )
+    return verdict, response
+
+
+@b2b_router.get("/capabilities", summary="Describe institutional API surfaces")
+async def capabilities(key_info: dict = Depends(require_api_key)):
+    return {
+        "product": "Chetana Partner API",
+        "positioning": "Verify-before-action trust and recovery API for banks, platforms, merchants, and public-sector fraud teams.",
+        "surfaces": [
+            "text and transcript intake",
+            "payment screenshot and QR review",
+            "trust bundle for send guard and recovery",
+            "official recovery rails and handoff scripts",
+            "link, UPI, and phone thin checks",
+        ],
+        "key_holder": key_info["name"],
+    }
+
+
+@b2b_router.post("/scan", response_model=PartnerScanResponse, summary="Canonical institutional scam scan")
 async def scan_text(req: ScanRequest, key_info: dict = Depends(require_api_key)):
-    """Full text scan against live threat intelligence. Returns verdict + signals."""
-    client = await _get_client()
-    try:
-        resp = await client.post(f"{KAVACH_URL}/scan", json={"text": req.text, "lang": req.lang})
-        if resp.status_code == 200:
-            data = resp.json()
-            score = data.get("score", data.get("threat_score", 0))
-            signals = data.get("signals", [])
-            if score >= 70:
-                verdict = "SCAM"
-            elif score >= 40:
-                verdict = "SUSPICIOUS"
-            else:
-                verdict = "SAFE"
-            return ScanResponse(
-                scan_id=data.get("scan_id", ""),
-                verdict=verdict,
-                score=score,
-                risk_level=data.get("risk_level", ""),
-                signals=signals,
-                explanation=data.get("explanation", ""),
-            )
-        return ScanResponse(verdict="ERROR", score=0, explanation=f"Upstream error: {resp.status_code}")
-    except httpx.ConnectError:
-        return ScanResponse(verdict="ERROR", score=0, explanation="Detection engine unavailable")
+    """Run the canonical Chetana trust contract for institutional workflows."""
+    _, response = await _run_partner_scan(req)
+    return response
+
+
+@b2b_router.post("/trust/bundle", summary="Full trust bundle for institutional decisioning")
+async def trust_bundle(req: ScanRequest, key_info: dict = Depends(require_api_key)):
+    """Return scan contract plus send-guard, merchant, and recovery outputs."""
+    verdict, response = await _run_partner_scan(req)
+    bundle = build_trust_bundle(
+        V0TrustRuntimeRequest(
+            verdict=verdict,
+            input_text=req.text,
+            source_name=req.source_name,
+            money_moved=req.money_moved,
+            goods_released=req.goods_released,
+        )
+    )
+    return {
+        "scan": response.model_dump(),
+        "trust_bundle": bundle.model_dump(),
+    }
+
+
+@b2b_router.post("/recovery", summary="Recovery-only packet for active incidents")
+async def recovery(req: ScanRequest, key_info: dict = Depends(require_api_key)):
+    """Return the structured recovery packet for official rails and escalation order."""
+    verdict, response = await _run_partner_scan(req)
+    packet = build_recovery_packet(
+        V0TrustRuntimeRequest(
+            verdict=verdict,
+            input_text=req.text,
+            source_name=req.source_name,
+            money_moved=req.money_moved,
+            goods_released=req.goods_released,
+        )
+    )
+    return {
+        "scan": response.model_dump(),
+        "recovery_packet": packet.model_dump(),
+    }
 
 
 @b2b_router.post("/link/check", summary="Check URL against threat feeds")
 async def check_link(req: LinkRequest, key_info: dict = Depends(require_api_key)):
-    """Check a URL against URLhaus (11K+ URLs), PhishTank (15K+ URLs), and AI analysis."""
     client = await _get_client()
     try:
         resp = await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.url, "lang": "en"})
@@ -107,7 +203,6 @@ async def check_link(req: LinkRequest, key_info: dict = Depends(require_api_key)
 
 @b2b_router.post("/upi/check", summary="Validate UPI ID")
 async def check_upi(req: UPIRequest, key_info: dict = Depends(require_api_key)):
-    """Check a UPI ID for known scam patterns and threat feed matches."""
     client = await _get_client()
     try:
         resp = await client.post(f"{KAVACH_URL}/api/upi/check", json={"upi_id": req.upi_id})
@@ -120,7 +215,6 @@ async def check_upi(req: UPIRequest, key_info: dict = Depends(require_api_key)):
 
 @b2b_router.post("/phone/check", summary="Check phone number")
 async def check_phone(req: PhoneRequest, key_info: dict = Depends(require_api_key)):
-    """Check a phone number against known scam databases."""
     client = await _get_client()
     try:
         resp = await client.post(f"{KAVACH_URL}/api/phone/check", json={"phone": req.phone})
@@ -133,11 +227,12 @@ async def check_phone(req: PhoneRequest, key_info: dict = Depends(require_api_ke
 
 @b2b_router.get("/usage", summary="Check your API usage")
 async def check_usage(key_info: dict = Depends(require_api_key)):
-    """Returns your current usage stats and limits."""
     from app.api_keys import TIERS
+
     tier = key_info["tier"]
     return {
         "name": key_info["name"],
         "tier": tier,
         "limits": TIERS[tier],
+        "positioning": "Use /api/v1/scan for machine-safe verdicts, /api/v1/trust/bundle for full recovery-aware decisions.",
     }

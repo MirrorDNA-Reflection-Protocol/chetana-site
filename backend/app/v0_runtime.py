@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -21,10 +22,22 @@ ScamType = Literal[
     "fake_payment_proof",
     "parcel_customs_scam",
     "job_scam",
+    "remote_support_scam",
     "impersonation_pressure_scam",
     "unknown_suspicious_pattern",
 ]
 ConfidenceBand = Literal["low", "medium", "high"]
+RiskLevel = Literal["high", "medium", "low"]
+EvidenceState = Literal["complete", "partial", "weak", "conflicting"]
+IncidentState = Literal[
+    "suspected",
+    "active_coercion",
+    "payment_requested",
+    "payment_attempted",
+    "device_access_requested",
+]
+ExplanationSource = Literal["deterministic", "ollama"]
+RecoveryUrgency = Literal["immediate", "priority", "monitor"]
 ReasonCode = Literal[
     "urgency_pressure",
     "asks_for_money",
@@ -39,6 +52,7 @@ ReasonCode = Literal[
     "language_inconsistency",
     "hidden_or_shortened_link",
     "unverifiable_contact",
+    "remote_access_request",
 ]
 RecommendedAction = Literal[
     "do_not_pay",
@@ -70,6 +84,11 @@ DeviceClass = Literal["android_phone", "ios_phone", "web", "desktop", "unknown"]
 ConsentClass = Literal["C0", "C1", "C2", "C3", "C4"]
 PayloadClass = Literal["derived_state", "cross_surface_signal", "save_intent", "export_artifact"]
 PersistenceClass = Literal["P0", "P1", "P2", "P3"]
+_DROP = object()
+METADATA_MAX_DEPTH = 2
+METADATA_MAX_KEYS = 24
+METADATA_MAX_LIST_ITEMS = 8
+METADATA_MAX_STRING = 160
 
 
 class StrictModel(BaseModel):
@@ -91,17 +110,34 @@ class V0Entities(StrictModel):
     person_names: list[str] = Field(default_factory=list)
 
 
+class V0Guidance(StrictModel):
+    lead: str
+    why_it_was_flagged: list[str] = Field(min_length=1, max_length=5)
+    do_now: list[str] = Field(min_length=1, max_length=5)
+    do_not_do: list[str] = Field(min_length=1, max_length=5)
+    if_already_acted: list[str] = Field(min_length=1, max_length=4)
+    verification_route: str
+    false_positive_recovery: str
+    calm_script: str
+    source: ExplanationSource = "deterministic"
+
+
 class V0Verdict(StrictModel):
     scan_id: str
     timestamp_utc: str
     input_type: InputType
     language_hint: str | None = None
     verdict: VerdictValue
+    risk_level: RiskLevel
     scam_type: ScamType
     confidence_band: ConfidenceBand
+    evidence_state: EvidenceState
+    incident_state: IncidentState
     reasons: list[V0Reason] = Field(min_length=1, max_length=5)
     entities: V0Entities | None = None
     summary_plain_language: str | None = None
+    safe_next_step: str | None = None
+    guidance: V0Guidance
     recommended_actions: list[RecommendedAction] = Field(min_length=1, max_length=4)
     share_shield_eligible: bool = False
     evidence_pack_eligible: bool = False
@@ -248,6 +284,11 @@ REASON_META: dict[ReasonCode, dict[str, Any]] = {
         "weight": 10,
         "explanation": "The sender gives contact details that are hard to verify independently.",
     },
+    "remote_access_request": {
+        "label": "Requests app install or device control",
+        "weight": 24,
+        "explanation": "It asks for screen sharing, remote access, an APK install, or device permissions that could hand control of your phone to someone else.",
+    },
 }
 
 
@@ -286,6 +327,10 @@ INVESTMENT_RE = re.compile(r"\b(invest|trading|crypto|forex|returns?|profit|stoc
 PAYMENT_SCREENSHOT_RE = re.compile(r"\b(paid|payment successful|payment complete|credited|debited|success|successful)\b", re.IGNORECASE)
 TXN_RE = re.compile(r"\b(?:utr|txn|transaction|reference|ref no|order id|bank ref)\b", re.IGNORECASE)
 WEIRD_TEXT_RE = re.compile(r"(?:[A-Z]{5,}|[!?]{3,}|₹\d+\s+FREE)")
+REMOTE_ACCESS_RE = re.compile(
+    r"\b(anydesk|teamviewer|quicksupport|screen ?share|remote access|assistive service|accessibility permission|download app|install app|install apk|apk link)\b",
+    re.IGNORECASE,
+)
 
 _V0_ROOT = Path.home() / ".mirrordna" / "chetana" / "v0"
 _V0_ROOT.mkdir(parents=True, exist_ok=True)
@@ -309,11 +354,52 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
 
 
+def _sanitize_metadata_value(value: Any, depth: int = 0) -> Any:
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else _DROP
+    if isinstance(value, str):
+        return value.strip()[:METADATA_MAX_STRING]
+    if isinstance(value, dict):
+        if depth > METADATA_MAX_DEPTH:
+            return _DROP
+        clean: dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= METADATA_MAX_KEYS:
+                break
+            normalized = _sanitize_metadata_value(item, depth + 1)
+            if normalized is _DROP:
+                continue
+            clean[str(key)[:64]] = normalized
+        return clean or _DROP
+    if isinstance(value, (list, tuple)):
+        if depth > METADATA_MAX_DEPTH:
+            return _DROP
+        clean_items: list[Any] = []
+        for item in list(value)[:METADATA_MAX_LIST_ITEMS]:
+            normalized = _sanitize_metadata_value(item, depth + 1)
+            if normalized is _DROP:
+                continue
+            clean_items.append(normalized)
+        return clean_items or _DROP
+    return _DROP
+
+
+def _sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    clean = _sanitize_metadata_value(metadata)
+    return clean if isinstance(clean, dict) else {}
+
+
 def build_event(payload: V0EventInput) -> V0Event:
+    event_payload = payload.model_dump()
+    event_payload["metadata"] = _sanitize_metadata(event_payload.get("metadata") or {})
     return V0Event(
         event_id=generate_event_id(),
         timestamp_utc=now_utc(),
-        **payload.model_dump(),
+        **event_payload,
     )
 
 
@@ -396,6 +482,8 @@ def _detect_scam_type(text: str, input_type: InputType) -> ScamType:
         scores["investment_scam"] += 3
     if re.search(r"\b(kyc|aadhaar|pan|account update|re-kyc)\b", text, re.IGNORECASE):
         scores["fake_kyc"] += 3
+    if REMOTE_ACCESS_RE.search(text):
+        scores["remote_support_scam"] += 4
     if input_type == "qr_image" or re.search(r"\b(qr|upi|collect request|upi id)\b", text, re.IGNORECASE):
         scores["upi_qr_scam"] += 3
     if input_type == "payment_screenshot" or re.search(r"\b(payment screenshot|utr|transaction successful|paid screenshot)\b", text, re.IGNORECASE):
@@ -427,6 +515,7 @@ def _build_summary(verdict: VerdictValue, scam_type: ScamType, actions: list[Rec
         "fake_payment_proof": "payment proof",
         "parcel_customs_scam": "parcel or customs message",
         "job_scam": "job offer",
+        "remote_support_scam": "remote support or app install request",
         "impersonation_pressure_scam": "authority pressure message",
         "unknown_suspicious_pattern": "message",
     }
@@ -439,6 +528,163 @@ def _build_summary(verdict: VerdictValue, scam_type: ScamType, actions: list[Rec
     if verdict == "needs_review":
         return f"There are warning signs in this {surface}, but not enough proof for a confident call. Treat it as needing review and {first_action}."
     return f"Chetana has low signal on this {surface} from the material provided. If the stakes are high, still {first_action}."
+
+
+def _risk_level_for_verdict(verdict: VerdictValue) -> RiskLevel:
+    if verdict == "high_risk":
+        return "high"
+    if verdict in {"caution", "needs_review"}:
+        return "medium"
+    return "low"
+
+
+def _safe_next_step_for_action(action: RecommendedAction) -> str:
+    if action == "do_not_pay":
+        return "Do not pay, approve, or release anything yet."
+    if action == "verify_with_official_source":
+        return "Verify this through the official app, website, or known number you already trust."
+    if action == "share_with_family":
+        return "Ask one trusted person to review it with you before you act."
+    if action == "save_evidence":
+        return "Save screenshots, links, UPI IDs, and timestamps before anything disappears."
+    if action == "report_and_block":
+        return "Use the official reporting rails first, then block the sender."
+    if action == "scan_again_with_more_context":
+        return "Scan again with the full chat, a clearer screenshot, or the original payment payload."
+    return "Treat this as not cleared until you verify it independently."
+
+
+def _derive_evidence_state(
+    payload: V0ScanInput,
+    reasons: dict[ReasonCode, V0Reason],
+    entities: V0Entities,
+    *,
+    official_host_found: bool,
+    suspicious_host_found: bool,
+) -> EvidenceState:
+    signal_groups = sum(
+        1
+        for present in (
+            bool(entities.urls),
+            bool(entities.upi_ids),
+            bool(entities.phone_numbers),
+            bool(entities.amounts),
+            bool(entities.merchant_names),
+            bool(reasons),
+        )
+        if present
+    )
+    if official_host_found and suspicious_host_found:
+        return "conflicting"
+    if payload.input_type in {"payment_screenshot", "qr_image"} and signal_groups >= 4:
+        return "complete"
+    if signal_groups >= 3 or len(reasons) >= 3:
+        return "partial"
+    return "weak"
+
+
+def _derive_incident_state(
+    payload: V0ScanInput,
+    reasons: dict[ReasonCode, V0Reason],
+    text: str,
+    entities: V0Entities,
+) -> IncidentState:
+    if REMOTE_ACCESS_RE.search(text) or "remote_access_request" in reasons:
+        return "device_access_requested"
+    if payload.input_type == "payment_screenshot" or "payment_screenshot_anomaly" in reasons:
+        return "payment_attempted"
+    if "asks_for_money" in reasons or payload.input_type == "qr_image" or entities.upi_ids:
+        return "payment_requested"
+    if "impersonates_authority" in reasons or "threat_language" in reasons or "urgency_pressure" in reasons:
+        return "active_coercion"
+    return "suspected"
+
+
+def _build_guidance(
+    *,
+    verdict: VerdictValue,
+    scam_type: ScamType,
+    reasons: dict[ReasonCode, V0Reason],
+    recommended_actions: list[RecommendedAction],
+    incident_state: IncidentState,
+    evidence_state: EvidenceState,
+) -> V0Guidance:
+    lead_map = {
+        "high_risk": "Pause here. The current material shows strong scam or coercion signals.",
+        "caution": "Pause here. Multiple warning signs are present and this should not be treated as cleared.",
+        "needs_review": "Pause here. There are warning signs, but the current evidence is still incomplete.",
+        "low_signal": "Chetana has low signal from the current material, not a clean safety confirmation.",
+    }
+    do_now: list[str] = []
+    for action in recommended_actions:
+        step = _safe_next_step_for_action(action)
+        if step not in do_now:
+            do_now.append(step)
+    if incident_state == "device_access_requested":
+        do_now.insert(0, "End the call or chat and refuse any app install, screen-share, or accessibility request.")
+    elif incident_state == "payment_attempted":
+        do_now.insert(0, "Verify the payment inside the real bank or PSP app before any money, goods, or access changes hands.")
+    elif incident_state == "payment_requested":
+        do_now.insert(0, "Do not approve, transfer, or scan anything until you verify the request outside the live channel.")
+    elif incident_state == "active_coercion":
+        do_now.insert(0, "Break the live pressure loop and verify through a second trusted route.")
+    do_now = do_now[:5]
+
+    do_not_do = [
+        "Do not share OTPs, PINs, passwords, or full identity documents.",
+        "Do not trust phone numbers, links, or payment handles inside the suspicious message alone.",
+    ]
+    if incident_state in {"payment_requested", "payment_attempted"}:
+        do_not_do.append("Do not pay, release goods, or approve a collect request until verified.")
+    if incident_state == "device_access_requested":
+        do_not_do.append("Do not install remote-access apps or enable accessibility / screen-share for a stranger.")
+    do_not_do = do_not_do[:5]
+
+    if_already_acted = [
+        "If money moved already, call 1930 and contact your bank or payment app immediately.",
+        "Preserve screenshots, links, transaction references, and the sender details before they disappear.",
+    ]
+    if incident_state == "device_access_requested":
+        if_already_acted.insert(0, "If you installed anything or granted device control, disconnect the session and remove the app or permission from a clean state.")
+    if_already_acted = if_already_acted[:4]
+
+    if incident_state == "device_access_requested":
+        verification_route = "Use the official bank, telecom, or support app you already trust. Never verify through the caller's app-install or screen-share path."
+    elif incident_state in {"payment_requested", "payment_attempted"}:
+        verification_route = "Verify the amount, recipient, and transaction reference inside the official bank / PSP app or merchant ledger."
+    elif scam_type in {"fake_kyc", "impersonation_pressure_scam"}:
+        verification_route = "Use the official bank, government, or institution website and a known helpline from your records."
+    else:
+        verification_route = "Use an official app, official website, or known phone number you already trust."
+
+    false_positive_recovery = (
+        "If you believe this is legitimate, re-check it with the full chat, a clearer screenshot, or the official app view. "
+        "Chetana keeps the warning visible, but you should verify through a second trusted source before overriding it."
+    )
+
+    calm_script = (
+        "I am not acting from this message alone. I will verify it through an official source I already trust."
+    )
+
+    why = [reason.explanation for reason in list(reasons.values())[:5]]
+    if not why:
+        why = [
+            "The current material does not provide enough strong evidence to clear the request safely."
+            if evidence_state == "weak"
+            else "The current material contains conflicting signals and needs independent verification."
+        ]
+
+    return V0Guidance(
+        lead=lead_map[verdict],
+        why_it_was_flagged=why,
+        do_now=do_now or ["Verify independently before you act."],
+        do_not_do=do_not_do,
+        if_already_acted=if_already_acted,
+        verification_route=verification_route,
+        false_positive_recovery=false_positive_recovery,
+        calm_script=calm_script,
+        source="deterministic",
+    )
 
 
 def analyze_scan(payload: V0ScanInput) -> V0Verdict:
@@ -464,11 +710,23 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
             input_type=payload.input_type,
             language_hint=payload.language_hint,
             verdict=verdict,
+            risk_level=_risk_level_for_verdict(verdict),
             scam_type="unknown_suspicious_pattern",
             confidence_band=confidence,
+            evidence_state="weak",
+            incident_state="suspected",
             reasons=list(reasons.values())[:5],
             entities=entities,
             summary_plain_language=summary,
+            safe_next_step=_safe_next_step_for_action(actions[0]),
+            guidance=_build_guidance(
+                verdict=verdict,
+                scam_type="unknown_suspicious_pattern",
+                reasons=reasons,
+                recommended_actions=actions,
+                incident_state="suspected",
+                evidence_state="weak",
+            ),
             recommended_actions=actions,
             share_shield_eligible=True,
             evidence_pack_eligible=True,
@@ -489,6 +747,8 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         _add_reason(reasons, scorebox, "move_off_platform")
     if WEIRD_TEXT_RE.search(text):
         _add_reason(reasons, scorebox, "language_inconsistency")
+    if REMOTE_ACCESS_RE.search(text):
+        _add_reason(reasons, scorebox, "remote_access_request")
 
     official_host_found = False
     suspicious_host_found = False
@@ -610,7 +870,23 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
             deduped_actions.append(action)
 
     scam_type = _detect_scam_type(text, payload.input_type)
+    evidence_state = _derive_evidence_state(
+        payload,
+        reasons,
+        entities,
+        official_host_found=official_host_found,
+        suspicious_host_found=suspicious_host_found,
+    )
+    incident_state = _derive_incident_state(payload, reasons, text, entities)
     summary = _build_summary(verdict, scam_type, deduped_actions)
+    guidance = _build_guidance(
+        verdict=verdict,
+        scam_type=scam_type,
+        reasons=reasons,
+        recommended_actions=deduped_actions,
+        incident_state=incident_state,
+        evidence_state=evidence_state,
+    )
     notes: str | None = None
     if verdict == "needs_review":
         notes = "Needs review means pause and verify with more context or an official source before you act."
@@ -620,6 +896,10 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         notes = "Use an official app, website, or helpline you already trust before you do anything."
     elif verdict == "low_signal":
         notes = "Low signal does not mean safe. It means the current material did not provide enough strong evidence for a stronger call."
+    if evidence_state == "conflicting":
+        notes = "The current material contains conflicting signals. Treat it as not cleared until an official source confirms it."
+    elif evidence_state == "weak" and verdict != "high_risk":
+        notes = "The current evidence is still weak. A fuller chat, clearer screenshot, or official app view will produce a stronger check."
 
     return V0Verdict(
         scan_id=generate_scan_id(),
@@ -627,11 +907,16 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         input_type=payload.input_type,
         language_hint=payload.language_hint,
         verdict=verdict,
+        risk_level=_risk_level_for_verdict(verdict),
         scam_type=scam_type,
         confidence_band=confidence,
+        evidence_state=evidence_state,
+        incident_state=incident_state,
         reasons=list(reasons.values())[:5],
         entities=entities,
         summary_plain_language=summary,
+        safe_next_step=_safe_next_step_for_action(deduped_actions[0]),
+        guidance=guidance,
         recommended_actions=deduped_actions[:4],
         share_shield_eligible=verdict in {"high_risk", "caution", "needs_review"},
         evidence_pack_eligible=verdict in {"high_risk", "caution", "needs_review"},
@@ -681,6 +966,8 @@ RecoveryIncidentType = Literal[
     "MERCHANT_PAYMENT_DISPUTE",
     "IMPERSONATION_ATTEMPT_BLOCKED",
     "PAYMENT_DISPUTE",
+    "REMOTE_ACCESS_OR_DEVICE_COMPROMISE",
+    "CREDENTIAL_THEFT_EXPOSURE",
 ]
 RecoveryRailId = Literal["BANK_APP_SUPPORT", "CYBER_HELPLINE_1930", "NCRP_PORTAL", "RBI_CMS"]
 
@@ -709,6 +996,9 @@ class V0RecoveryPacket(StrictModel):
     packet_id: str
     generated_at_utc: str
     incident_type: RecoveryIncidentType
+    urgency: RecoveryUrgency
+    incident_state: IncidentState
+    evidence_state: EvidenceState
     summary: str
     immediate_actions: list[str] = Field(min_length=1)
     official_rails: list[V0OfficialRail] = Field(min_length=1)
@@ -866,6 +1156,10 @@ def _build_case_packet(
 def _incident_type_for_request(payload: V0TrustRuntimeRequest) -> RecoveryIncidentType:
     verdict = payload.verdict
     codes = _reason_codes(verdict)
+    if "remote_access_request" in codes or verdict.incident_state == "device_access_requested":
+        return "REMOTE_ACCESS_OR_DEVICE_COMPROMISE"
+    if verdict.scam_type == "fake_kyc" and ("unverifiable_contact" in codes or "impersonates_authority" in codes):
+        return "CREDENTIAL_THEFT_EXPOSURE"
     if payload.goods_released or verdict.input_type == "payment_screenshot":
         return "MERCHANT_PAYMENT_DISPUTE"
     if payload.money_moved and (
@@ -885,6 +1179,10 @@ def _incident_type_for_request(payload: V0TrustRuntimeRequest) -> RecoveryIncide
 def _rails_for_incident(incident_type: RecoveryIncidentType) -> list[V0OfficialRail]:
     if incident_type == "AUTHORIZED_PUSH_PAYMENT_FRAUD":
         order = ["CYBER_HELPLINE_1930", "NCRP_PORTAL", "BANK_APP_SUPPORT", "RBI_CMS"]
+    elif incident_type == "REMOTE_ACCESS_OR_DEVICE_COMPROMISE":
+        order = ["CYBER_HELPLINE_1930", "NCRP_PORTAL", "BANK_APP_SUPPORT", "RBI_CMS"]
+    elif incident_type == "CREDENTIAL_THEFT_EXPOSURE":
+        order = ["BANK_APP_SUPPORT", "CYBER_HELPLINE_1930", "NCRP_PORTAL", "RBI_CMS"]
     elif incident_type == "IMPERSONATION_ATTEMPT_BLOCKED":
         order = ["CYBER_HELPLINE_1930", "NCRP_PORTAL"]
     else:
@@ -898,6 +1196,20 @@ def _immediate_actions(
     money_moved: bool,
     goods_released: bool,
 ) -> list[str]:
+    if incident_type == "REMOTE_ACCESS_OR_DEVICE_COMPROMISE":
+        return [
+            "End the live call or screen-share session immediately.",
+            "Do not enter OTPs, UPI PINs, or passwords while anyone else can see your screen.",
+            "Remove the remote-access app or dangerous permission from a clean state, then check accessibility and device-admin settings.",
+            "If banking, SIM, or wallet access may be exposed, call 1930 and your bank or provider immediately.",
+        ]
+    if incident_type == "CREDENTIAL_THEFT_EXPOSURE":
+        return [
+            "Stop entering any more codes, passwords, KYC details, or identity documents into the suspicious flow.",
+            "Change the exposed password or PIN from an official app or clean device path you already trust.",
+            "Contact the bank, wallet, or institution directly if OTPs, credentials, Aadhaar, or PAN details were shared.",
+            "Preserve the link, screenshot, sender details, and timestamps for reporting.",
+        ]
     if incident_type == "AUTHORIZED_PUSH_PAYMENT_FRAUD":
         return [
             "End the live call or chat with the other party immediately.",
@@ -951,6 +1263,20 @@ def _handoff_script(
     return " ".join(parts)
 
 
+def _recovery_urgency(payload: V0TrustRuntimeRequest, incident_type: RecoveryIncidentType) -> RecoveryUrgency:
+    if payload.money_moved or payload.goods_released:
+        return "immediate"
+    if incident_type in {
+        "AUTHORIZED_PUSH_PAYMENT_FRAUD",
+        "REMOTE_ACCESS_OR_DEVICE_COMPROMISE",
+        "CREDENTIAL_THEFT_EXPOSURE",
+    }:
+        return "immediate"
+    if payload.verdict.verdict == "high_risk":
+        return "priority"
+    return "monitor"
+
+
 def build_recovery_packet(payload: V0TrustRuntimeRequest) -> V0RecoveryPacket:
     text = _normalize_text(payload.input_text)
     verdict = payload.verdict
@@ -971,6 +1297,9 @@ def build_recovery_packet(payload: V0TrustRuntimeRequest) -> V0RecoveryPacket:
         packet_id=f"chetana-recovery-{uuid4().hex[:12]}",
         generated_at_utc=now_utc(),
         incident_type=incident_type,
+        urgency=_recovery_urgency(payload, incident_type),
+        incident_state=verdict.incident_state,
+        evidence_state=verdict.evidence_state,
         summary=summary,
         immediate_actions=_immediate_actions(
             incident_type,

@@ -9,3 +9,6 @@ __pycache__/
 .env
 nohup.out
 CLAUDE.md
+apps/*/node_modules/
+apps/*/.expo/
+apps/*/dist/

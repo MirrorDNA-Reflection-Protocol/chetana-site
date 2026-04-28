@@ -549,33 +549,30 @@ export function StatsStrip() {
 
     const loadStats = async () => {
       try {
-        const [radarResp, statsResp, languagesResp] = await Promise.all([
-          fetch(`${API}/api/radar/public`),
+        const [summaryResp, statsResp, languagesResp] = await Promise.all([
+          fetch(`${API}/api/v1/analytics/summary`),
           fetch(`${API}/api/stats/live`),
           fetch(`${API}/api/languages`),
         ]);
 
-        const radar = radarResp.ok ? await radarResp.json() : {};
+        const summary = summaryResp.ok ? await summaryResp.json() : {};
         const liveStats = statsResp.ok ? await statsResp.json() : {};
         const languages = languagesResp.ok ? await languagesResp.json() : {};
 
-        const totalScans = Math.max(
-          Number(radar.total ?? 0),
-          Number(radar.scans_today ?? 0),
-          Number(liveStats.total_scans ?? 0),
+        const totalScans = Number(summary?.totals?.scan_completes ?? liveStats.total_scans ?? 0);
+        const scamsCaught = Number(summary?.totals?.risky_verdicts ?? liveStats.scams_caught ?? 0);
+        const languageCount = Math.max(
+          Number(languages.live_count ?? 0),
+          Number(Object.keys(summary?.breakdowns?.languages ?? {}).length || 0),
+          Number(liveStats.languages ?? 0),
+          12,
         );
-        const scamsCaught = Math.max(
-          Number(radar.scams_week ?? 0),
-          Number(radar.scams_today ?? 0),
-          Number(liveStats.scams_caught ?? 0),
-        );
-        const liveCount = Math.max(Number(languages.live_count ?? 0), Number(liveStats.languages ?? 0), 12);
 
         if (!cancelled) {
           setStats({
             total_scans: totalScans,
             scams_caught: scamsCaught,
-            languages: liveCount,
+            languages: languageCount,
           });
         }
       } catch {
@@ -636,7 +633,22 @@ interface ChatMsg {
   id: number;
   role: "user" | "bot";
   text: string;
-  scanResult?: { verdict: string; score: number; signals: string[]; action: string; trust_state?: string; reason_codes?: string[]; kavach_score?: number; council_score?: number; council_agreement?: number; council_votes?: CouncilVote[] };
+  scanResult?: {
+    scan_id?: string;
+    verdict: string;
+    score: number;
+    signals: string[];
+    action: string;
+    trust_state?: string;
+    reason_codes?: string[];
+    kavach_score?: number;
+    council_score?: number;
+    council_agreement?: number;
+    council_votes?: CouncilVote[];
+    guidance?: any;
+    incident_state?: string;
+    evidence_state?: string;
+  };
   file?: string;
   suggestions?: string[];
 }
@@ -844,9 +856,11 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const signals: string[] = data.why_flagged || data.signals || data.red_flags || [];
   const action = data.action_eligibility || data.recommended_action || "";
   const explanation = data.explanation || data.analysis || "";
+  const guidance = data.guidance;
   const moneyRisk = isMoneyRisk(mode, explanation, signals);
   const scenario = detectIncidentPattern(mode, explanation, signals, action, fileName);
   const needsMoreEvidence =
+    guidance?.needs_more_evidence ||
     data.trust_state === "unverified" ||
     ((verdict === "UNCLEAR" || verdict === "MEDIUM") && (signals.length < 2 || score < 55)) ||
     ((mode === "media" || mode === "voice") && signals.length === 0 && score < 45);
@@ -858,7 +872,39 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
 
   let text = "";
 
-  if (needsMoreEvidence) {
+  if (guidance?.lead) {
+    text = `**${guidance.lead}**\n\n`;
+    if (guidance.scenario_label) {
+      text += `**What this may be:**\n• ${guidance.scenario_label}\n\n`;
+    }
+    if (guidance.why_it_was_flagged?.length) {
+      text += "**Why Chetana is worried:**\n";
+      text += guidance.why_it_was_flagged.map((item: string) => `• ${item}`).join("\n");
+      text += "\n\n";
+    }
+    if (guidance.do_now?.length) {
+      text += "**What to do now:**\n";
+      text += guidance.do_now.map((item: string) => `• ${item}`).join("\n");
+      text += "\n\n";
+    }
+    if (guidance.do_not_do?.length) {
+      text += "**Do not do this yet:**\n";
+      text += guidance.do_not_do.map((item: string) => `• ${item}`).join("\n");
+      text += "\n\n";
+    }
+    if (guidance.if_already_acted?.length) {
+      text += "**If you already acted:**\n";
+      text += guidance.if_already_acted.map((item: string) => `• ${item}`).join("\n");
+      text += "\n\n";
+    }
+    if (guidance.verification_route) {
+      text += `**Best verification route:**\n• ${guidance.verification_route}\n\n`;
+    }
+    if (guidance.false_positive_recovery) {
+      text += `**If you think this is legitimate:**\n• ${guidance.false_positive_recovery}\n\n`;
+    }
+    text += `**Hindi quick line:**\n• ${guidance.hindi_quick_line || hindiQuickLine}`;
+  } else if (needsMoreEvidence) {
     const actions = dedupeSteps([
       scenario?.steps[0] || "",
       mode === "media" || mode === "voice"
@@ -960,7 +1006,26 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const council_score = data.council_score;
   const council_agreement = data.council_agreement;
   const council_votes: CouncilVote[] = data.council_votes || [];
-  return { text, scanResult: { verdict, score, signals, action, trust_state, reason_codes, kavach_score, council_score, council_agreement, council_votes }, suggestions };
+  return {
+    text,
+    scanResult: {
+      scan_id: data.scan_id,
+      verdict,
+      score,
+      signals,
+      action,
+      trust_state,
+      reason_codes,
+      kavach_score,
+      council_score,
+      council_agreement,
+      council_votes,
+      guidance: data.guidance,
+      incident_state: data.incident_state,
+      evidence_state: data.evidence_state,
+    },
+    suggestions,
+  };
 }
 
 /* ── TrustWrap Card — structured result display ────────────── */
@@ -1121,7 +1186,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
   const fileRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const msgId = useRef(1);
-  const [incidentMode, setIncidentMode] = useState<{ verdict: string; score?: number; signals?: string[]; trust_state?: string } | null>(null);
+  const [incidentMode, setIncidentMode] = useState<{ scan_id?: string; verdict: string; score?: number; signals?: string[]; trust_state?: string } | null>(null);
 
   const SpeechRecClass = useMemo(() => getSpeechRecognition(), []);
 
@@ -1510,6 +1575,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   <div className="tool-incident-cta">
                     <button className="tool-protect-btn" onClick={() => {
                       setIncidentMode({
+                        scan_id: msg.scanResult!.scan_id,
                         verdict: msg.scanResult!.verdict,
                         score: msg.scanResult!.score,
                         signals: msg.scanResult!.signals,
@@ -1557,7 +1623,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
       </div>
 
       {/* Footer — one line */}
-      <p className="tool-privacy-line">Nothing is stored unless you choose to save it. Your data stays on your device for basic checks.</p>
+      <p className="tool-privacy-line">Basic checks can happen in your browser. Full checks go to Chetana&apos;s servers for processing and are not stored unless you choose to save something.</p>
       <footer className="tool-footer">
         Advisory only — not a government service · Emergency: 1930 · <a href="https://activemirror.ai" target="_blank" rel="noopener">activemirror.ai</a>
       </footer>
@@ -1597,7 +1663,7 @@ type IncidentScreen = {
   callback_guidance_available?: boolean;
 };
 
-function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string; score?: number; signals?: string[]; trust_state?: string }; onClose: () => void }) {
+function IncidentMode({ scanResult, onClose }: { scanResult?: { scan_id?: string; verdict: string; score?: number; signals?: string[]; trust_state?: string }; onClose: () => void }) {
   const [incidentId, setIncidentId] = useState<string | null>(null);
   const [screen, setScreen] = useState<IncidentScreen | null>(null);
   const [step, setStep] = useState("");
@@ -1613,6 +1679,7 @@ function IncidentMode({ scanResult, onClose }: { scanResult?: { verdict: string;
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            scan_id: scanResult?.scan_id,
             risk_level: "red",
             category: null,
             score: scanResult?.score ?? 80,

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   AlertBanner, BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
-  IncidentStepper, FamilyPage, Footer, StatsStrip
+  IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -239,7 +239,6 @@ export default function App() {
                 onNavigate={setPage}
                 onStartScan={startSeededScan}
               />
-              <StatsStrip />
             </>}
 
             {page === "consumer" && <>

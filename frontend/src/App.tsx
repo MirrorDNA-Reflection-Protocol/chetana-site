@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
-  IncidentStepper, FamilyPage, Footer
+  AlertBanner, BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
+  IncidentStepper, FamilyPage, Footer, StatsStrip
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -12,6 +12,7 @@ import { threats, weather } from "./data";
 import ChetanaV0Experience from "./ChetanaV0Experience";
 import OpsAnalyticsPage from "./OpsAnalyticsPage";
 import { I18nProvider } from "./i18n";
+import PressureProofHome from "./PressureProofHome";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 function initialPageFromLocation(): PageId {
@@ -31,6 +32,12 @@ export default function App() {
   const [sharedAttachment, setSharedAttachment] = useState<File | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const startSeededScan = (input: string) => {
+    setSharedContent(input);
+    setSharedAttachment(null);
+    setPage("scan");
+  };
 
   const syncPageUrl = (nextPage: PageId) => {
     const params = new URLSearchParams(window.location.search);
@@ -227,11 +234,12 @@ export default function App() {
           <motion.div key={page} {...pageAnim}>
 
             {page === "home" && <>
-              <ChetanaV0Experience
+              <AlertBanner onNavigate={setPage} />
+              <PressureProofHome
                 onNavigate={setPage}
-                initialInput={sharedContent}
-                initialFile={sharedAttachment}
+                onStartScan={startSeededScan}
               />
+              <StatsStrip />
             </>}
 
             {page === "consumer" && <>

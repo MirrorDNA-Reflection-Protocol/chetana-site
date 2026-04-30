@@ -51,6 +51,25 @@ const DEFAULT_PROMPTS: Record<V0Mode, string> = {
   payment_screenshot: "Upload the payment screenshot. Add any note that explains the context.",
 };
 
+const COMPOSER_COPY: Record<V0Mode, { title: string; body: string }> = {
+  text: {
+    title: "Paste the message, link, or payment request",
+    body: "Add the exact message if you can. Extra context is optional, not required.",
+  },
+  screenshot: {
+    title: "Upload the screenshot and add any useful context",
+    body: "Use this when the suspicious content is already on your screen or mixed into a longer chat.",
+  },
+  qr_image: {
+    title: "Upload the QR image or paste the payment payload",
+    body: "Use whatever detail you can read before you scan, pay, or share it forward.",
+  },
+  payment_screenshot: {
+    title: "Upload the payment proof before you trust it",
+    body: "This lane is for merchants, delivery staff, sellers, and anyone verifying a transfer screenshot.",
+  },
+};
+
 const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }> = {
   text: {
     kicker: "FREE SCAM CHECKER FOR INDIA",
@@ -268,6 +287,7 @@ export default function ChetanaV0Experience({
   }, [sessionId]);
 
   const hero = useMemo(() => HERO_COPY[mode], [mode]);
+  const composerCopy = useMemo(() => COMPOSER_COPY[mode], [mode]);
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
@@ -716,8 +736,8 @@ export default function ChetanaV0Experience({
             <div className="v0-composer-head">
               <div>
                 <div className="v0-section-label">Scan box</div>
-                <h2>{hero.title}</h2>
-                <p className="v0-composer-copy">{hero.body}</p>
+                <h2>{composerCopy.title}</h2>
+                <p className="v0-composer-copy">{composerCopy.body}</p>
               </div>
               <div className="v0-status">{status}</div>
             </div>

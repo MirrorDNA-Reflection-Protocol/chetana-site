@@ -21,7 +21,9 @@ P0 scope (from docs/03_IMPLEMENTATION_BACKLOG.md):
 from __future__ import annotations
 
 import logging
+import json
 import time
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
@@ -51,27 +53,69 @@ logger = logging.getLogger("chetana.incident")
 
 router = APIRouter(prefix="/api/incident", tags=["incident"])
 
-# ── In-memory session store ───────────────────────────────────────────────────
-# { incident_id: (IncidentSession, created_at_epoch) }
-_SESSION_STORE: Dict[str, tuple[IncidentSession, float]] = {}
-_SESSION_TTL_SECONDS = 3600  # 1 hour
+# ── Durable session store ────────────────────────────────────────────────────
+_SESSION_ROOT = Path.home() / ".mirrordna" / "chetana" / "incident_sessions"
+_SESSION_ROOT.mkdir(parents=True, exist_ok=True)
+_SESSION_TTL_SECONDS = 7 * 24 * 3600  # 7 days
+
+
+def _session_path(incident_id: str) -> Path:
+    return _SESSION_ROOT / f"{incident_id}.json"
+
+
+def _load_record(incident_id: str) -> dict[str, Any]:
+    path = _session_path(incident_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Incident session {incident_id!r} not found.")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.error("Failed to read incident session %s: %s", incident_id, exc)
+        raise HTTPException(status_code=500, detail="Incident session could not be loaded.")
+
+
+def _find_session_by_scan(scan_id: str) -> IncidentSession | None:
+    for path in _SESSION_ROOT.glob("*.json"):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+            created_at = float(record.get("created_at_epoch", 0))
+            session_data = record.get("session", {})
+            if session_data.get("scan_id") != scan_id:
+                continue
+            if time.time() - created_at > _SESSION_TTL_SECONDS:
+                path.unlink(missing_ok=True)
+                continue
+            session = IncidentSession.model_validate(session_data)
+            if not session.completed:
+                return session
+        except Exception:
+            continue
+    return None
 
 
 def _get_session(incident_id: str) -> IncidentSession:
-    entry = _SESSION_STORE.get(incident_id)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"Incident session {incident_id!r} not found.")
-    session, created_at = entry
+    record = _load_record(incident_id)
+    created_at = float(record.get("created_at_epoch", 0))
     if time.time() - created_at > _SESSION_TTL_SECONDS:
-        del _SESSION_STORE[incident_id]
+        _session_path(incident_id).unlink(missing_ok=True)
         raise HTTPException(status_code=410, detail="Incident session expired.")
-    return session
+    return IncidentSession.model_validate(record.get("session", {}))
 
 
 def _save_session(session: IncidentSession) -> None:
-    existing = _SESSION_STORE.get(session.incident_id)
-    created_at = existing[1] if existing else time.time()
-    _SESSION_STORE[session.incident_id] = (session, created_at)
+    path = _session_path(session.incident_id)
+    created_at = time.time()
+    if path.exists():
+        try:
+            created_at = float(json.loads(path.read_text(encoding="utf-8")).get("created_at_epoch", created_at))
+        except Exception:
+            created_at = time.time()
+    record = {
+        "created_at_epoch": created_at,
+        "updated_at_epoch": time.time(),
+        "session": session.model_dump(mode="json"),
+    }
+    path.write_text(json.dumps(record, ensure_ascii=True, indent=2), encoding="utf-8")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -89,6 +133,17 @@ async def start_incident(req: IncidentStartRequest) -> IncidentStartResponse:
             status_code=400,
             detail="Incident mode is only available for red or amber risk results.",
         )
+
+    if req.scan_id:
+        existing = _find_session_by_scan(req.scan_id)
+        if existing is not None:
+            screen = get_screen(existing)
+            logger.info("Incident resumed: id=%s category=%s risk=%s", existing.incident_id, existing.category, existing.risk_level)
+            return IncidentStartResponse(
+                incident_id=existing.incident_id,
+                step=existing.current_step,
+                screen=screen,
+            )
 
     category = resolve_category(req.category, req.score)
 

@@ -1,9 +1,9 @@
 """
 Chetana Showcase Site — Backend API.
 
-Proxies to the live Kavach API at :8790 for real scan results.
-Serves the web app, recent scam patterns, and helper routes.
-Includes a simple keyword-matched assistant for common questions.
+Serves the web app, local-first scan and chat flows, partner APIs,
+recent scam patterns, and helper routes.
+Kavach remains available for thin identifier checks and feeds.
 """
 from __future__ import annotations
 
@@ -13,12 +13,14 @@ import re
 import sys
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
+from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
 from pathlib import Path
+from uuid import uuid4
 
 # Load shared Chetana soul, gates, prompt from canonical location
 _CHETANA_DIR = Path.home() / ".mirrordna" / "chetana"
@@ -26,14 +28,11 @@ if _CHETANA_DIR.is_dir() and str(_CHETANA_DIR) not in sys.path:
     sys.path.insert(0, str(_CHETANA_DIR))
 
 try:
-    from prompt import build_system_prompt  # noqa: E402
-    from gates import gate_output, enforce_disclaimer  # noqa: E402
+    from gates import gate_output  # noqa: E402
 except ModuleNotFoundError as exc:  # pragma: no cover - runtime resilience
     if exc.name not in {"prompt", "gates"}:
         raise
     from app.chetana_runtime_fallback import (  # noqa: E402
-        build_system_prompt,
-        enforce_disclaimer,
         gate_output,
     )
 
@@ -52,8 +51,22 @@ from app.v0_runtime import (  # noqa: E402
     build_trust_bundle,
     log_event as log_v0_event,
 )
+from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary  # noqa: E402
+from app.gamechanger.rules import (  # noqa: E402
+    analyze_request as analyze_gamechanger_request,
+    build_emergency_response as build_gamechanger_emergency_response,
+    load_official_rails,
+)
+from app.gamechanger.schemas import (  # noqa: E402
+    AnalyzeRequest as GamechangerAnalyzeRequest,
+    AnalyzeResponse as GamechangerAnalyzeResponse,
+    EmergencyRequest as GamechangerEmergencyRequest,
+    EmergencyResponse as GamechangerEmergencyResponse,
+    OfficialRail as GamechangerOfficialRail,
+)
+from app.scan_guidance import build_live_scan_guidance, enrich_v0_verdict  # noqa: E402
 
-KAVACH_URL = "http://127.0.0.1:8791"
+KAVACH_URL = "http://127.0.0.1:8790"
 TELEGRAM_API = "https://api.telegram.org"
 
 
@@ -180,388 +193,13 @@ async def _close_client():
         await _client.aclose()
 
 
-# ── Google Cloud Translation API ──────────────────────────────────────
-
-def _load_google_api_key() -> str:
-    """Load GOOGLE_API_KEY from env or macOS Keychain."""
-    import os, subprocess
-    key = os.environ.get("GOOGLE_API_KEY", "")
-    if key:
-        return key
-    try:
-        result = subprocess.run(
-            ["security", "find-generic-password", "-a", "mirrordna", "-s", "GOOGLE_API_KEY", "-w"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except Exception:
-        pass
-    return ""
-
-_GOOGLE_API_KEY = _load_google_api_key()
-_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2"
-
-
-# ── Scam Council: multi-model consensus scoring ─────────────────────
-
-_COUNCIL_PROMPT_TEMPLATE = (
-    'You are a scam detection expert. Analyze this message and respond with ONLY a JSON object:\n'
-    '{"score": <0-100>, "verdict": "<SCAM|SUSPICIOUS|SAFE>", "reason": "<one sentence>"}\n\n'
-    'Score guide: 0-30 = safe, 31-60 = suspicious, 61-100 = scam.\n\n'
-    'Message to analyze:\n'
-)
-
-
-def _council_prompt(text: str) -> str:
-    return _COUNCIL_PROMPT_TEMPLATE + text[:1000]
-
-
-def _load_council_keys() -> dict:
-    """Load API keys for council members from macOS Keychain + env."""
-    import os, subprocess
-    keys = {}
-    # Try macOS Keychain first
-    for key_name in ["DEEPSEEK_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "OPENAI_API_KEY"]:
-        # Check env first
-        if os.environ.get(key_name):
-            keys[key_name] = os.environ[key_name]
-            continue
-        # Fall back to Keychain
-        try:
-            result = subprocess.run(
-                ["security", "find-generic-password", "-a", "mirrordna", "-s", key_name, "-w"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                keys[key_name] = result.stdout.strip()
-        except Exception:
-            pass
-    loaded = [k for k in keys if keys[k]]
-    logger.info("Council keys loaded: %s", ", ".join(loaded) if loaded else "none")
-    return keys
-
-_COUNCIL_KEYS = _load_council_keys()
-_COUNCIL_BUDGET_SEC = 4.0
-_COUNCIL_LOCAL_MODELS: tuple[tuple[str, float], ...] = (
-    ("chetana-guard-fast", 3.0),
-    ("phi4-mini", 2.0),
-)
-
-
-async def _vote_deepseek(text: str) -> dict | None:
-    """DeepSeek (China) council vote."""
-    key = _COUNCIL_KEYS.get("DEEPSEEK_API_KEY")
-    if not key:
-        return None
-    try:
-        client = await get_client()
-        resp = await client.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
-            timeout=10.0,
-        )
-        if resp.status_code == 200:
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            return _parse_vote(raw, "DeepSeek", "China")
-    except Exception as e:
-        logger.debug("DeepSeek vote failed: %s", e)
-    return None
-
-
-async def _vote_mistral(text: str) -> dict | None:
-    """Mistral (France/EU) council vote."""
-    key = _COUNCIL_KEYS.get("MISTRAL_API_KEY")
-    if not key:
-        return None
-    try:
-        client = await get_client()
-        resp = await client.post(
-            "https://api.mistral.ai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
-            timeout=10.0,
-        )
-        if resp.status_code == 200:
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            return _parse_vote(raw, "Mistral", "EU")
-    except Exception as e:
-        logger.debug("Mistral vote failed: %s", e)
-    return None
-
-
-async def _vote_groq(text: str) -> dict | None:
-    """Groq/Llama (US) council vote — ultra-fast inference."""
-    key = _COUNCIL_KEYS.get("GROQ_API_KEY")
-    if not key:
-        return None
-    try:
-        client = await get_client()
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": _council_prompt(text)}], "temperature": 0.1, "max_tokens": 150},
-            timeout=8.0,
-        )
-        if resp.status_code == 200:
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            return _parse_vote(raw, "Llama-70B", "US")
-    except Exception as e:
-        logger.debug("Groq vote failed: %s", e)
-    return None
-
-
-async def _vote_india(text: str) -> dict | None:
-    """India council vote — prefer the fast local model and keep latency bounded."""
-    try:
-        client = await get_client()
-        for model, timeout_s in _COUNCIL_LOCAL_MODELS:
-            try:
-                resp = await client.post(
-                    f"{OLLAMA_URL}/api/generate",
-                    json={"model": model, "prompt": _council_prompt(text), "stream": False, "keep_alive": "5m"},
-                    timeout=timeout_s,
-                )
-                if resp.status_code == 200:
-                    raw = resp.json().get("response", "").strip()
-                    if raw and len(raw) > 5:
-                        vote = _parse_vote(raw, model, "India")
-                        if vote:
-                            return vote
-            except Exception as e:
-                logger.debug("India vote failed for %s: %s", model, e)
-                continue
-    except Exception as e:
-        logger.debug("India vote failed: %s", e)
-    return None
-
-
-def _parse_vote(raw: str, model_name: str, region: str) -> dict | None:
-    """Parse a council vote from raw model output."""
-    import json as _json
-    try:
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start >= 0 and end > start:
-            vote = _json.loads(raw[start:end])
-            vote["model"] = model_name
-            vote["region"] = region
-            vote["score"] = max(0, min(100, int(vote.get("score", vote.get("threat_score", 50)))))
-            if not vote.get("reason") and vote.get("explanation"):
-                vote["reason"] = vote["explanation"]
-            return vote
-    except Exception:
-        pass
-    return None
-
-
-async def scam_council(text: str) -> dict:
-    """International Scam Council: 4 models from 4 countries vote independently.
-    DeepSeek (China) + Mistral (EU) + Groq/Llama (US) + Sarvam (India).
-    Returns {council_score, council_verdict, council_votes, agreement}."""
-    import asyncio
-
-    def _consume_task_result(task: asyncio.Task) -> None:
-        try:
-            task.result()
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.debug("Council vote task failed: %s", e)
-
-    tasks = [
-        asyncio.create_task(_vote_deepseek(text), name="deepseek"),
-        asyncio.create_task(_vote_mistral(text), name="mistral"),
-        asyncio.create_task(_vote_groq(text), name="groq"),
-        asyncio.create_task(_vote_india(text), name="india"),
-    ]
-    for task in tasks:
-        task.add_done_callback(_consume_task_result)
-    done, pending = await asyncio.wait(tasks, timeout=_COUNCIL_BUDGET_SEC)
-
-    if pending:
-        skipped = ", ".join(task.get_name() for task in pending)
-        logger.warning(
-            "Council budget exceeded after %.1fs; skipping: %s",
-            _COUNCIL_BUDGET_SEC,
-            skipped,
-        )
-        for task in pending:
-            task.cancel()
-
-    votes = []
-    for task in done:
-        try:
-            vote = task.result()
-        except asyncio.CancelledError:
-            continue
-        except Exception:
-            continue
-        if vote is not None:
-            votes.append(vote)
-
-    if not votes:
-        return {"council_score": None, "council_verdict": None, "council_votes": [], "agreement": 0, "models_voted": 0}
-
-    scores = [v["score"] for v in votes]
-    avg_score = sum(scores) / len(scores)
-    max_diff = max(scores) - min(scores) if len(scores) > 1 else 0
-    agreement = max(0, 100 - max_diff)
-
-    if avg_score >= 65:
-        verdict = "SUSPICIOUS"
-    elif avg_score >= 35:
-        verdict = "UNCLEAR"
-    else:
-        verdict = "LOW_RISK"
-
-    # Strong disagreement → fail safe, use higher score
-    if max_diff > 40:
-        verdict = "UNCLEAR"
-
-    return {
-        "council_score": round(avg_score),
-        "council_verdict": verdict,
-        "council_votes": votes,
-        "agreement": round(agreement),
-        "models_voted": len(votes),
-    }
-
-# ── Cost guard: hard cap on translation usage ────────────────────────
-# Free tier: 500K chars/month. We cap at 400K to stay safe.
-_TRANSLATE_CHAR_LIMIT = 400_000  # monthly cap (chars)
-_translate_chars_used = 0
-_translate_month = datetime.now(timezone.utc).month
-
-
-def _check_translate_budget(text_len: int) -> bool:
-    """Returns True if we have budget for this translation."""
-    global _translate_chars_used, _translate_month
-    now_month = datetime.now(timezone.utc).month
-    if now_month != _translate_month:
-        _translate_chars_used = 0
-        _translate_month = now_month
-    return (_translate_chars_used + text_len) <= _TRANSLATE_CHAR_LIMIT
-
-
-def _record_translate_usage(text_len: int):
-    global _translate_chars_used
-    _translate_chars_used += text_len
-
-
-_SARVAM_LANGS = {"hi", "ta", "te", "kn", "ml", "bn", "mr", "gu", "pa", "or", "as", "ur"}
-
-
-async def _sarvam_translate(text: str, source: str, target: str) -> str | None:
-    """Translate via local Sarvam model (Ollama). Free, offline, good for Indian languages + dialects."""
-    src_name = LANG_NAMES.get(source, source)
-    tgt_name = LANG_NAMES.get(target, target)
-    prompt = f"Translate the following {src_name} text to {tgt_name}. Output ONLY the translation, nothing else.\n\n{text[:2000]}"
-    try:
-        client = await get_client()
-        resp = await client.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={"model": SARVAM_MODEL, "prompt": prompt, "stream": False},
-            timeout=15.0,
-        )
-        if resp.status_code == 200:
-            return resp.json().get("response", "").strip()
-    except Exception as e:
-        logger.debug("Sarvam translate failed: %s", e)
-    return None
-
-
-async def google_translate(text: str, target: str = "en", source: str | None = None) -> tuple[str, str]:
-    """Translate text. Strategy:
-    1. Indian regional languages → try Sarvam (free, local) first
-    2. Fallback or international → Google Cloud Translation API
-    3. Budget-capped at 400K chars/month to stay in free tier
-    Returns (translated_text, detected_source_language)."""
-    if not text or len(text.strip()) < 3:
-        return text, source or "en"
-
-    # For Indian languages, try Sarvam first (free, no budget cost)
-    if source in _SARVAM_LANGS or target in _SARVAM_LANGS:
-        sarvam_result = await _sarvam_translate(text, source or "auto", target)
-        if sarvam_result and len(sarvam_result) > 3:
-            return sarvam_result, source or "en"
-
-    # Fallback to Google Translate API
-    if not _GOOGLE_API_KEY:
-        return text, source or "en"
-    if not _check_translate_budget(len(text)):
-        logger.warning("Translation budget exhausted (%d/%d chars). Skipping.",
-                       _translate_chars_used, _TRANSLATE_CHAR_LIMIT)
-        return text, source or "en"
-    try:
-        client = await get_client()
-        trimmed = text[:5000]
-        payload: dict = {"q": trimmed, "target": target, "key": _GOOGLE_API_KEY}
-        if source:
-            payload["source"] = source
-        resp = await client.post(_TRANSLATE_URL, json=payload, timeout=5.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            t = data["data"]["translations"][0]
-            _record_translate_usage(len(trimmed))
-            return t["translatedText"], t.get("detectedSourceLanguage", source or "en")
-    except Exception as e:
-        logger.debug("Google Translate failed: %s", e)
-    return text, source or "en"
-
-
 @app.get("/api/translate/budget")
 async def translate_budget():
-    """Check translation API budget usage."""
+    """Expose the current local-only translation posture."""
     return {
-        "chars_used": _translate_chars_used,
-        "chars_limit": _TRANSLATE_CHAR_LIMIT,
-        "chars_remaining": max(0, _TRANSLATE_CHAR_LIMIT - _translate_chars_used),
-        "percent_used": round(_translate_chars_used / _TRANSLATE_CHAR_LIMIT * 100, 1),
-        "month": _translate_month,
         "sarvam_available": True,
-        "google_available": bool(_GOOGLE_API_KEY),
-    }
-
-
-async def translate_scan_result(result: dict, target_lang: str) -> dict:
-    """Translate scan result fields back to user's language."""
-    if target_lang == "en" or not _GOOGLE_API_KEY:
-        return result
-    # Translate explanation and signals
-    for field in ["explanation", "analysis"]:
-        if result.get(field):
-            translated, _ = await google_translate(result[field], target=target_lang)
-            result[field] = translated
-    if result.get("why_flagged"):
-        translated_flags = []
-        for flag in result["why_flagged"][:5]:
-            t, _ = await google_translate(flag, target=target_lang)
-            translated_flags.append(t)
-        result["why_flagged"] = translated_flags
-    return result
-
-
-# ── Health endpoint ───────────────────────────────────────────────────
-
-@app.get("/health")
-async def health_check():
-    """Check Chetana + Kavach connectivity."""
-    kavach_ok = False
-    try:
-        client = await get_client()
-        # Kavach redirects / to /ui, so check /ui directly
-        resp = await client.get(f"{KAVACH_URL}/ui", timeout=3.0)
-        kavach_ok = resp.status_code == 200
-    except Exception:
-        pass
-    status = "healthy" if kavach_ok else "degraded"
-    return {
-        "status": status,
-        "chetana": "up",
-        "kavach": "up" if kavach_ok else "down",
-        "port": 8093,
+        "google_available": False,
+        "mode": "local_only",
     }
 
 
@@ -569,6 +207,7 @@ async def health_check():
 
 SARVAM_MODEL = "hf.co/mradermacher/sarvam-translate-i1-GGUF:Q4_K_M"
 OLLAMA_URL = "http://127.0.0.1:11434"
+MEDIA_PROXY_TIMEOUT = httpx.Timeout(90.0, connect=10.0)
 
 LANG_NAMES = {
     "hi": "Hindi", "ta": "Tamil", "te": "Telugu", "kn": "Kannada",
@@ -610,19 +249,23 @@ def detect_script_lang(text: str) -> str | None:
     return dominant
 
 
-async def sarvam_translate(text: str, lang: str) -> str:
-    """Translate text to an Indian language using local Sarvam model via Ollama.
-    Returns original text if lang is 'en' or translation fails."""
-    if lang == "en" or lang not in LANG_NAMES:
+async def local_translate_text(text: str, target_lang: str) -> str:
+    """Translate text locally via Ollama without sending scan content to external services."""
+    if not text.strip():
         return text
-    target = LANG_NAMES[lang]
+    target = "English" if target_lang == "en" else LANG_NAMES.get(target_lang)
+    if not target:
+        return text
     try:
         client = await get_client()
         resp = await client.post(
             f"{OLLAMA_URL}/api/generate",
             json={
                 "model": SARVAM_MODEL,
-                "prompt": f"Translate to {target}: {text}",
+                "prompt": (
+                    f"Translate to {target}. Preserve URLs, UPI IDs, phone numbers, "
+                    f"amounts, and transaction references exactly.\n\n{text}"
+                ),
                 "stream": False,
             },
             timeout=15.0,
@@ -630,8 +273,15 @@ async def sarvam_translate(text: str, lang: str) -> str:
         if resp.status_code == 200:
             return resp.json().get("response", "").strip() or text
     except Exception as e:
-        logger.warning("Sarvam translate failed (%s→%s): %s", lang, target, e)
+        logger.warning("Local translate failed (%s): %s", target_lang, e)
     return text
+
+
+async def sarvam_translate(text: str, lang: str) -> str:
+    """Translate text to an Indian language using the local translation helper."""
+    if lang == "en" or lang not in LANG_NAMES:
+        return text
+    return await local_translate_text(text, lang)
 
 
 async def translate_scan_result(result: dict, lang: str) -> dict:
@@ -647,6 +297,17 @@ async def translate_scan_result(result: dict, lang: str) -> dict:
     # Translate summary if present
     if "summary" in result and result["summary"]:
         result["summary"] = await sarvam_translate(result["summary"], lang)
+    if "guidance" in result and isinstance(result["guidance"], dict):
+        guidance = result["guidance"]
+        for field in ["lead", "verification_route", "false_positive_recovery", "hindi_quick_line"]:
+            if guidance.get(field):
+                guidance[field] = await sarvam_translate(guidance[field], lang)
+        for field in ["why_it_was_flagged", "do_now", "do_not_do", "if_already_acted"]:
+            if guidance.get(field):
+                translated_items = []
+                for item in guidance[field]:
+                    translated_items.append(await sarvam_translate(item, lang))
+                guidance[field] = translated_items
     return result
 
 
@@ -673,6 +334,7 @@ class PhoneCheckRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=2000)
+    lang: str = "en"
 
 
 class APKCheckRequest(BaseModel):
@@ -691,7 +353,146 @@ class OracleVerifyRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "backend": "showcase", "kavach": KAVACH_URL}
+    kavach_ok = False
+    try:
+        import httpx as _httpx
+
+        resp = _httpx.get(f"{KAVACH_URL}/ui", timeout=3.0)
+        kavach_ok = resp.status_code == 200
+    except Exception:
+        kavach_ok = False
+    return {
+        "status": "healthy" if kavach_ok else "degraded",
+        "backend": "showcase",
+        "kavach": "up" if kavach_ok else "down",
+        "port": 8093,
+    }
+
+
+def _is_link_submission(text: str) -> bool:
+    stripped = text.strip()
+    return stripped.startswith(("http://", "https://", "www.")) and len(stripped.split()) <= 2
+
+
+def _legacy_verdict_from_v0(verdict_value: str) -> str:
+    if verdict_value == "high_risk":
+        return "SUSPICIOUS"
+    if verdict_value in {"caution", "needs_review"}:
+        return "UNCLEAR"
+    return "LOW_RISK"
+
+
+def _legacy_action_eligibility(verdict_value: str) -> str:
+    if verdict_value == "high_risk":
+        return "warn_and_verify"
+    if verdict_value in {"caution", "needs_review"}:
+        return "inform_and_suggest"
+    return "inform_only"
+
+
+def _legacy_trust_state(verdict_value: str) -> str:
+    if verdict_value == "high_risk":
+        return "blocked"
+    if verdict_value in {"caution", "needs_review"}:
+        return "inspect"
+    return "unverified"
+
+
+def _legacy_score_from_v0(verdict_model: Any) -> int:
+    base_scores = {
+        "high_risk": 82,
+        "caution": 58,
+        "needs_review": 38,
+        "low_signal": 14,
+    }
+    confidence_adjustment = {
+        "high": 6,
+        "medium": 0,
+        "low": -6,
+    }
+    evidence_adjustment = {
+        "complete": 4,
+        "partial": 1,
+        "weak": -4,
+        "conflicting": 3,
+    }
+    incident_adjustment = {
+        "device_access_requested": 6,
+        "payment_attempted": 5,
+        "payment_requested": 3,
+        "active_coercion": 2,
+        "suspected": 0,
+    }
+    score = base_scores.get(verdict_model.verdict, 20)
+    score += confidence_adjustment.get(verdict_model.confidence_band, 0)
+    score += evidence_adjustment.get(verdict_model.evidence_state, 0)
+    score += incident_adjustment.get(verdict_model.incident_state, 0)
+    return max(0, min(100, int(score)))
+
+
+async def _run_local_scan_contract(text: str, lang: str = "en") -> dict[str, Any]:
+    detected = detect_script_lang(text)
+    response_lang = detected or lang or "en"
+    normalized = text.strip()
+    scan_text = normalized
+    if response_lang != "en":
+        scan_text = await local_translate_text(normalized, "en")
+
+    verdict_model = analyze_v0_scan(
+        V0ScanInput(
+            input_type="text",
+            text=scan_text,
+            language_hint=response_lang,
+        )
+    )
+    verdict_model = await enrich_v0_verdict(verdict_model)
+
+    legacy_verdict = _legacy_verdict_from_v0(verdict_model.verdict)
+    score = _legacy_score_from_v0(verdict_model)
+    is_link = _is_link_submission(normalized)
+
+    live_guidance = await build_live_scan_guidance(
+        text=normalized,
+        verdict=legacy_verdict,
+        score=score,
+        signals=verdict_model.guidance.why_it_was_flagged[:5],
+        explanation=verdict_model.summary_plain_language or "",
+        is_link=is_link,
+    )
+    guidance = {
+        **live_guidance,
+        **verdict_model.guidance.model_dump(),
+        "scenario_label": live_guidance.get("scenario_label"),
+        "hindi_quick_line": live_guidance.get("hindi_quick_line"),
+        "needs_more_evidence": live_guidance.get("needs_more_evidence", verdict_model.evidence_state == "weak"),
+    }
+
+    result = {
+        "scan_id": verdict_model.scan_id,
+        "verdict": legacy_verdict,
+        "risk_score": score,
+        "score": score,
+        "surface": "link trust" if is_link else "general trust",
+        "why_flagged": guidance["why_it_was_flagged"][:5],
+        "signals": guidance["why_it_was_flagged"][:5],
+        "summary": verdict_model.summary_plain_language,
+        "action_eligibility": _legacy_action_eligibility(verdict_model.verdict),
+        "engine": "chetana_v0_local",
+        "trust_state": _legacy_trust_state(verdict_model.verdict),
+        "reason_codes": [reason.code for reason in verdict_model.reasons],
+        "guidance": guidance,
+        "safe_next_step": verdict_model.safe_next_step,
+        "confidence_band": verdict_model.confidence_band,
+        "risk_level": verdict_model.risk_level,
+        "evidence_state": verdict_model.evidence_state,
+        "incident_state": verdict_model.incident_state,
+        "scam_type": verdict_model.scam_type,
+        "recommended_actions": verdict_model.recommended_actions,
+        "advice": guidance["do_now"][:3],
+    }
+    result = await translate_scan_result(result, response_lang)
+    result["lang"] = response_lang
+    return result
 
 
 # ── Weather ───────────────────────────────────────────────────────────
@@ -967,106 +768,31 @@ async def scan(req: ScanRequest):
 
 @app.post("/api/scan/full")
 async def scan_full(req: FullScanRequest):
-    """Full scan with Google Translate for multilingual input — scans in any language."""
-    # Auto-detect language from input text
-    detected = detect_script_lang(req.text)
-    lang = detected if detected else req.lang
-
-    # Translate non-English input to English for Kavach scanning
-    scan_text = req.text
-    source_lang = lang
-    if lang != "en":
-        scan_text, source_lang = await google_translate(req.text, target="en")
-        if source_lang != "en":
-            lang = source_lang  # Use detected language for response translation
-
-    import asyncio
-
+    """Canonical local-first scan path used by the main frontend."""
     try:
-        client = await get_client()
-        is_link = req.text.startswith("http://") or req.text.startswith("https://")
+        result = await _run_local_scan_contract(req.text, req.lang)
+        if result["risk_score"] >= 70:
+            snippet = req.text[:120].replace("*", "").replace("`", "")
+            import asyncio
 
-        # Run Kavach + Council in parallel
-        async def kavach_scan():
-            if is_link:
-                return await client.post(f"{KAVACH_URL}/api/link/check", json={"url": req.text, "lang": "en"})
-            return await client.post(f"{KAVACH_URL}/api/scan/full", json={"text": scan_text, "lang": "en"})
-
-        kavach_task = asyncio.create_task(kavach_scan())
-        council_task = asyncio.create_task(scam_council(scan_text))
-
-        resp = await kavach_task
-        council = await council_task
-
-        if resp.status_code == 200:
-            data = resp.json()
-            kavach_score = data.get("score", data.get("threat_score", 0))
-            signals = data.get("signals", [])
-
-            # Ensemble: weighted average — Kavach (primary) 60%, Council 40%
-            council_score = council.get("council_score") or kavach_score
-            final_score = round(kavach_score * 0.6 + council_score * 0.4)
-
-            # Confidence gate: if Kavach and Council disagree by >30, use the HIGHER score (fail safe)
-            if abs(kavach_score - council_score) > 30:
-                final_score = max(kavach_score, council_score)
-
-            if final_score >= 70:
-                verdict = "SUSPICIOUS"
-                action = "warn_and_verify"
-            elif final_score >= 40:
-                verdict = "UNCLEAR"
-                action = "inform_and_suggest"
-            else:
-                verdict = "LOW_RISK"
-                action = "inform_only"
-
-            explanation = data.get("explanation", "")
-            advice = data.get("advice", "")
-
-            result = {
-                "verdict": verdict,
-                "risk_score": final_score,
-                "score": final_score,
-                "surface": "link trust" if is_link else "general trust",
-                "why_flagged": signals[:5] if signals else ([explanation[:200]] if explanation else ["Analysis complete"]),
-                "explanation": explanation,
-                "advice": advice,
-                "action_eligibility": action,
-                "engine": data.get("engine", "kavach"),
-                "kavach_score": kavach_score,
-                "council_score": council_score,
-                "council_agreement": council.get("agreement"),
-                "council_models": council.get("models_voted", 0),
-                "council_votes": council.get("council_votes", []),
-            }
-
-            # Translate to user's language
-            result = await translate_scan_result(result, lang)
-            result["lang"] = lang
-
-            # Push high-risk alerts to Telegram
-            if final_score >= 70:
-                snippet = req.text[:120].replace("*", "").replace("`", "")
-                alert = (
+            asyncio.ensure_future(
+                _notify_telegram(
                     f"🚨 *HIGH RISK scan*\n"
-                    f"Kavach: {kavach_score} | Council: {council_score} | Final: {final_score}\n"
-                    f"Agreement: {council.get('agreement', '?')}%\n"
+                    f"Score: {result['risk_score']}\n"
+                    f"Type: {result.get('scam_type', 'unknown')}\n"
                     f"Content: `{snippet}`"
                 )
-                asyncio.ensure_future(_notify_telegram(alert))
-
-            return result
+            )
+        return result
     except Exception as e:
         logger.warning("Full scan failed: %s", e)
-
-    return {
-        "verdict": "SERVICE_UNAVAILABLE",
-        "risk_score": 0,
-        "surface": "unknown",
-        "why_flagged": ["Live analysis temporarily unavailable"],
-        "action_eligibility": "retry",
-    }
+        return {
+            "verdict": "SERVICE_UNAVAILABLE",
+            "risk_score": 0,
+            "surface": "unknown",
+            "why_flagged": ["Live analysis temporarily unavailable"],
+            "action_eligibility": "retry",
+        }
 
 
 # ── Quick scan (pattern-only, fastest path) ───────────────────────────
@@ -1136,48 +862,25 @@ class TTSRequest(BaseModel):
 
 @app.post("/api/tts")
 async def text_to_speech(req: TTSRequest):
-    """Convert text to speech using Sarvam Bulbul (free credits) or Bhashini."""
-    tts_lang = SARVAM_TTS_LANG_MAP.get(req.lang)
-
-    # Try Sarvam Bulbul first (₹1000 free credits, no credit card)
-    if _SARVAM_API_KEY and tts_lang:
-        try:
-            client = await get_client()
-            resp = await client.post(
-                "https://api.sarvam.ai/text-to-speech",
-                headers={
-                    "api-subscription-key": _SARVAM_API_KEY,
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "inputs": [req.text[:500]],
-                    "target_language_code": tts_lang,
-                    "model": "bulbul:v2",
-                    "enable_preprocessing": True,
-                },
-                timeout=10.0,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                audio_b64 = data.get("audios", [None])[0]
-                if audio_b64:
-                    return {"audio": audio_b64, "format": "wav", "engine": "sarvam-bulbul"}
-        except Exception as e:
-            logger.warning("Sarvam TTS failed: %s", e)
-
-    # Fallback: browser-native TTS (return signal to frontend)
-    return {"audio": None, "format": "browser", "engine": "browser-speechsynthesis",
-            "hint": "Use browser SpeechSynthesis API as fallback"}
+    """Return the browser-native TTS path to keep Chetana local-first."""
+    return {
+        "audio": None,
+        "format": "browser",
+        "engine": "browser-speechsynthesis",
+        "hint": "Use browser SpeechSynthesis API as fallback",
+        "lang": req.lang,
+        "text_length": len(req.text),
+    }
 
 
 @app.get("/api/tts/status")
 async def tts_status():
     """Check which TTS engines are available."""
     return {
-        "sarvam": bool(_SARVAM_API_KEY),
-        "bhashini": bool(_BHASHINI_API_KEY),
+        "sarvam": False,
+        "bhashini": False,
         "browser": True,
-        "languages": list(SARVAM_TTS_LANG_MAP.keys()) if _SARVAM_API_KEY else ["en"],
+        "languages": list(SARVAM_TTS_LANG_MAP.keys()),
     }
 
 
@@ -1540,36 +1243,6 @@ async def _fetch_kb_articles_for_chat(query: str) -> list[dict]:
         pass
     return []
 
-
-# System prompt loaded from shared soul + knowledge + gates
-CHETANA_SYSTEM_PROMPT = build_system_prompt("chat")
-
-_LLM_KEYS: dict[str, str] = {}
-
-
-def _load_llm_keys() -> dict[str, str]:
-    """Load all LLM API keys from env and secrets.env. Cached after first call."""
-    if _LLM_KEYS:
-        return _LLM_KEYS
-    import os
-    key_names = [
-        "OPENAI_API_KEY", "GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3",
-        "GROQ_API_KEY", "GROQ_API_KEY_2",
-    ]
-    for name in key_names:
-        val = os.getenv(name, "")
-        if val:
-            _LLM_KEYS[name] = val
-    secrets = Path.home() / ".mirrordna" / "secrets.env"
-    if secrets.exists():
-        for line in secrets.read_text().splitlines():
-            line = line.strip().removeprefix("export ").strip()
-            for name in key_names:
-                if line.startswith(f"{name}=") and name not in _LLM_KEYS:
-                    _LLM_KEYS[name] = line.split("=", 1)[1].strip().strip('"').strip("'")
-    return _LLM_KEYS
-
-
 def _parse_suggestions(reply: str) -> tuple[str, list[str]]:
     """Extract suggestion questions from LLM reply if present."""
     suggestions = []
@@ -1585,92 +1258,6 @@ def _parse_suggestions(reply: str) -> tuple[str, list[str]]:
         if suggestions:
             reply = "\n".join(main_lines).strip()
     return reply, suggestions
-
-
-async def _try_openai(message: str, keys: dict) -> str | None:
-    """Try OpenAI GPT-4o-mini."""
-    key = keys.get("OPENAI_API_KEY")
-    if not key:
-        return None
-    try:
-        client = await get_client()
-        resp = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "system", "content": CHETANA_SYSTEM_PROMPT},
-                    {"role": "user", "content": message},
-                ],
-                "max_tokens": 300, "temperature": 0.7,
-            },
-            timeout=15.0,
-        )
-        if resp.status_code == 200:
-            return resp.json()["choices"][0]["message"]["content"].strip()
-        logger.warning("OpenAI failed: %s", resp.status_code)
-    except Exception as e:
-        logger.warning("OpenAI error: %s", e)
-    return None
-
-
-async def _try_gemini(message: str, keys: dict) -> str | None:
-    """Try Gemini Flash (cycles through available keys)."""
-    for key_name in ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"]:
-        key = keys.get(key_name)
-        if not key:
-            continue
-        try:
-            client = await get_client()
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "systemInstruction": {"parts": [{"text": CHETANA_SYSTEM_PROMPT}]},
-                    "contents": [{"parts": [{"text": message}]}],
-                    "generationConfig": {"maxOutputTokens": 300, "temperature": 0.7},
-                },
-                timeout=15.0,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
-                if text:
-                    return text.strip()
-            logger.warning("Gemini %s failed: %s", key_name, resp.status_code)
-        except Exception as e:
-            logger.warning("Gemini %s error: %s", key_name, e)
-    return None
-
-
-async def _try_groq(message: str, keys: dict) -> str | None:
-    """Try Groq Llama."""
-    for key_name in ["GROQ_API_KEY", "GROQ_API_KEY_2"]:
-        key = keys.get(key_name)
-        if not key:
-            continue
-        try:
-            client = await get_client()
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": CHETANA_SYSTEM_PROMPT},
-                        {"role": "user", "content": message},
-                    ],
-                    "max_tokens": 300, "temperature": 0.7,
-                },
-                timeout=15.0,
-            )
-            if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"].strip()
-            logger.warning("Groq %s failed: %s", key_name, resp.status_code)
-        except Exception as e:
-            logger.warning("Groq %s error: %s", key_name, e)
-    return None
 
 
 OLLAMA_CHAT_SYSTEM = (
@@ -1724,16 +1311,9 @@ def _looks_scannable(msg: str) -> bool:
 
 
 async def _inline_scan(content: str) -> dict | None:
-    """Run a fast pattern scan via Kavach and return results."""
+    """Run the canonical local-first scan contract for suspicious content."""
     try:
-        client = await get_client()
-        resp = await client.post(
-            f"{KAVACH_URL}/scan",
-            json={"text": content, "lang": "en"},
-            timeout=5.0,
-        )
-        if resp.status_code == 200:
-            return resp.json()
+        return await _run_local_scan_contract(content, "en")
     except Exception as e:
         logger.debug("Inline scan failed: %s", e)
     return None
@@ -1741,7 +1321,7 @@ async def _inline_scan(content: str) -> dict | None:
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    """LLM-powered chat with auto-scan: detects suspicious content and scans inline."""
+    """Local-first chat with canonical inline scam checks."""
     message = req.message.strip()
     if not message:
         return {"reply": "Please type a message.", "articles": [], "suggestions": []}
@@ -1753,80 +1333,56 @@ async def chat(req: ChatRequest):
     if _looks_scannable(message):
         scan_result = await _inline_scan(message)
 
-    keys = _load_llm_keys()
-
-    # If we have a scan result, enrich the LLM prompt with it
-    llm_message = message
     if scan_result:
-        score = scan_result.get("threat_score", 0)
-        level = scan_result.get("risk_level", "LOW")
-        signals = scan_result.get("signals", [])
-        advice = scan_result.get("advice", [])
+        guidance = scan_result.get("guidance", {})
+        reply = "\n\n".join(
+            [
+                guidance["lead"],
+                "Why this was flagged:\n" + "\n".join(f"- {item}" for item in guidance["why_it_was_flagged"][:3]),
+                "What to do now:\n" + "\n".join(f"- {item}" for item in guidance["do_now"][:3]),
+                "If you already acted:\n" + "\n".join(f"- {item}" for item in guidance["if_already_acted"][:2]),
+            ]
+        )
+        suggestions = ["What should I do next?", "How to report fraud?", "Tell me about this scam type"]
+        if scan_result.get("risk_score", 0) >= 70:
+            snippet = message[:120].replace("*", "").replace("`", "")
+            import asyncio
+
+            asyncio.ensure_future(
+                _notify_telegram(
+                    f"🚨 *HIGH RISK via chat*\n"
+                    f"Score: {scan_result['risk_score']}/100\n"
+                    f"Type: {scan_result.get('scam_type', 'unknown')}\n"
+                    f"`{snippet}`"
+                )
+            )
+        return {
+            "reply": reply,
+            "articles": kb_articles,
+            "suggestions": suggestions,
+            "scan": scan_result,
+        }
+
+    llm_message = message
+    if kb_articles:
+        article_context = "\n\n".join(
+            f"- {item['title']}: {item['reply'][:280]}" for item in kb_articles[:4]
+        )
         llm_message = (
-            f"[SCAN RESULT: {level} risk, score {score}/100, "
-            f"signals: {', '.join(signals[:4]) if signals else 'none'}]\n\n"
-            f"User pasted this content for checking:\n{message}\n\n"
-            f"Explain the scan result to the user in a helpful way. "
-            f"Mention the risk score and key signals. If high risk, give emergency steps."
+            "Use the context below if it helps, but answer directly and concisely.\n\n"
+            f"{article_context}\n\nUser question:\n{message}"
         )
 
-    # Try providers in order: OpenAI → Gemini → Groq
-    reply = await _try_openai(llm_message, keys)
-    if not reply:
-        reply = await _try_gemini(llm_message, keys)
-    if not reply:
-        reply = await _try_groq(llm_message, keys)
-
+    reply = await _try_ollama_chat(llm_message)
     if reply:
-        # Run through safety gates before returning
         gated = gate_output(reply)
         reply = gated["text"]
         if gated["gated"]:
-            logger.info("Chat gate fired: %s", gated["flags"])
+            logger.info("Ollama chat gate fired: %s", gated["flags"])
         reply, suggestions = _parse_suggestions(reply)
         if not suggestions:
-            suggestions = ["How do I check a suspicious message?", "What scams are trending?", "How to report fraud?"]
-        result = {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
-        if scan_result:
-            result["scan"] = {
-                "risk_score": scan_result.get("threat_score", 0),
-                "risk_level": scan_result.get("risk_level", "LOW"),
-                "signals": scan_result.get("signals", [])[:5],
-                "advice": scan_result.get("advice", [])[:3],
-            }
-            # Push high-risk to Telegram
-            if scan_result.get("threat_score", 0) >= 70:
-                snippet = message[:120].replace("*", "").replace("`", "")
-                import asyncio
-                asyncio.ensure_future(_notify_telegram(
-                    f"🚨 *HIGH RISK via chat*\nScore: {scan_result['threat_score']}/100\n`{snippet}`"
-                ))
-        return result
-
-    # Fallback: if scan result exists, format it without LLM
-    if scan_result:
-        score = scan_result.get("threat_score", 0)
-        level = scan_result.get("risk_level", "LOW")
-        signals = scan_result.get("signals", [])
-        advice = scan_result.get("advice", [])
-        if score >= 70:
-            reply = f"🚨 HIGH RISK (score: {score}/100). "
-        elif score >= 35:
-            reply = f"⚠️ MEDIUM RISK (score: {score}/100). "
-        else:
-            reply = f"✅ LOW RISK (score: {score}/100). "
-        if signals:
-            reply += "Signals: " + ", ".join(signals[:3]) + ". "
-        if advice:
-            reply += advice[0]
-        suggestions = ["What should I do next?", "How to report fraud?", "Tell me about this scam type"]
-        return {
-            "reply": reply, "articles": kb_articles, "suggestions": suggestions,
-            "scan": {
-                "risk_score": score, "risk_level": level,
-                "signals": signals[:5], "advice": (advice if isinstance(advice, list) else [advice])[:3],
-            },
-        }
+            suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
+        return {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
 
     # Final fallback: keyword matching
     matches = _match_faq(message)
@@ -1834,17 +1390,6 @@ async def chat(req: ChatRequest):
         reply = matches[0]["reply"]
         suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
     else:
-        # Try local Ollama (Sarvam multilingual model) before generic fallback
-        reply = await _try_ollama_chat(message)
-        if reply:
-            gated = gate_output(reply)
-            reply = gated["text"]
-            if gated["gated"]:
-                logger.info("Ollama chat gate fired: %s", gated["flags"])
-            reply, suggestions = _parse_suggestions(reply)
-            if not suggestions:
-                suggestions = ["How does scanning work?", "What scam types exist?", "How to report fraud?"]
-            return {"reply": reply, "articles": kb_articles, "suggestions": suggestions[:4]}
         reply = (
             "I'm not sure about that specific topic, but I can help you check suspicious messages, "
             "understand scam types, or find emergency resources. "
@@ -2028,6 +1573,46 @@ _ANALYTICS_LOG.parent.mkdir(parents=True, exist_ok=True)
 
 _VALID_VERDICTS = {"SUSPICIOUS", "HIGH", "UNCLEAR", "MEDIUM", "LOW_RISK", "LOW", "SERVICE_UNAVAILABLE"}
 
+
+def _legacy_scan_input_type(scan_type: Any) -> str:
+    normalized = str(scan_type or "").strip().lower()
+    if normalized == "qr":
+        return "qr_image"
+    if normalized == "media":
+        return "screenshot"
+    if normalized == "voice":
+        return "mixed"
+    return "text"
+
+
+def _legacy_verdict_to_v0(verdict: Any, score: Any) -> tuple[str, str]:
+    normalized = str(verdict or "").strip().upper()
+    numeric_score: float | None = None
+    try:
+        if score is not None:
+            numeric_score = float(score)
+    except (TypeError, ValueError):
+        numeric_score = None
+
+    if normalized in {"SUSPICIOUS", "HIGH"}:
+        return "high_risk", "high"
+    if normalized in {"UNCLEAR", "MEDIUM"}:
+        return "caution", "medium"
+    if normalized in {"LOW_RISK", "LOW"}:
+        return "low_signal", "low"
+    if numeric_score is not None and numeric_score >= 70:
+        return "high_risk", "high"
+    if numeric_score is not None and numeric_score >= 40:
+        return "caution", "medium"
+    return "low_signal", "low"
+
+
+def _legacy_session_id(body: dict[str, Any]) -> str:
+    provided = str(body.get("session_id") or "").strip()
+    if provided:
+        return provided
+    return f"legacy-session-{uuid4().hex[:12]}"
+
 @app.post("/api/analytics/event")
 async def log_event(req: Request):
     body = await req.json()
@@ -2046,40 +1631,66 @@ async def log_event(req: Request):
     entry["ts"] = _time.time()
     with open(_ANALYTICS_LOG, "a") as f:
         f.write(_json.dumps(entry) + "\n")
+
+    if entry.get("event") == "scan":
+        verdict, confidence_band = _legacy_verdict_to_v0(entry.get("verdict"), entry.get("score"))
+        try:
+            log_v0_event(
+                V0EventInput(
+                    event_name="scan_completed",
+                    session_id=_legacy_session_id(body),
+                    input_type=_legacy_scan_input_type(entry.get("scan_type")),
+                    verdict=verdict,
+                    confidence_band=confidence_band,
+                    device_class="web",
+                    language_hint=str(entry.get("language") or "").strip() or None,
+                    metadata={
+                        "analytics_source": "legacy_api",
+                        "legacy_event": str(entry.get("event") or ""),
+                        "legacy_scan_type": str(entry.get("scan_type") or ""),
+                        "legacy_verdict": str(entry.get("verdict") or ""),
+                    },
+                )
+            )
+        except Exception as exc:  # pragma: no cover - analytics should not break scans
+            logger.warning("Legacy analytics mirror failed: %s", exc)
     return {"ok": True}
 
 @app.get("/api/stats/live")
 async def live_stats():
-    total_scans = 0
-    scams_caught = 0
-    types_used = 0
+    return build_live_stats_snapshot()
 
-    if _ANALYTICS_LOG.exists():
-        lines = _ANALYTICS_LOG.read_text().strip().splitlines()
-        events = [_json.loads(l) for l in lines if l.strip()]
-        scans = [e for e in events if e.get("event") == "scan"]
-        suspicious = [s for s in scans if s.get("verdict") in ("SUSPICIOUS", "HIGH")]
-        types_used = len(set(s.get("scan_type", "") for s in scans))
-        total_scans = len(scans)
-        scams_caught = len(suspicious)
 
-    try:
-        client = await get_client()
-        resp = await client.get(f"{KAVACH_URL}/api/radar/public")
-        if resp.status_code == 200:
-            radar = resp.json()
-            total_scans = max(total_scans, int(radar.get("total", 0) or 0), int(radar.get("scans_today", 0) or 0))
-            scams_caught = max(scams_caught, int(radar.get("scams_week", 0) or 0), int(radar.get("scams_today", 0) or 0))
-    except Exception as e:
-        logger.warning("Kavach live stats fallback failed: %s", e)
+@app.get("/api/v1/analytics/summary")
+async def analytics_summary(days: int = Query(default=14, ge=1, le=90)):
+    """Return canonical Chetana usage analytics from the v0 event ledger."""
+    summary = build_v0_analytics_summary(trailing_days=days)
+    return summary.model_dump()
 
-    return {"total_scans": total_scans, "scams_caught": scams_caught, "scan_types_used": max(types_used, 8), "languages": 12}
+
+@app.get("/api/v1/rails", response_model=list[GamechangerOfficialRail])
+async def gamechanger_rails():
+    """Return the verified official recovery rails used by the gamechanger runtime."""
+    return load_official_rails()
+
+
+@app.post("/api/v1/analyze", response_model=GamechangerAnalyzeResponse)
+async def gamechanger_analyze(req: GamechangerAnalyzeRequest):
+    """Return the backend-first gamechanger analysis contract for mobile and partners."""
+    return analyze_gamechanger_request(req)
+
+
+@app.post("/api/v1/emergency", response_model=GamechangerEmergencyResponse)
+async def gamechanger_emergency(req: GamechangerEmergencyRequest):
+    """Return the state-based emergency recovery packet for active incidents."""
+    return build_gamechanger_emergency_response(req)
 
 
 @app.post("/api/v0/scan")
 async def v0_scan(req: V0ScanInput):
     """Bounded Chetana v0 scan loop: scan -> explain -> share -> report -> learn."""
     result = analyze_v0_scan(req)
+    result = await enrich_v0_verdict(result)
     return result.model_dump()
 
 
@@ -2191,6 +1802,7 @@ async def privacy_policy():
     <li>We do <strong>not</strong> link submissions to your identity, IP address, or device.</li>
     <li>We do <strong>not</strong> sell, share, or transfer your data to third parties.</li>
     <li>Submitted media is processed only for the scan flow and is not kept longer than needed for the response.</li>
+    <li>Scan and chat analysis stay on Chetana's own infrastructure. We do not send that content to external LLM providers.</li>
   </ul>
 
   <h2>Telemetry</h2>
@@ -2200,7 +1812,7 @@ async def privacy_policy():
   <p>Chetana servers are operated in India. We aim to keep processing close to the user and avoid collecting more than is needed for the scan result.</p>
 
   <h2>Third-party services</h2>
-  <p>Some checks may use external reputation or safety feeds for URLs or identifiers. Those services receive only the specific value being checked, not your broader conversation context.</p>
+  <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Chetana's own scan and chat analysis remain local to our infrastructure.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>
@@ -2331,7 +1943,7 @@ async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=MEDIA_PROXY_TIMEOUT) as client:
         resp = await client.post(
             f"{KAVACH_URL}/api/media/analyze",
             files={"file": (file.filename, content, file.content_type)},
@@ -2395,7 +2007,7 @@ async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en
     # Step 3: Also proxy to Kavach for its analysis
     kavach_result = {}
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=MEDIA_PROXY_TIMEOUT) as client:
             resp = await client.post(
                 f"{KAVACH_URL}/api/voice/analyze",
                 files={"file": (file.filename, content, file.content_type)},
@@ -2431,7 +2043,7 @@ async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=MEDIA_PROXY_TIMEOUT) as client:
         ocr_resp = await client.post(
             f"{KAVACH_URL}/api/extract-text",
             files={"file": (file.filename, content, file.content_type)},
@@ -2470,7 +2082,7 @@ async def proxy_media_card(file: UploadFile = File(...), caption: str = Form(def
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=MEDIA_PROXY_TIMEOUT) as client:
         resp = await client.post(
             f"{KAVACH_URL}/scan_media_card",
             files={"file": (file.filename, content, file.content_type)},

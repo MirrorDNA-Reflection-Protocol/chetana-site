@@ -13,6 +13,9 @@ export type ChetanaResultProps = {
   summary?: string;
   nextStep?: string;
   reasons: ResultReason[];
+  doNotDo?: string[];
+  verificationRoute?: string;
+  contextChips?: string[];
   onEmergencyHelp?: () => void;
   onCheckAnother?: () => void;
   onToggleBreakdown?: () => void;
@@ -66,6 +69,9 @@ export default function ChetanaResultScreen({
   summary,
   nextStep,
   reasons,
+  doNotDo = [],
+  verificationRoute,
+  contextChips = [],
   onEmergencyHelp,
   onCheckAnother,
   onToggleBreakdown,
@@ -76,11 +82,11 @@ export default function ChetanaResultScreen({
 
   return (
     <section className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-      <div className={`rounded-3xl border p-5 sm:p-6 ${copy.panelClass}`}>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <div
-              className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${copy.badgeClass}`}
+        <div className={`rounded-3xl border p-5 sm:p-6 ${copy.panelClass}`}>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <div
+                className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${copy.badgeClass}`}
             >
               {copy.title}
             </div>
@@ -89,6 +95,19 @@ export default function ChetanaResultScreen({
             </h2>
           </div>
         </div>
+
+        {contextChips.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {contextChips.map((chip) => (
+              <span
+                key={chip}
+                className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-4">
           <p className="text-sm font-medium text-zinc-500">Calm next step</p>
@@ -122,6 +141,30 @@ export default function ChetanaResultScreen({
             ))}
           </ul>
         </div>
+
+        {(doNotDo.length > 0 || verificationRoute) && (
+          <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4">
+            {doNotDo.length > 0 && (
+              <>
+                <p className="text-sm font-medium text-zinc-500">Do not do this yet</p>
+                <ul className="mt-3 space-y-2">
+                  {doNotDo.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm text-zinc-800">
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-zinc-900" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {verificationRoute && (
+              <>
+                <p className="mt-4 text-sm font-medium text-zinc-500">Best verification route</p>
+                <p className="mt-1 text-sm text-zinc-900">{verificationRoute}</p>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="mt-5">
           <p className="mb-3 text-sm font-medium text-zinc-500">What to do now</p>

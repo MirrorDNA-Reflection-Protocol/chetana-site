@@ -25,21 +25,24 @@ The goal is simple: turn suspicious content into a clear next step for a real pe
 
 Each scan returns:
 
-- verdict: `safe`, `risky`, or `unclear`
+- verdict: `high_risk`, `caution`, `needs_review`, or `low_signal`
+- risk level, evidence state, and incident state
 - scam type
 - plain-language reasons
 - confidence band
 - safest next action
+- structured guidance and recovery language
 - optional share shield
 - optional evidence pack
 
 ## v0 principles
 
-- only three verdict states
-- if evidence is weak, default to `unclear`
+- no "safe" verdict
+- if evidence is weak, default to `needs_review` or `low_signal`, not reassurance
 - show reasons, not just labels
 - keep official recovery rails visible
 - do not fake certainty
+- keep scan and chat analysis local-first
 - do not imply government affiliation
 
 ## v0 API
@@ -50,6 +53,29 @@ Public `v0` endpoints added in this build:
 POST /api/v0/scan
 POST /api/v0/evidence
 POST /api/v0/events
+POST /api/v0/trust/send-guard
+POST /api/v0/trust/recovery
+POST /api/v0/trust/merchant
+POST /api/v0/trust/bundle
+```
+
+Analytics endpoints:
+
+```bash
+GET  /api/v1/analytics/summary
+GET  /api/stats/live
+```
+
+Partner / institutional endpoints:
+
+```bash
+GET  /api/v1/capabilities
+POST /api/v1/scan
+POST /api/v1/trust/bundle
+POST /api/v1/recovery
+POST /api/v1/link/check
+POST /api/v1/upi/check
+POST /api/v1/phone/check
 ```
 
 Example:
@@ -69,7 +95,8 @@ curl -X POST https://chetana.activemirror.ai/api/v0/scan \
 
 - **Frontend:** Vite 5 + React 18 + TypeScript + Framer Motion
 - **Backend:** FastAPI + Python 3.11
-- **v0 runtime:** deterministic verdict engine plus evidence and event logging
+- **v0 runtime:** deterministic verdict engine plus local-first explanation, evidence, and event logging
+- **analytics engine:** canonical rollups from `~/.mirrordna/chetana/v0/events.jsonl` with funnel, daily, verdict, scam-type, and language summaries
 - **Infra:** FastAPI serves the built frontend
 
 ## Local dev

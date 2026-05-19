@@ -1,0 +1,102 @@
+[
+  {
+    "rail_id": "CYBER_HELPLINE_1930",
+    "name": "National Cyber Fraud Helpline 1930",
+    "channel": "phone",
+    "url": "https://i4c.mha.gov.in/ncrp.aspx",
+    "contact": "1930",
+    "use_when": [
+      "money transferred",
+      "upi fraud",
+      "remote-access banking scam",
+      "otp or pin shared"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://i4c.mha.gov.in/ncrp.aspx"
+  },
+  {
+    "rail_id": "NCRP_PORTAL",
+    "name": "National Cyber Crime Reporting Portal",
+    "channel": "web",
+    "url": "https://www.cybercrime.gov.in/",
+    "contact": null,
+    "use_when": [
+      "file or complete a cybercrime complaint",
+      "financial fraud follow-through",
+      "evidence submission"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.cybercrime.gov.in/"
+  },
+  {
+    "rail_id": "NCRP_SUSPECT_REPOSITORY",
+    "name": "I4C Suspect Repository",
+    "channel": "web",
+    "url": "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx",
+    "contact": null,
+    "use_when": [
+      "check phone number",
+      "check upi id",
+      "check account number",
+      "check suspicious identifier"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx"
+  },
+  {
+    "rail_id": "RBI_CMS",
+    "name": "RBI Complaint Management System",
+    "channel": "web",
+    "url": "https://cms.rbi.org.in/",
+    "contact": null,
+    "use_when": [
+      "complaint against bank",
+      "complaint against payment system participant",
+      "unresolved regulated-entity grievance"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.rbi.org.in/Scripts/FAQDisplay.aspx?Id=153"
+  },
+  {
+    "rail_id": "MEA_EMIGRATE",
+    "name": "eMigrate Portal",
+    "channel": "web",
+    "url": "https://emigrate.gov.in/",
+    "contact": null,
+    "use_when": [
+      "verify recruiting agent",
+      "verify overseas employment route",
+      "check emigration path"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.mea.gov.in/issues-of-intending-emigrants.htm"
+  },
+  {
+    "rail_id": "MEA_OVERSEAS_EMPLOYMENT",
+    "name": "MEA Overseas Employment Guidance",
+    "channel": "web",
+    "url": "https://www.mea.gov.in/emigration-abroad-for-emp.htm",
+    "contact": null,
+    "use_when": [
+      "work visa verification",
+      "recruiter verification",
+      "do not surrender passport guidance"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.mea.gov.in/emigration-abroad-for-emp.htm"
+  },
+  {
+    "rail_id": "ERSS_112",
+    "name": "Emergency Response Support System 112",
+    "channel": "phone",
+    "url": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss",
+    "contact": "112",
+    "use_when": [
+      "immediate physical threat",
+      "active coercion",
+      "urgent police assistance"
+    ],
+    "verified_on": "2026-04-28",
+    "source_url": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss"
+  }
+]

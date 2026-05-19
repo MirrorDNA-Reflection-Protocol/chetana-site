@@ -3,6 +3,7 @@ export type PageId =
   | "consumer"
   | "merchant"
   | "nexus"
+  | "ops"
   | "weather"
   | "atlas"
   | "trust"
@@ -42,10 +43,13 @@ export interface GraphNode { data: { id: string; label: string; kind: string; sc
 export interface GraphEdge { data: { id: string; source: string; target: string; label?: string; weight?: number; }; }
 
 export interface ScanResult {
+  scan_id?: string;
   verdict: string;
   risk_score: number;
   surface: string;
   why_flagged: string[];
   action_eligibility: string;
   engine?: string;
+  trust_state?: string;
+  guidance?: any;
 }

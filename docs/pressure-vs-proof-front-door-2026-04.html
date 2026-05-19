@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chetana — Pressure vs Proof</title>
+<meta name="description" content="A meta front door for Chetana that reframes scam defense as pressure versus proof.">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08070c;--surface:rgba(255,255,255,.04);--line:rgba(255,255,255,.08);--text:#ede9e0;--muted:#8a8478;
+  --amber:#d4a24e;--amberBright:#e8c372;--green:#5cb97a;--red:#c47a7a;--mono:'Geist Mono',monospace;
+  --sans:'Syne',sans-serif;--serif:'Instrument Serif',serif;
+}
+*{box-sizing:border-box;margin:0}
+body{
+  font-family:var(--sans);background:
+    radial-gradient(circle at 20% 0%, rgba(212,162,78,.12), transparent 35%),
+    radial-gradient(circle at 80% 10%, rgba(92,185,122,.08), transparent 28%),
+    var(--bg);
+  color:var(--text);min-height:100vh;line-height:1.6;padding:28px;
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.25;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+.page{max-width:1280px;margin:0 auto;display:grid;gap:24px}
+.marquee,.shell,.routes,.principles,.manifesto{border:1px solid var(--line);background:rgba(12,11,16,.8);box-shadow:0 24px 80px rgba(0,0,0,.25)}
+.marquee{padding:14px 18px;border-radius:18px;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--amberBright);overflow:hidden;white-space:nowrap}
+.marquee-track{display:inline-block;animation:scroll 22s linear infinite}
+@keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.shell{display:grid;grid-template-columns:1fr 1.02fr;gap:24px;border-radius:32px;padding:28px}
+.hero{padding:8px 6px 8px 2px}
+.kicker,.chip,.tab,.quote-label{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(232,195,114,.18);background:rgba(212,162,78,.08);font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--amberBright)}
+h1{font-family:var(--serif);font-style:normal;font-size:clamp(46px,6vw,84px);line-height:.96;letter-spacing:-1px;margin-top:18px}
+h1 span{display:block;color:var(--amberBright)}
+.lede{max-width:620px;color:var(--muted);font-size:18px;margin-top:18px}
+.hero-actions,.composer-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.primary,.secondary,.route{cursor:pointer;border-radius:16px;transition:transform .18s ease}
+.primary,.secondary{min-height:52px;padding:0 20px;border:1px solid transparent;font-weight:700}
+.primary{background:linear-gradient(135deg,var(--amberBright),var(--amber));color:#130e05}
+.secondary{background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.12);color:var(--text)}
+.primary:hover,.secondary:hover,.route:hover,.tab:hover{transform:translateY(-1px)}
+.trust,.chips,.tabs{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.trust span,.chip,.tab{padding:0 12px;min-height:36px;display:inline-flex;align-items:center;background:rgba(255,255,255,.02);border:1px solid var(--line);color:var(--muted)}
+.chamber{position:relative;border-radius:28px;padding:24px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02))}
+.head,.meter-copy,.composer-head,.recovery{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.label,.lane,.recovery span{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.head strong,.composer-head strong{display:block;margin-top:4px;font-size:20px}
+.meter{margin-top:18px;padding:18px;border-radius:22px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.meter-copy strong{display:block;font-size:28px}
+.track{display:grid;gap:10px;margin-top:14px}
+.bar{height:12px;border-radius:999px}
+.pressure{background:linear-gradient(90deg,rgba(196,122,122,.42),rgba(196,122,122,.94))}
+.proof{background:linear-gradient(90deg,rgba(212,162,78,.38),rgba(92,185,122,.92))}
+.columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.card,.composer,.principle,.quote{border-radius:24px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.card{padding:20px}
+.card h2{font-family:var(--serif);font-style:normal;font-size:28px;line-height:1.05;margin-top:10px}
+.card ul{list-style:none;display:grid;gap:12px;margin-top:18px}
+.card li{position:relative;padding-left:18px;color:var(--muted)}
+.card li::before{content:"";position:absolute;left:0;top:11px;width:8px;height:8px;border-radius:999px}
+.card.pressureCard{background:linear-gradient(180deg,rgba(196,122,122,.11),rgba(255,255,255,.02))}
+.card.proofCard{background:linear-gradient(180deg,rgba(212,162,78,.12),rgba(255,255,255,.02))}
+.pressureCard li::before{background:var(--red)}
+.proofCard li::before{background:var(--green)}
+.composer{margin-top:18px;padding:20px}
+.textLink{color:var(--amberBright);font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+textarea{width:100%;min-height:156px;margin-top:14px;padding:18px;border-radius:20px;border:1px solid rgba(255,255,255,.1);background:rgba(7,7,11,.78);color:var(--text);resize:vertical;font:inherit;line-height:1.65}
+.recovery{margin-top:18px;padding:16px 18px;border-radius:20px;border:1px solid rgba(196,122,122,.18);background:rgba(196,122,122,.08);align-items:flex-start}
+.recovery strong{display:block;margin-bottom:6px}
+.recovery a{color:#ffd4d4;text-decoration:none}
+.routes,.principles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:16px;border-radius:28px;background:transparent;border:none;box-shadow:none}
+.route,.principle{padding:22px;border:1px solid var(--line);background:rgba(12,11,16,.8);border-radius:24px}
+.route strong,.principle strong,.quote strong{display:block;font-size:22px;line-height:1.1}
+.route p,.principle p,.manifesto p{margin-top:10px;color:var(--muted)}
+.routeAction{display:inline-flex;align-items:center;gap:8px;margin-top:18px;color:var(--amberBright);font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.manifesto{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;padding:28px;border-radius:30px}
+.manifesto h2{font-family:var(--serif);font-style:normal;font-size:clamp(34px,4vw,52px);line-height:1.03;margin-top:16px}
+.quote{display:grid;align-content:center;gap:12px;padding:24px;background:linear-gradient(180deg,rgba(232,195,114,.12),rgba(255,255,255,.02))}
+.quote-label{width:max-content}
+@media(max-width:1080px){.shell,.manifesto{grid-template-columns:1fr}}
+@media(max-width:920px){.columns,.routes,.principles{grid-template-columns:1fr}.head,.meter-copy,.composer-head,.recovery{flex-direction:column;align-items:flex-start}}
+@media(max-width:640px){body{padding:16px}.shell,.manifesto{padding:20px;border-radius:24px}h1{font-size:40px}.lede{font-size:16px}.primary,.secondary{width:100%}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="marquee">
+    <div class="marquee-track">RECENT · Fake KYC links still rush users into paying small “verification” fees · Fake payment screenshots still target shops and delivery staff · If money already moved, call 1930 first · RECENT · Fake KYC links still rush users into paying small “verification” fees · Fake payment screenshots still target shops and delivery staff · If money already moved, call 1930 first · </div>
+  </div>
+
+  <section class="shell">
+    <div class="hero">
+      <div class="kicker">Pressure vs Proof front door</div>
+      <h1>Scams do not just ask for money.<span>They ask for speed.</span></h1>
+      <p class="lede">This concept reframes Chetana as an interception chamber. The first question is not “what class of scam is this?” but “what is pressuring me, and what can actually be proved?”</p>
+      <div class="hero-actions">
+        <button class="primary">Run a live check</button>
+        <button class="secondary">Money already moved?</button>
+      </div>
+      <div class="trust">
+        <span>Free</span><span>No sign-up</span><span>Built for India</span><span>Recovery-first</span>
+      </div>
+      <div class="chips">
+        <span class="chip">SMS / chat</span>
+        <span class="chip">Link / domain</span>
+        <span class="chip">QR / collect request</span>
+        <span class="chip">Payment proof</span>
+        <span class="chip">Call / voice note</span>
+        <span class="chip">Official rails</span>
+      </div>
+    </div>
+
+    <div class="chamber">
+      <div class="head">
+        <div>
+          <div class="label">Pressure vs Proof</div>
+          <strong id="scenarioTitle">Bank scare text</strong>
+        </div>
+        <span class="lane" id="scenarioLane">SMS / WhatsApp</span>
+      </div>
+
+      <div class="tabs" id="tabs"></div>
+
+      <div class="meter">
+        <div class="meter-copy">
+          <div><span class="label">Pressure</span><strong id="pressureValue">92</strong></div>
+          <div><span class="label">Proof</span><strong id="proofValue">22</strong></div>
+          <div><span class="label">Interception gap</span><strong id="gapValue">70</strong></div>
+        </div>
+        <div class="track">
+          <div class="bar pressure" id="pressureBar" style="width:92%"></div>
+          <div class="bar proof" id="proofBar" style="width:22%"></div>
+        </div>
+      </div>
+
+      <div class="columns">
+        <div class="card pressureCard">
+          <div class="label">What the scam wants</div>
+          <h2>Move faster than evidence.</h2>
+          <ul id="pressureList"></ul>
+        </div>
+        <div class="card proofCard">
+          <div class="label">What reality can prove</div>
+          <h2>Verify on your own rails.</h2>
+          <ul id="proofList"></ul>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-head">
+          <div>
+            <div class="label">Rehearse with a live case</div>
+            <strong>Load a scenario or paste your own suspicious text.</strong>
+          </div>
+          <button class="textLink" id="reloadSample">Reload sample</button>
+        </div>
+        <textarea id="draft"></textarea>
+        <div class="composer-actions">
+          <button class="primary">Send this to the scanner</button>
+          <button class="secondary">Check payment proof instead</button>
+        </div>
+      </div>
+
+      <div class="recovery">
+        <div>
+          <strong id="recoveryLine">If you already entered details or paid, call 1930 and your bank now.</strong>
+          <span id="trustRoute">Verify only from the official banking app or card-back helpline.</span>
+        </div>
+        <a href="tel:1930">Call 1930 ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="routes">
+    <article class="route">
+      <strong>Check a suspicious message</strong>
+      <p>Paste text, upload a screenshot, or bring in a QR, link, or voice note for a live check.</p>
+      <span class="routeAction">Open live check →</span>
+    </article>
+    <article class="route">
+      <strong>Money already moved</strong>
+      <p>Skip diagnosis and open the recovery steps first. Chetana should pivot to action, not explanation.</p>
+      <span class="routeAction">Open recovery flow →</span>
+    </article>
+    <article class="route">
+      <strong>I run a shop</strong>
+      <p>Use the payment screenshot lane before handing over goods, stock, service, or delivery.</p>
+      <span class="routeAction">Open merchant lane →</span>
+    </article>
+  </section>
+
+  <section class="principles">
+    <article class="principle">
+      <strong>Scams attack your clock</strong>
+      <p>The lie matters, but the demand for speed matters more. Chetana should interrupt the timer.</p>
+    </article>
+    <article class="principle">
+      <strong>Proof beats performance</strong>
+      <p>The interface should pull users away from threats, screenshots, and authority theatre and back to rails they can verify themselves.</p>
+    </article>
+    <article class="principle">
+      <strong>Recovery stays visible</strong>
+      <p>If money moved, the product should stop acting clever and show 1930 plus official complaint rails immediately.</p>
+    </article>
+  </section>
+
+  <section class="manifesto">
+    <div>
+      <div class="kicker">Meta shift</div>
+      <h2>Chetana should feel less like a website and more like a civic reflex.</h2>
+      <p>The novel move is product grammar, not extra chrome. Compress the front door into one sentence of behavior: if pressure rises faster than proof, pause and verify.</p>
+    </div>
+    <div class="quote">
+      <div class="quote-label">New front-door rule</div>
+      <strong>If pressure &gt; proof, do not pay, click, reply, or hand over goods.</strong>
+    </div>
+  </section>
+</div>
+
+<script>
+const scenarios = [
+  {
+    id:"kyc",label:"Bank scare text",lane:"SMS / WhatsApp",pressureScore:92,proofScore:22,
+    sample:"Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify",
+    pressureSignals:[
+      "Claims your account will break today unless you act now.",
+      "Pushes you toward a link and a small payment before you can think.",
+      "Uses bank language without any verifiable branch, app, or official callback path."
+    ],
+    proofSignals:[
+      "Open the real bank app yourself instead of touching the message link.",
+      "Check whether the sender, domain, and requested fee match any real bank flow.",
+      "A real bank will not ask for UPI PIN, screen share, or a rush payment to keep your account alive."
+    ],
+    recoveryLine:"If you already entered details or paid, call 1930 and your bank now.",
+    trustRoute:"Verify only from the official banking app or card-back helpline."
+  },
+  {
+    id:"payment",label:"Fake payment proof",lane:"Shop counter / delivery",pressureScore:86,proofScore:35,
+    sample:"Customer says payment is done and shows a screenshot with SUCCESSFUL written on it, but your UPI app does not show the money yet. They want to leave with the goods now.",
+    pressureSignals:[
+      "The entire story depends on a screenshot instead of your own bank confirmation.",
+      "The buyer wants goods released before your app settles or confirms the credit.",
+      "Speed is the attack surface: handover happens before truth catches up."
+    ],
+    proofSignals:[
+      "Your own bank or UPI app is the authority, not the customer's screen.",
+      "Check for UTR, settlement, and actual credit inside your account history.",
+      "Wait for your rail, not their theatre."
+    ],
+    recoveryLine:"Do not hand over goods until your app confirms payment.",
+    trustRoute:"Use the merchant lane for payment screenshot and QR proof checks."
+  },
+  {
+    id:"authority",label:"Digital arrest call",lane:"Phone / voice note",pressureScore:96,proofScore:18,
+    sample:"Caller says they are from police and your Aadhaar is linked to a criminal case. They tell you not to disconnect, not to tell family, and to transfer money for verification.",
+    pressureSignals:[
+      "Isolation is part of the script: stay on the line and tell nobody.",
+      "Authority theatre replaces evidence with fear, urgency, and secrecy.",
+      "Payment is framed as a shortcut to safety."
+    ],
+    proofSignals:[
+      "Real police do not settle cases over random calls or video chats.",
+      "Disconnect and call a known family member or official number you already trust.",
+      "Separate fear from evidence before you do anything else."
+    ],
+    recoveryLine:"If money or account access was shared, switch from fear mode to recovery mode immediately.",
+    trustRoute:"Use official numbers you already know, never the ones given in the threatening call."
+  },
+  {
+    id:"qr",label:"QR collect request",lane:"UPI / QR",pressureScore:84,proofScore:28,
+    sample:"Seller says scan this QR to receive your refund. The app shows a collect request and asks for UPI PIN to complete it.",
+    pressureSignals:[
+      "The story says receive money, but the rail is actually asking you to approve a debit.",
+      "Uses refund language to disguise a collect request.",
+      "Relies on UI confusion and speed instead of clear payee proof."
+    ],
+    proofSignals:[
+      "Read the payee and flow inside the real UPI app before you approve anything.",
+      "Receiving money should not require your UPI PIN for a payment request you did not expect.",
+      "If the action and the story disagree, trust the rail."
+    ],
+    recoveryLine:"If you approved a request by mistake, call 1930 and your bank immediately.",
+    trustRoute:"Cross-check payee identity and request type inside your own UPI app."
+  }
+];
+
+const els = {
+  tabs: document.getElementById("tabs"),
+  title: document.getElementById("scenarioTitle"),
+  lane: document.getElementById("scenarioLane"),
+  pressureValue: document.getElementById("pressureValue"),
+  proofValue: document.getElementById("proofValue"),
+  gapValue: document.getElementById("gapValue"),
+  pressureBar: document.getElementById("pressureBar"),
+  proofBar: document.getElementById("proofBar"),
+  pressureList: document.getElementById("pressureList"),
+  proofList: document.getElementById("proofList"),
+  recoveryLine: document.getElementById("recoveryLine"),
+  trustRoute: document.getElementById("trustRoute"),
+  draft: document.getElementById("draft"),
+  reloadSample: document.getElementById("reloadSample")
+};
+
+let activeId = scenarios[0].id;
+
+function renderScenario(id){
+  const scenario = scenarios.find(item => item.id === id) || scenarios[0];
+  activeId = scenario.id;
+  els.title.textContent = scenario.label;
+  els.lane.textContent = scenario.lane;
+  els.pressureValue.textContent = scenario.pressureScore;
+  els.proofValue.textContent = scenario.proofScore;
+  els.gapValue.textContent = Math.max(scenario.pressureScore - scenario.proofScore, 0);
+  els.pressureBar.style.width = scenario.pressureScore + "%";
+  els.proofBar.style.width = scenario.proofScore + "%";
+  els.recoveryLine.textContent = scenario.recoveryLine;
+  els.trustRoute.textContent = scenario.trustRoute;
+  els.draft.value = scenario.sample;
+  els.pressureList.innerHTML = scenario.pressureSignals.map(item => `<li>${item}</li>`).join("");
+  els.proofList.innerHTML = scenario.proofSignals.map(item => `<li>${item}</li>`).join("");
+  [...els.tabs.children].forEach(node => node.classList.toggle("active", node.dataset.id === scenario.id));
+}
+
+scenarios.forEach((scenario) => {
+  const button = document.createElement("button");
+  button.className = "tab";
+  button.dataset.id = scenario.id;
+  button.textContent = scenario.label;
+  button.addEventListener("click", () => renderScenario(scenario.id));
+  els.tabs.appendChild(button);
+});
+
+els.reloadSample.addEventListener("click", () => renderScenario(activeId));
+renderScenario(activeId);
+</script>
+</body>
+</html>

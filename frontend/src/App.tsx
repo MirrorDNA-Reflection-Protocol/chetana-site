@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
+  AlertBanner, BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
   IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
@@ -10,11 +10,22 @@ import VigilancePage from "./VigilancePage";
 import StoryPage from "./StoryPage";
 import { threats, weather } from "./data";
 import ChetanaV0Experience from "./ChetanaV0Experience";
+import OpsAnalyticsPage from "./OpsAnalyticsPage";
 import { I18nProvider } from "./i18n";
+import PressureProofHome from "./PressureProofHome";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
+function initialPageFromLocation(): PageId {
+  const params = new URLSearchParams(window.location.search);
+  const requestedPage = params.get("page");
+  if (requestedPage === "ops" || params.get("ops") === "1" || window.location.pathname === "/ops") {
+    return "ops";
+  }
+  return "home";
+}
+
 export default function App() {
-  const [page, _setPage] = useState<PageId>("home");
+  const [page, _setPage] = useState<PageId>(() => initialPageFromLocation());
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
   const [pendingPage, setPendingPage] = useState<PageId>("scan");
   const [sharedContent, setSharedContent] = useState<string | null>(null);
@@ -22,12 +33,35 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const startSeededScan = (input: string) => {
+    setSharedContent(input);
+    setSharedAttachment(null);
+    setPage("scan");
+  };
+
+  const syncPageUrl = (nextPage: PageId) => {
+    const params = new URLSearchParams(window.location.search);
+    const nextPath = window.location.pathname === "/ops" ? "/" : window.location.pathname;
+    if (nextPage === "ops") {
+      params.set("page", "ops");
+    } else {
+      params.delete("page");
+      params.delete("ops");
+      params.delete("days");
+    }
+    const query = params.toString();
+    const nextUrl = `${nextPath}${query ? `?${query}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  };
+
   const setPage = (p: PageId) => {
-    if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic") {
+    if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic" && p !== "ops") {
       setPendingPage(p);
       _setPage("proof");
+      syncPageUrl("proof");
     } else {
       _setPage(p);
+      syncPageUrl(p);
     }
   };
 
@@ -200,10 +234,10 @@ export default function App() {
           <motion.div key={page} {...pageAnim}>
 
             {page === "home" && <>
-              <ChetanaV0Experience
+              <AlertBanner onNavigate={setPage} />
+              <PressureProofHome
                 onNavigate={setPage}
-                initialInput={sharedContent}
-                initialFile={sharedAttachment}
+                onStartScan={startSeededScan}
               />
             </>}
 
@@ -253,6 +287,7 @@ export default function App() {
               />
             </>}
 
+            {page === "ops" && <OpsAnalyticsPage onNavigate={setPage} />}
             {page === "weather" && <SafetyRadar signals={weather} />}
             {page === "trust" && <TrustPage />}
             {page === "proof" && (
@@ -260,6 +295,7 @@ export default function App() {
                 onAccepted={() => {
                   setTermsAccepted(true);
                   _setPage(pendingPage);
+                  syncPageUrl(pendingPage);
                 }}
               />
             )}
@@ -272,10 +308,10 @@ export default function App() {
           </motion.div>
         </AnimatePresence>
       </main>
-      <Footer onNavigate={setPage} />
+      {page !== "ops" && <Footer onNavigate={setPage} />}
 
       {/* FAB — goes to scan page (with proof gate) */}
-      {page !== "home" && page !== "scan" && page !== "proof" && (
+      {page !== "home" && page !== "scan" && page !== "proof" && page !== "ops" && (
         <button className="sw-fab" onClick={() => setPage("scan")}>
           <span style={{ fontSize: 20 }}>🛡️</span>
           <span className="sw-fab-label">Scan now</span>

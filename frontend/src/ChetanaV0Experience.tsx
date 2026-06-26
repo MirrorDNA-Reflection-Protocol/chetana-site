@@ -219,12 +219,6 @@ const RESULT_PREVIEW_REASONS = [
   "Unknown sender",
 ];
 
-const SIMPLE_STEPS = [
-  { label: "1", title: "Screenshot it", body: "Chat, SMS, email, QR, profile, link, payment proof." },
-  { label: "2", title: "Ask Chetana", body: "Upload it here. Paste text only if that is easier." },
-  { label: "3", title: "Act safely", body: "See the risk, why it was flagged, and the safest next step." },
-];
-
 const DEMO_FLAGS = ["Urgency", "Payment request", "Unknown link"];
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
@@ -937,29 +931,6 @@ export default function ChetanaV0Experience({
               ))}
             </div>
           </motion.div>
-
-          <motion.div
-            className="v0-simple-steps"
-            initial="hidden"
-            animate="show"
-            variants={{ show: { transition: { staggerChildren: 0.12 } } }}
-          >
-            {SIMPLE_STEPS.map((step) => (
-              <motion.div
-                className="v0-simple-step"
-                key={step.title}
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  show: { opacity: 1, y: 0 },
-                }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-              >
-                <span>{step.label}</span>
-                <strong>{step.title}</strong>
-                <p>{step.body}</p>
-              </motion.div>
-            ))}
-          </motion.div>
         </div>
       )}
 
@@ -977,6 +948,13 @@ export default function ChetanaV0Experience({
                 </p>
               </div>
               <div className="v0-status">{status}</div>
+            </div>
+
+            <div className="v0-quick-row">
+              <button className="v0-quick-chip" onClick={loadSample}>Try an example</button>
+              <button className="v0-quick-chip" onClick={() => selectMode("payment_screenshot")}>
+                <CreditCard size={14} /> Check payment proof
+              </button>
             </div>
 
             <div className="v0-simple-tabs" aria-label="Choose input type">
@@ -1379,25 +1357,6 @@ export default function ChetanaV0Experience({
         </div>
 
         <aside className="v0-side">
-          {!result && (
-            <div className="v0-side-card">
-              <div className="v0-section-label">Send any screenshot</div>
-              <strong>Chetana can check what is visible and explain the risk in plain language.</strong>
-              <ul>
-                <li>WhatsApp, SMS, email, Telegram, and suspicious links.</li>
-                <li>QR codes, UPI requests, and payment screenshots.</li>
-                <li>Profiles, fake notices, delivery messages, or bank warnings.</li>
-              </ul>
-              <p className="v0-side-note">Installed app: share screenshots into Chetana from the Android share sheet.</p>
-              <div className="v0-inline-actions">
-                <button onClick={loadSample}>Try example</button>
-                <button onClick={() => openModeLane("payment_screenshot")}>
-                  <CreditCard size={14} /> Payment proof
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Emergency card always visible — before and after result */}
           <div className="v0-side-card danger">
             <div className="v0-section-label">If money already went</div>

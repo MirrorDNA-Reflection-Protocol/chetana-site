@@ -419,6 +419,7 @@ REMOTE_ACCESS_RE = re.compile(
 _V0_ROOT = Path.home() / ".mirrordna" / "chetana" / "v0"
 _V0_ROOT.mkdir(parents=True, exist_ok=True)
 V0_EVENTS_LOG = _V0_ROOT / "events.jsonl"
+V0_LOOP_RECEIPTS_LOG = _V0_ROOT / "loop_receipts.jsonl"
 
 
 def now_utc() -> str:
@@ -434,8 +435,47 @@ def generate_event_id() -> str:
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def _stable_hash(payload: dict[str, Any]) -> str:
+    material = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _latest_chain_hash(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    for line in reversed(path.read_text(encoding="utf-8").splitlines()):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        chain_hash = event.get("event_hash") or event.get("chain_head") or event.get("iteration_hash")
+        if isinstance(chain_hash, str) and chain_hash:
+            return chain_hash
+    return None
+
+
+def _hash_without_chain_fields(payload: dict[str, Any]) -> str:
+    material = dict(payload)
+    material.pop("event_hash", None)
+    material.pop("chain_head", None)
+    return _stable_hash(material)
+
+
+def _append_loop_receipt(payload: dict[str, Any], path: Path | None = None) -> dict[str, Any]:
+    receipt_path = path or V0_LOOP_RECEIPTS_LOG
+    event = dict(payload)
+    event["prev_hash"] = _latest_chain_hash(receipt_path)
+    event["event_hash"] = _hash_without_chain_fields(event)
+    event["chain_head"] = event["event_hash"]
+    _append_jsonl(receipt_path, event)
+    return event
 
 
 def _sanitize_metadata_value(value: Any, depth: int = 0) -> Any:
@@ -1137,6 +1177,152 @@ class V0TrustBundle(StrictModel):
     send_guard: V0SendGuardAssessment
     merchant_release: V0MerchantReleaseAssessment | None = None
     recovery_packet: V0RecoveryPacket | None = None
+
+
+class V0LoopReceiptRequest(StrictModel):
+    verdict: V0Verdict
+    input_text: str = Field(default="", max_length=20000)
+    evidence_pack: V0EvidencePack | None = None
+    trust_bundle: V0TrustBundle | None = None
+    session_id: str | None = None
+
+
+class V0LoopReceipt(StrictModel):
+    type: Literal["chetana_scam_checker_loop_iteration"] = "chetana_scam_checker_loop_iteration"
+    loop_id: str
+    contract_hash: str
+    iteration_hash: str
+    status: Literal["pass", "fail"]
+    scan_id: str
+    session_id: str | None = None
+    phases: list[dict[str, Any]]
+    validators: list[dict[str, Any]]
+    next_guard: str
+    receipt_path: str
+    prev_hash: str | None = None
+    event_hash: str | None = None
+    chain_head: str | None = None
+
+
+def _validator_result(name: str, passed: bool, detail: str) -> dict[str, Any]:
+    return {
+        "validator": name,
+        "status": "pass" if passed else "fail",
+        "detail": detail,
+    }
+
+
+def _loop_phase(name: str, status: str, evidence: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "phase": name,
+        "status": status,
+        "evidence": evidence,
+        "evidence_hash": _stable_hash(evidence),
+    }
+
+
+def build_v0_loop_receipt(payload: V0LoopReceiptRequest) -> V0LoopReceipt:
+    verdict = payload.verdict
+    input_text = payload.input_text.strip()
+    input_hash = hashlib.sha256(input_text.encode("utf-8")).hexdigest()
+    contract = {
+        "type": "chetana_scam_checker_loop_contract",
+        "version": 1,
+        "surface": "chetana_v0_scam_checker",
+        "phase_order": ["observe", "decide", "act", "verify", "record", "ratchet"],
+        "success_criteria": [
+            "return a bounded scam-check verdict",
+            "show a safe next step",
+            "record the receipt without storing raw screenshot bytes",
+        ],
+        "validators": [
+            "verdict_schema",
+            "reason_present",
+            "safe_next_step_present",
+            "official_help_for_high_risk",
+            "privacy_no_raw_screenshot",
+        ],
+        "rollback_rule": "Do not rely on the scan; ask for clearer evidence or official verification.",
+    }
+    contract_hash = _stable_hash(contract)
+    has_reason = bool(verdict.reasons or verdict.guidance.why_it_was_flagged)
+    has_safe_step = bool((verdict.safe_next_step or "").strip() or verdict.guidance.do_now)
+    needs_official_help = verdict.verdict in {"high_risk", "caution"} or verdict.risk_level == "high"
+    has_official_help = (
+        not needs_official_help
+        or "report_and_block" in verdict.recommended_actions
+        or bool(payload.trust_bundle and (payload.trust_bundle.recovery_packet or payload.trust_bundle.send_guard.recovery_packet))
+    )
+
+    validators = [
+        _validator_result("verdict_schema", True, "V0Verdict accepted by strict schema."),
+        _validator_result("reason_present", has_reason, "At least one reason or explanation is visible."),
+        _validator_result("safe_next_step_present", has_safe_step, "A calm next step is visible."),
+        _validator_result(
+            "official_help_for_high_risk",
+            has_official_help,
+            "High-risk scans include official help or report guidance.",
+        ),
+        _validator_result("privacy_no_raw_screenshot", True, "Receipt stores hashes and derived fields, not raw image bytes."),
+    ]
+    status: Literal["pass", "fail"] = "pass" if all(item["status"] == "pass" for item in validators) else "fail"
+    next_guard = (
+        "Keep deterministic verdict ownership with Chetana; use OCR only for extraction."
+        if status == "pass"
+        else "Do not claim the scan is complete; request clearer evidence or official verification."
+    )
+    phases = [
+        _loop_phase(
+            "observe",
+            "pass",
+            {
+                "input_hash": input_hash,
+                "input_type": verdict.input_type,
+                "text_character_count": len(input_text),
+                "runtime_source": verdict.runtime_source,
+                "extraction_quality": verdict.extraction_quality,
+            },
+        ),
+        _loop_phase(
+            "decide",
+            "pass",
+            {
+                "verdict": verdict.verdict,
+                "risk_level": verdict.risk_level,
+                "confidence_band": verdict.confidence_band,
+                "scam_type": verdict.scam_type,
+                "decision_owner": "chetana_deterministic_runtime",
+            },
+        ),
+        _loop_phase(
+            "act",
+            "pass" if has_safe_step else "fail",
+            {
+                "safe_next_step": verdict.safe_next_step or (verdict.guidance.do_now[0] if verdict.guidance.do_now else ""),
+                "recommended_actions": verdict.recommended_actions,
+                "share_shield_eligible": verdict.share_shield_eligible,
+                "evidence_pack_eligible": verdict.evidence_pack_eligible,
+            },
+        ),
+        _loop_phase("verify", "pass" if status == "pass" else "fail", {"validator_results": validators}),
+        _loop_phase("record", "pass", {"receipt_path": str(V0_LOOP_RECEIPTS_LOG), "raw_screenshot_stored": False}),
+        _loop_phase("ratchet", "pass", {"next_guard": next_guard, "next_slice": "collect clean Chetana receipts before training"}),
+    ]
+    iteration = {
+        "type": "chetana_scam_checker_loop_iteration",
+        "loop_id": f"chetana_loop_{contract_hash[:16]}",
+        "contract_hash": contract_hash,
+        "status": status,
+        "scan_id": verdict.scan_id,
+        "session_id": payload.session_id,
+        "phases": phases,
+        "validators": validators,
+        "next_guard": next_guard,
+        "receipt_path": str(V0_LOOP_RECEIPTS_LOG),
+    }
+    iteration["iteration_hash"] = _stable_hash(iteration)
+    event = _append_loop_receipt(iteration)
+    return V0LoopReceipt(**event)
 
 
 _TX_REFERENCE_RE = re.compile(

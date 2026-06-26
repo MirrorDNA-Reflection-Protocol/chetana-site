@@ -53,6 +53,23 @@ If extraction quality is weak
 
 The ladder is intentionally conservative. The app should produce a useful first answer even when OCR is unavailable, slow, rate-limited, or rejected by the user.
 
+## Scam Checker Loop Receipt
+
+Each completed first-pass or improved scan records a compact loop receipt:
+
+```text
+observe -> decide -> act -> verify -> record -> ratchet
+```
+
+The public UI only shows a small "Safety loop recorded" line with a short receipt hash. The backend stores the full loop phases in `~/.mirrordna/chetana/v0/loop_receipts.jsonl`.
+
+Receipt rules:
+
+- Chetana owns the verdict; OCR and model helpers can only improve extraction.
+- Validators check schema acceptance, visible reasons, a safe next step, official-help guidance for high-risk scans, and no raw screenshot bytes in the receipt.
+- Failed validators still produce a receipt and a next guard.
+- Receipts are suitable input for future eval/training proposals, but they are not a training loop by themselves.
+
 ## Runtime Units
 
 ### BrowserExtractionProvider

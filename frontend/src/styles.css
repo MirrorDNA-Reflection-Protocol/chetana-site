@@ -1087,6 +1087,40 @@ main {
   flex: 0 0 auto;
 }
 
+.v0-loop-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(92,185,122,0.24);
+  background: rgba(92,185,122,0.08);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.v0-loop-receipt.fail {
+  border-color: rgba(217, 138, 74,0.28);
+  background: rgba(217, 138, 74,0.1);
+}
+
+.v0-loop-receipt svg {
+  color: var(--safe);
+  flex: 0 0 auto;
+}
+
+.v0-loop-receipt.fail svg {
+  color: var(--amber-l);
+}
+
+.v0-loop-receipt small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
 .v0-improve-panel {
   display: flex;
   align-items: center;

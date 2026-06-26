@@ -45,12 +45,14 @@ logger = logging.getLogger("chetana.showcase")
 from app.v0_runtime import (  # noqa: E402
     V0EvidenceRequest,
     V0EventInput,
+    V0LoopReceiptRequest,
     V0ScanInput,
     V0TrustRuntimeRequest,
     analyze_scan as analyze_v0_scan,
     assess_send_guard,
     build_merchant_release_assessment,
     build_evidence_pack,
+    build_v0_loop_receipt,
     build_recovery_packet,
     build_trust_bundle,
     log_event as log_v0_event,
@@ -2070,6 +2072,13 @@ async def v0_events(req: V0EventInput):
     """Append an anonymous v0 analytics event to the Chetana event log."""
     event = log_v0_event(req)
     return {"ok": True, "event": event.model_dump()}
+
+
+@app.post("/api/v0/loop/receipt")
+async def v0_loop_receipt(req: V0LoopReceiptRequest):
+    """Append a Chetana scam-check loop receipt for the completed scan."""
+    receipt = build_v0_loop_receipt(req)
+    return {"loop_receipt": receipt.model_dump()}
 
 
 @app.post("/api/v0/trust/send-guard")

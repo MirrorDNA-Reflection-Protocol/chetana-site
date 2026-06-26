@@ -206,6 +206,32 @@ export interface V0TrustBundle {
   recovery_packet?: V0RecoveryPacket | null;
 }
 
+export interface V0LoopReceipt {
+  type: "chetana_scam_checker_loop_iteration";
+  loop_id: string;
+  contract_hash: string;
+  iteration_hash: string;
+  status: "pass" | "fail";
+  scan_id: string;
+  session_id?: string | null;
+  phases: Array<{
+    phase: "observe" | "decide" | "act" | "verify" | "record" | "ratchet";
+    status: "pass" | "fail";
+    evidence: Record<string, unknown>;
+    evidence_hash: string;
+  }>;
+  validators: Array<{
+    validator: string;
+    status: "pass" | "fail";
+    detail: string;
+  }>;
+  next_guard: string;
+  receipt_path: string;
+  prev_hash?: string | null;
+  event_hash?: string | null;
+  chain_head?: string | null;
+}
+
 export interface V0EventPayload {
   event_name: V0EventName;
   session_id: string;

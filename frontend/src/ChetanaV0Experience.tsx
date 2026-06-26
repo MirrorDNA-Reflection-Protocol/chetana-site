@@ -22,6 +22,7 @@ import {
   V0Mode,
   V0EvidencePack,
   V0EventName,
+  V0LoopReceipt,
   V0TrustBundle,
   V0Verdict,
   actionCopy,
@@ -264,6 +265,7 @@ export default function ChetanaV0Experience({
   const [result, setResult] = useState<V0Verdict | null>(null);
   const [evidence, setEvidence] = useState<V0EvidencePack | null>(null);
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
+  const [loopReceipt, setLoopReceipt] = useState<V0LoopReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
   const [improving, setImproving] = useState(false);
@@ -325,6 +327,7 @@ export default function ChetanaV0Experience({
     setResult(null);
     setEvidence(null);
     setTrustBundle(null);
+    setLoopReceipt(null);
     setError(null);
     setImproveError(null);
     setImproving(false);
@@ -365,6 +368,33 @@ export default function ChetanaV0Experience({
     setFile(null);
     resetScanState("Sample loaded. Edit it if you want, then scan.");
     window.requestAnimationFrame(scrollToComposer);
+  };
+
+  const recordLoopReceipt = async (
+    verdict: V0Verdict,
+    extracted: string,
+    evidencePack: V0EvidencePack | null,
+    bundle: V0TrustBundle | null,
+  ) => {
+    try {
+      const receiptResp = await fetch("/api/v0/loop/receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          verdict,
+          input_text: extracted,
+          evidence_pack: evidencePack,
+          trust_bundle: bundle,
+          session_id: sessionId,
+        }),
+      });
+      if (receiptResp.ok) {
+        const receiptData = (await receiptResp.json()) as { loop_receipt: V0LoopReceipt };
+        setLoopReceipt(receiptData.loop_receipt);
+      }
+    } catch {
+      // The scam-check result stays useful if local receipt recording fails.
+    }
   };
 
   const runScan = async () => {
@@ -465,6 +495,7 @@ export default function ChetanaV0Experience({
       localStorage.setItem("chetana_v0_scan_count", String(previousCount + 1));
       localStorage.setItem("chetana_v0_last_scan_at", String(Date.now()));
 
+      let evidencePackForLoop: V0EvidencePack | null = null;
       if (scanData.evidence_pack_eligible) {
         const evidenceResp = await fetch("/api/v0/evidence", {
           method: "POST",
@@ -476,10 +507,12 @@ export default function ChetanaV0Experience({
         });
         if (evidenceResp.ok) {
           const evidenceData = (await evidenceResp.json()) as { evidence_pack: V0EvidencePack };
+          evidencePackForLoop = evidenceData.evidence_pack;
           setEvidence(evidenceData.evidence_pack);
         }
       }
 
+      let trustBundleForLoop: V0TrustBundle | null = null;
       try {
         const trustResp = await fetch("/api/v0/trust/bundle", {
           method: "POST",
@@ -492,12 +525,14 @@ export default function ChetanaV0Experience({
         });
         if (trustResp.ok) {
           const trustData = (await trustResp.json()) as { trust_bundle: V0TrustBundle };
+          trustBundleForLoop = trustData.trust_bundle;
           setTrustBundle(trustData.trust_bundle);
         }
       } catch {
         // The scan result is still useful even if the trust bundle request fails.
       }
 
+      await recordLoopReceipt(scanData, extracted, evidencePackForLoop, trustBundleForLoop);
       setStatus("Done. Read this before you reply or pay.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Chetana could not complete the check right now.";
@@ -512,6 +547,7 @@ export default function ChetanaV0Experience({
     if (!file || !result) return;
     setImproving(true);
     setImproveError(null);
+    setLoopReceipt(null);
     setStatus("Improving the text extraction...");
 
     try {
@@ -543,7 +579,28 @@ export default function ChetanaV0Experience({
       const improved = (await improveResp.json()) as V0Verdict;
       setResult(improved);
       setEvidence(null);
-      setTrustBundle(null);
+      let improvedTrustBundle: V0TrustBundle | null = null;
+      try {
+        const trustResp = await fetch("/api/v0/trust/bundle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict: improved,
+            input_text: lastExtractedInput?.text || "",
+            source_name: file?.name || null,
+          }),
+        });
+        if (trustResp.ok) {
+          const trustData = (await trustResp.json()) as { trust_bundle: V0TrustBundle };
+          improvedTrustBundle = trustData.trust_bundle;
+          setTrustBundle(trustData.trust_bundle);
+        } else {
+          setTrustBundle(null);
+        }
+      } catch {
+        setTrustBundle(null);
+      }
+      await recordLoopReceipt(improved, lastExtractedInput?.text || "", null, improvedTrustBundle);
       setDetailsOpen(false);
       setShowFullBreakdown(false);
       setStatus(
@@ -887,6 +944,14 @@ export default function ChetanaV0Experience({
                 <Check size={14} />
                 <span>{runtimeSourceLabel(result)}</span>
               </div>
+
+              {loopReceipt && (
+                <div className={`v0-loop-receipt ${loopReceipt.status}`}>
+                  <Shield size={14} />
+                  <span>Safety loop recorded</span>
+                  <small>{(loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
+                </div>
+              )}
 
               {result.can_improve_scan && file && mode !== "text" && (
                 <div className="v0-improve-panel">

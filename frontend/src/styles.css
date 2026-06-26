@@ -1068,6 +1068,52 @@ main {
   gap: 18px;
 }
 
+.v0-runtime-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.v0-runtime-source svg {
+  color: var(--primary-bright);
+  flex: 0 0 auto;
+}
+
+.v0-improve-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.v0-improve-panel strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--heading);
+}
+
+.v0-improve-panel p {
+  max-width: 68ch;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.v0-improve-error {
+  color: #fecaca !important;
+}
+
 .v0-result-card.high_risk {
   border-color: rgba(217, 138, 74,0.28);
 }
@@ -1306,7 +1352,8 @@ main {
 
   .v0-composer-foot,
   .v0-result-top,
-  .v0-composer-head {
+  .v0-composer-head,
+  .v0-improve-panel {
     flex-direction: column;
     align-items: stretch;
   }

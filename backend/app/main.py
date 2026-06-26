@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 import httpx
+import json
 import logging
 import os
 import re
 import sys
 import time
 from datetime import datetime, timezone
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -69,6 +70,12 @@ from app.gamechanger.schemas import (  # noqa: E402
     OfficialRail as GamechangerOfficialRail,
 )
 from app.scan_guidance import build_live_scan_guidance, enrich_v0_verdict  # noqa: E402
+from app.mistral_ocr import (  # noqa: E402
+    MistralOcrError,
+    MistralOcrUnavailable,
+    extract_text_with_mistral_ocr,
+    mistral_ocr_available,
+)
 from app.whatsapp_webhook import whatsapp_router  # noqa: E402
 
 KAVACH_URL = "http://127.0.0.1:8790"
@@ -1831,11 +1838,223 @@ async def gamechanger_emergency(req: GamechangerEmergencyRequest):
     return build_gamechanger_emergency_response(req)
 
 
+V0_IMPROVE_INPUT_TYPES = {"screenshot", "qr_image", "payment_screenshot", "mixed"}
+
+
+def _clean_v0_input_type(input_type: str | None) -> str:
+    normalized = (input_type or "screenshot").strip().lower()
+    return normalized if normalized in V0_IMPROVE_INPUT_TYPES else "screenshot"
+
+
+def _parse_quality_snapshot(raw: str | None) -> dict[str, Any]:
+    try:
+        parsed = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    confidence = parsed.get("confidence")
+    if isinstance(confidence, int | float):
+        normalized_confidence = max(0.0, min(1.0, float(confidence)))
+    else:
+        normalized_confidence = None
+
+    raw_flags = parsed.get("quality_flags")
+    flags: list[str] = []
+    if isinstance(raw_flags, list):
+        for flag in raw_flags:
+            if not isinstance(flag, str):
+                continue
+            clean = re.sub(r"[^a-z0-9_:-]+", "_", flag.strip().lower())[:64]
+            if clean and clean not in flags:
+                flags.append(clean)
+            if len(flags) >= 8:
+                break
+
+    character_count = parsed.get("character_count")
+    if not isinstance(character_count, int) or character_count < 0:
+        character_count = None
+
+    return {
+        "source": "browser",
+        "confidence": normalized_confidence,
+        "quality_flags": flags,
+        "character_count": character_count,
+    }
+
+
+async def _fallback_improve_result(
+    *,
+    input_type: str,
+    local_text: str,
+    language_hint: str | None,
+    source_name: str | None,
+    session_id: str | None,
+    quality_snapshot: dict[str, Any],
+    fallback_reason: str,
+    ocr_attempted: bool,
+    ocr_latency_ms: int | None = None,
+):
+    flags = list(quality_snapshot.get("quality_flags") or [])
+    if fallback_reason not in flags:
+        flags.append(fallback_reason)
+    if not local_text.strip() and "empty_text" not in flags:
+        flags.append("empty_text")
+    fallback_input = V0ScanInput(
+        input_type=input_type,  # type: ignore[arg-type]
+        text=local_text[:20000],
+        language_hint=language_hint,
+        source_name=source_name,
+        session_id=session_id,
+        extraction={
+            **quality_snapshot,
+            "quality_flags": flags[:8],
+            "character_count": len(local_text.strip()),
+        },
+    )
+    result = analyze_v0_scan(fallback_input)
+    result = await enrich_v0_verdict(result)
+    return result.model_copy(
+        update={
+            "runtime_source": "needs clearer screenshot",
+            "extraction_quality": "empty" if not local_text.strip() else "weak",
+            "can_improve_scan": False,
+            "ocr_provider": "mistral",
+            "ocr_attempted": ocr_attempted,
+            "ocr_latency_ms": ocr_latency_ms,
+            "fallback_reason": fallback_reason,
+        }
+    )
+
+
 @app.post("/api/v0/scan")
 async def v0_scan(req: V0ScanInput):
     """Bounded Chetana v0 scan loop: scan -> explain -> share -> report -> learn."""
     result = analyze_v0_scan(req)
     result = await enrich_v0_verdict(result)
+    if result.can_improve_scan and not mistral_ocr_available():
+        result = result.model_copy(
+            update={
+                "can_improve_scan": False,
+                "fallback_reason": result.fallback_reason or "ocr_unavailable",
+            }
+        )
+    return result.model_dump()
+
+
+@app.post("/api/v0/scan/improve")
+async def v0_scan_improve(
+    file: UploadFile = File(...),
+    input_type: str = Form("screenshot"),
+    source_name: str | None = Form(None),
+    consent_token: str = Form(...),
+    local_extracted_text: str = Form(""),
+    quality_snapshot: str = Form("{}"),
+    session_id: str | None = Form(None),
+    language_hint: str | None = Form(None),
+):
+    """Manual OCR escalation: extract better text, then rescan through deterministic Chetana."""
+    if consent_token != "cloud-ocr-consent":
+        raise HTTPException(status_code=400, detail="cloud_ocr_consent_required")
+
+    clean_input_type = _clean_v0_input_type(input_type)
+    local_text = (local_extracted_text or "")[:20000]
+    parsed_quality = _parse_quality_snapshot(quality_snapshot)
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="empty_upload")
+
+    if not mistral_ocr_available():
+        result = await _fallback_improve_result(
+            input_type=clean_input_type,
+            local_text=local_text,
+            language_hint=language_hint,
+            source_name=source_name or file.filename,
+            session_id=session_id,
+            quality_snapshot=parsed_quality,
+            fallback_reason="ocr_unavailable",
+            ocr_attempted=False,
+        )
+        return result.model_dump()
+
+    try:
+        ocr = await extract_text_with_mistral_ocr(
+            content=content,
+            filename=file.filename or source_name,
+            content_type=file.content_type,
+        )
+    except MistralOcrUnavailable:
+        result = await _fallback_improve_result(
+            input_type=clean_input_type,
+            local_text=local_text,
+            language_hint=language_hint,
+            source_name=source_name or file.filename,
+            session_id=session_id,
+            quality_snapshot=parsed_quality,
+            fallback_reason="ocr_unavailable",
+            ocr_attempted=False,
+        )
+        return result.model_dump()
+    except MistralOcrError as exc:
+        result = await _fallback_improve_result(
+            input_type=clean_input_type,
+            local_text=local_text,
+            language_hint=language_hint,
+            source_name=source_name or file.filename,
+            session_id=session_id,
+            quality_snapshot=parsed_quality,
+            fallback_reason=str(exc)[:80] or "ocr_failed",
+            ocr_attempted=True,
+        )
+        return result.model_dump()
+
+    ocr_text = ocr.text.strip()
+    if not ocr_text:
+        result = await _fallback_improve_result(
+            input_type=clean_input_type,
+            local_text=local_text,
+            language_hint=language_hint,
+            source_name=source_name or file.filename,
+            session_id=session_id,
+            quality_snapshot=parsed_quality,
+            fallback_reason="ocr_returned_empty",
+            ocr_attempted=True,
+            ocr_latency_ms=ocr.latency_ms,
+        )
+        return result.model_dump()
+
+    combined_text = "\n\n".join([part for part in [local_text.strip(), ocr_text] if part])[:20000]
+    result = analyze_v0_scan(
+        V0ScanInput(
+            input_type=clean_input_type,  # type: ignore[arg-type]
+            text=combined_text,
+            language_hint=language_hint,
+            source_name=source_name or file.filename,
+            session_id=session_id,
+            extraction={
+                "source": "mistral",
+                "confidence": ocr.confidence,
+                "quality_flags": [],
+                "character_count": len(ocr_text),
+                "image_metadata": {
+                    "page_count": ocr.page_count,
+                },
+            },
+        )
+    )
+    result = await enrich_v0_verdict(result)
+    result = result.model_copy(
+        update={
+            "runtime_source": "local + OCR fallback",
+            "extraction_quality": "strong" if len(ocr_text) >= 12 else "weak",
+            "can_improve_scan": False,
+            "ocr_provider": ocr.provider,
+            "ocr_attempted": True,
+            "ocr_latency_ms": ocr.latency_ms,
+            "fallback_reason": None,
+        }
+    )
     return result.model_dump()
 
 
@@ -1977,8 +2196,6 @@ async def privacy_policy():
 
 
 # ── Proxy endpoints to Kavach ──
-import httpx
-from fastapi import UploadFile, File, Form
 
 # ── Decode Firewall Gate ──────────────────────────────────────────────────
 _decode_fw_path = Path.home() / ".mirrordna" / "lib" / "decode_firewall.py"

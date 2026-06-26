@@ -200,6 +200,11 @@ export function localPatternScan(text: string): LocalScanResult {
 let worker: any = null;
 let tesseractModule: typeof import("tesseract.js") | null = null;
 
+export interface BrowserOcrResult {
+  text: string;
+  confidence: number | null;
+}
+
 async function getTesseract() {
   if (!tesseractModule) {
     tesseractModule = await import("tesseract.js");
@@ -268,11 +273,22 @@ async function preprocessForOCR(imageFile: File): Promise<Blob> {
   });
 }
 
-export async function browserOCR(imageFile: File): Promise<string> {
+export async function browserOCRWithConfidence(imageFile: File): Promise<BrowserOcrResult> {
   const w = await getWorker();
   const preprocessed = await preprocessForOCR(imageFile);
-  const { data: { text } } = await w.recognize(preprocessed);
-  return text.trim();
+  const { data: { text, confidence } } = await w.recognize(preprocessed);
+  const normalizedConfidence = typeof confidence === "number"
+    ? Math.max(0, Math.min(1, confidence > 1 ? confidence / 100 : confidence))
+    : null;
+  return {
+    text: text.trim(),
+    confidence: normalizedConfidence,
+  };
+}
+
+export async function browserOCR(imageFile: File): Promise<string> {
+  const result = await browserOCRWithConfidence(imageFile);
+  return result.text;
 }
 
 /* ── Combined local-first scan for screenshots ────────────── */

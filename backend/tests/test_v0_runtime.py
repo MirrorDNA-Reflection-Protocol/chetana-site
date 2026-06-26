@@ -68,6 +68,30 @@ class V0TrustRuntimeTests(unittest.TestCase):
         self.assertIsNone(bundle.merchant_release)
         self.assertEqual(scan.evidence_state, "weak")
         self.assertEqual(scan.guidance.source, "deterministic")
+        self.assertEqual(scan.runtime_source, "local")
+        self.assertEqual(scan.extraction_quality, "strong")
+        self.assertFalse(scan.can_improve_scan)
+
+    def test_weak_screenshot_extraction_can_be_improved(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="screenshot",
+                text="ok",
+                language_hint="en",
+                session_id="test-session",
+                extraction={
+                    "source": "browser",
+                    "confidence": 0.2,
+                    "quality_flags": ["low_ocr_confidence"],
+                    "character_count": 2,
+                },
+            )
+        )
+
+        self.assertEqual(scan.runtime_source, "needs clearer screenshot")
+        self.assertEqual(scan.extraction_quality, "weak")
+        self.assertTrue(scan.can_improve_scan)
+        self.assertEqual(scan.fallback_reason, "low_ocr_confidence")
 
     def test_verified_payment_proof_can_clear_merchant_release(self) -> None:
         verdict = V0Verdict(

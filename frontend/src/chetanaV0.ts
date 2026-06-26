@@ -1,4 +1,4 @@
-import { browserOCR } from "./localScanner";
+import { browserOCRWithConfidence } from "./localScanner";
 
 export type V0Mode = "text" | "screenshot" | "qr_image" | "payment_screenshot";
 export type V0InputType = "text" | "screenshot" | "qr_image" | "payment_screenshot" | "mixed";
@@ -30,6 +30,8 @@ export type V0RecommendedAction =
   | "report_and_block"
   | "scan_again_with_more_context"
   | "treat_as_unclear";
+export type V0RuntimeSource = "local" | "local + OCR fallback" | "needs clearer screenshot";
+export type V0ExtractionQuality = "strong" | "weak" | "empty";
 export type V0EventName =
   | "app_open"
   | "scan_started"
@@ -72,6 +74,14 @@ export interface V0Guidance {
   source: "deterministic" | "ollama";
 }
 
+export interface V0ScanExtraction {
+  source: "manual" | "browser" | "mistral";
+  confidence?: number | null;
+  quality_flags: string[];
+  character_count: number;
+  image_metadata?: Record<string, string | number | boolean | null>;
+}
+
 export interface V0Verdict {
   scan_id: string;
   timestamp_utc: string;
@@ -92,6 +102,18 @@ export interface V0Verdict {
   share_shield_eligible: boolean;
   evidence_pack_eligible: boolean;
   notes?: string | null;
+  runtime_source?: V0RuntimeSource;
+  extraction_quality?: V0ExtractionQuality;
+  can_improve_scan?: boolean;
+  ocr_provider?: string | null;
+  ocr_attempted?: boolean;
+  ocr_latency_ms?: number | null;
+  fallback_reason?: string | null;
+}
+
+export interface V0ExtractedInput {
+  text: string;
+  extraction: V0ScanExtraction;
 }
 
 export interface V0EvidencePack {
@@ -758,16 +780,88 @@ export async function decodeQrImage(file: File): Promise<string> {
   }
 }
 
-export async function extractTextForMode(mode: V0Mode, file: File | null, text: string): Promise<string> {
+function buildExtractionMetadata(
+  mode: V0Mode,
+  file: File | null,
+  extractedText: string,
+  source: V0ScanExtraction["source"],
+  confidence: number | null,
+): V0ScanExtraction {
+  const characterCount = extractedText.trim().length;
+  const qualityFlags: string[] = [];
+  if (characterCount === 0) {
+    qualityFlags.push("empty_text");
+  }
+  if (mode !== "text" && characterCount > 0 && characterCount < 12) {
+    qualityFlags.push("very_short_text");
+  }
+  if (confidence !== null && confidence < 0.45) {
+    qualityFlags.push("low_ocr_confidence");
+  }
+  if (file && file.size > 6 * 1024 * 1024) {
+    qualityFlags.push("dense_document");
+  }
+  if (mode === "payment_screenshot" && characterCount > 0 && characterCount < 20) {
+    qualityFlags.push("image_only_payment_request");
+  }
+
+  return {
+    source,
+    confidence,
+    quality_flags: Array.from(new Set(qualityFlags)),
+    character_count: characterCount,
+    image_metadata: file
+      ? {
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type || "unknown",
+        }
+      : undefined,
+  };
+}
+
+export async function extractScanInputForMode(mode: V0Mode, file: File | null, text: string): Promise<V0ExtractedInput> {
   const pasted = text.trim();
-  if (mode === "text" && pasted) return pasted;
-  if (!file) return pasted;
+  if (mode === "text" && pasted) {
+    return {
+      text: pasted,
+      extraction: buildExtractionMetadata(mode, null, pasted, "manual", 1),
+    };
+  }
+  if (!file) {
+    return {
+      text: pasted,
+      extraction: buildExtractionMetadata(mode, null, pasted, pasted ? "manual" : "browser", pasted ? 1 : null),
+    };
+  }
   if (mode === "qr_image") {
     const qrPayload = await decodeQrImage(file);
     if (qrPayload) {
-      return [pasted, qrPayload].filter(Boolean).join("\n\n").trim();
+      const extracted = [pasted, qrPayload].filter(Boolean).join("\n\n").trim();
+      return {
+        text: extracted,
+        extraction: buildExtractionMetadata(mode, file, extracted, "browser", 1),
+      };
     }
   }
-  const ocrText = await browserOCR(file);
-  return [pasted, ocrText].filter(Boolean).join("\n\n").trim();
+  const ocr = await browserOCRWithConfidence(file);
+  const extracted = [pasted, ocr.text].filter(Boolean).join("\n\n").trim();
+  return {
+    text: extracted,
+    extraction: buildExtractionMetadata(mode, file, extracted, "browser", ocr.confidence),
+  };
+}
+
+export async function extractTextForMode(mode: V0Mode, file: File | null, text: string): Promise<string> {
+  const extracted = await extractScanInputForMode(mode, file, text);
+  return extracted.text;
+}
+
+export function runtimeSourceLabel(verdict: Pick<V0Verdict, "runtime_source" | "ocr_latency_ms">): string {
+  if (verdict.runtime_source === "local + OCR fallback") {
+    const latency = verdict.ocr_latency_ms ? ` · OCR ${Math.max(1, Math.round(verdict.ocr_latency_ms / 1000))}s` : "";
+    return `Checked with OCR fallback${latency}`;
+  }
+  if (verdict.runtime_source === "needs clearer screenshot") return "Need a clearer screenshot";
+  return "Checked locally";
 }

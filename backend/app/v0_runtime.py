@@ -63,6 +63,8 @@ RecommendedAction = Literal[
     "scan_again_with_more_context",
     "treat_as_unclear",
 ]
+RuntimeSource = Literal["local", "local + OCR fallback", "needs clearer screenshot"]
+ExtractionQuality = Literal["strong", "weak", "empty"]
 EventName = Literal[
     "app_open",
     "scan_started",
@@ -122,6 +124,14 @@ class V0Guidance(StrictModel):
     source: ExplanationSource = "deterministic"
 
 
+class V0ScanExtraction(StrictModel):
+    source: str = Field(default="browser", max_length=32)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    quality_flags: list[str] = Field(default_factory=list, max_length=8)
+    character_count: int | None = Field(default=None, ge=0)
+    image_metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
 class V0Verdict(StrictModel):
     scan_id: str
     timestamp_utc: str
@@ -142,6 +152,13 @@ class V0Verdict(StrictModel):
     share_shield_eligible: bool = False
     evidence_pack_eligible: bool = False
     notes: str | None = None
+    runtime_source: RuntimeSource = "local"
+    extraction_quality: ExtractionQuality = "strong"
+    can_improve_scan: bool = False
+    ocr_provider: str | None = None
+    ocr_attempted: bool = False
+    ocr_latency_ms: int | None = Field(default=None, ge=0)
+    fallback_reason: str | None = None
 
 
 class V0ScanInput(StrictModel):
@@ -150,6 +167,73 @@ class V0ScanInput(StrictModel):
     language_hint: str | None = None
     source_name: str | None = None
     session_id: str | None = None
+    extraction: V0ScanExtraction | None = None
+
+
+IMPROVABLE_INPUT_TYPES: set[InputType] = {"screenshot", "qr_image", "payment_screenshot", "mixed"}
+WEAK_EXTRACTION_FLAGS = {
+    "empty_text",
+    "very_short_text",
+    "low_ocr_confidence",
+    "dense_document",
+    "image_only_payment_request",
+    "mixed_language_or_script",
+    "possible_crop",
+}
+
+
+def _clean_quality_flags(flags: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for flag in flags:
+        normalized = re.sub(r"[^a-z0-9_:-]+", "_", str(flag).strip().lower())[:64]
+        if normalized and normalized not in cleaned:
+            cleaned.append(normalized)
+        if len(cleaned) >= 8:
+            break
+    return cleaned
+
+
+def _runtime_metadata_for_scan(payload: V0ScanInput, text: str) -> dict[str, Any]:
+    extraction = payload.extraction
+    flags = _clean_quality_flags(extraction.quality_flags if extraction else [])
+    normalized_text = text.strip()
+    character_count = extraction.character_count if extraction and extraction.character_count is not None else len(normalized_text)
+
+    if not normalized_text and "empty_text" not in flags:
+        flags.append("empty_text")
+    if payload.input_type != "text" and 0 < character_count < 12 and "very_short_text" not in flags:
+        flags.append("very_short_text")
+    if (
+        extraction
+        and extraction.confidence is not None
+        and extraction.confidence < 0.45
+        and "low_ocr_confidence" not in flags
+    ):
+        flags.append("low_ocr_confidence")
+
+    weak_flags = [flag for flag in flags if flag in WEAK_EXTRACTION_FLAGS]
+    if not normalized_text:
+        extraction_quality: ExtractionQuality = "empty"
+    elif payload.input_type != "text" and weak_flags:
+        extraction_quality = "weak"
+    else:
+        extraction_quality = "strong"
+
+    can_improve = payload.input_type in IMPROVABLE_INPUT_TYPES and extraction_quality in {"empty", "weak"}
+    fallback_reason = weak_flags[0] if can_improve and weak_flags else None
+    if can_improve and not fallback_reason and extraction_quality == "empty":
+        fallback_reason = "empty_text"
+
+    return {
+        "runtime_source": "needs clearer screenshot" if can_improve else "local",
+        "extraction_quality": extraction_quality,
+        "can_improve_scan": can_improve,
+        "fallback_reason": fallback_reason,
+    }
+
+
+def _with_runtime_metadata(verdict: V0Verdict, payload: V0ScanInput, text: str) -> V0Verdict:
+    return verdict.model_copy(update=_runtime_metadata_for_scan(payload, text))
 
 
 class V0EvidencePack(StrictModel):
@@ -704,33 +788,37 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         confidence: ConfidenceBand = "low"
         actions: list[RecommendedAction] = ["scan_again_with_more_context", "treat_as_unclear"]
         summary = _build_summary(verdict, "unknown_suspicious_pattern", actions)
-        return V0Verdict(
-            scan_id=generate_scan_id(),
-            timestamp_utc=now_utc(),
-            input_type=payload.input_type,
-            language_hint=payload.language_hint,
-            verdict=verdict,
-            risk_level=_risk_level_for_verdict(verdict),
-            scam_type="unknown_suspicious_pattern",
-            confidence_band=confidence,
-            evidence_state="weak",
-            incident_state="suspected",
-            reasons=list(reasons.values())[:5],
-            entities=entities,
-            summary_plain_language=summary,
-            safe_next_step=_safe_next_step_for_action(actions[0]),
-            guidance=_build_guidance(
+        return _with_runtime_metadata(
+            V0Verdict(
+                scan_id=generate_scan_id(),
+                timestamp_utc=now_utc(),
+                input_type=payload.input_type,
+                language_hint=payload.language_hint,
                 verdict=verdict,
+                risk_level=_risk_level_for_verdict(verdict),
                 scam_type="unknown_suspicious_pattern",
-                reasons=reasons,
-                recommended_actions=actions,
-                incident_state="suspected",
+                confidence_band=confidence,
                 evidence_state="weak",
+                incident_state="suspected",
+                reasons=list(reasons.values())[:5],
+                entities=entities,
+                summary_plain_language=summary,
+                safe_next_step=_safe_next_step_for_action(actions[0]),
+                guidance=_build_guidance(
+                    verdict=verdict,
+                    scam_type="unknown_suspicious_pattern",
+                    reasons=reasons,
+                    recommended_actions=actions,
+                    incident_state="suspected",
+                    evidence_state="weak",
+                ),
+                recommended_actions=actions,
+                share_shield_eligible=True,
+                evidence_pack_eligible=True,
+                notes="Need more context before a stronger verdict.",
             ),
-            recommended_actions=actions,
-            share_shield_eligible=True,
-            evidence_pack_eligible=True,
-            notes="Need more context before a stronger verdict.",
+            payload,
+            text,
         )
 
     if URGENCY_RE.search(text):
@@ -901,26 +989,30 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
     elif evidence_state == "weak" and verdict != "high_risk":
         notes = "The current evidence is still weak. A fuller chat, clearer screenshot, or official app view will produce a stronger check."
 
-    return V0Verdict(
-        scan_id=generate_scan_id(),
-        timestamp_utc=now_utc(),
-        input_type=payload.input_type,
-        language_hint=payload.language_hint,
-        verdict=verdict,
-        risk_level=_risk_level_for_verdict(verdict),
-        scam_type=scam_type,
-        confidence_band=confidence,
-        evidence_state=evidence_state,
-        incident_state=incident_state,
-        reasons=list(reasons.values())[:5],
-        entities=entities,
-        summary_plain_language=summary,
-        safe_next_step=_safe_next_step_for_action(deduped_actions[0]),
-        guidance=guidance,
-        recommended_actions=deduped_actions[:4],
-        share_shield_eligible=verdict in {"high_risk", "caution", "needs_review"},
-        evidence_pack_eligible=verdict in {"high_risk", "caution", "needs_review"},
-        notes=notes,
+    return _with_runtime_metadata(
+        V0Verdict(
+            scan_id=generate_scan_id(),
+            timestamp_utc=now_utc(),
+            input_type=payload.input_type,
+            language_hint=payload.language_hint,
+            verdict=verdict,
+            risk_level=_risk_level_for_verdict(verdict),
+            scam_type=scam_type,
+            confidence_band=confidence,
+            evidence_state=evidence_state,
+            incident_state=incident_state,
+            reasons=list(reasons.values())[:5],
+            entities=entities,
+            summary_plain_language=summary,
+            safe_next_step=_safe_next_step_for_action(deduped_actions[0]),
+            guidance=guidance,
+            recommended_actions=deduped_actions[:4],
+            share_shield_eligible=verdict in {"high_risk", "caution", "needs_review"},
+            evidence_pack_eligible=verdict in {"high_risk", "caution", "needs_review"},
+            notes=notes,
+        ),
+        payload,
+        text,
     )
 
 

@@ -29,18 +29,20 @@ import {
   downloadJson,
   entitySections,
   evidenceStateLabel,
-  extractTextForMode,
+  extractScanInputForMode,
   getOrCreateV0SessionId,
   incidentStateLabel,
   incidentTypeLabel,
   merchantDecisionLabel,
   reportScript,
+  runtimeSourceLabel,
   scamTypeLabel,
   sendGuardDecisionLabel,
   shareShieldText,
   trackV0Event,
   verdictLabel,
   verdictSummary,
+  V0ExtractedInput,
   V0_MODE_CARDS,
 } from "./chetanaV0";
 import ChetanaResultScreen, { riskFromVerdict } from "./ChetanaResultScreen";
@@ -263,6 +265,9 @@ export default function ChetanaV0Experience({
   const [evidence, setEvidence] = useState<V0EvidencePack | null>(null);
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [improveError, setImproveError] = useState<string | null>(null);
+  const [improving, setImproving] = useState(false);
+  const [lastExtractedInput, setLastExtractedInput] = useState<V0ExtractedInput | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [showFullBreakdown, setShowFullBreakdown] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -321,6 +326,9 @@ export default function ChetanaV0Experience({
     setEvidence(null);
     setTrustBundle(null);
     setError(null);
+    setImproveError(null);
+    setImproving(false);
+    setLastExtractedInput(null);
     setDetailsOpen(false);
     setShowFullBreakdown(false);
     setShareCopied(false);
@@ -374,10 +382,12 @@ export default function ChetanaV0Experience({
       }).catch(() => {});
 
       setStatus(mode === "text" ? "Reading the message..." : "Extracting what is visible...");
-      const extracted = await extractTextForMode(mode, file, text);
+      const extractedInput = await extractScanInputForMode(mode, file, text);
+      const extracted = extractedInput.text;
       if (!extracted) {
         throw new Error("Please paste the message or upload an image first.");
       }
+      setLastExtractedInput(extractedInput);
 
       setStatus("Explaining the risk in plain language...");
       const scanResp = await fetch("/api/v0/scan", {
@@ -389,6 +399,7 @@ export default function ChetanaV0Experience({
           language_hint: navigator.language.slice(0, 2),
           source_name: file?.name || null,
           session_id: sessionId,
+          extraction: extractedInput.extraction,
         }),
       });
 
@@ -494,6 +505,58 @@ export default function ChetanaV0Experience({
       setStatus("Could not finish the check.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runImproveScan = async () => {
+    if (!file || !result) return;
+    setImproving(true);
+    setImproveError(null);
+    setStatus("Improving the text extraction...");
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("input_type", mode);
+      form.append("source_name", file.name);
+      form.append("consent_token", "cloud-ocr-consent");
+      form.append("local_extracted_text", lastExtractedInput?.text || "");
+      form.append("quality_snapshot", JSON.stringify(lastExtractedInput?.extraction || {
+        source: "browser",
+        confidence: null,
+        quality_flags: result.fallback_reason ? [result.fallback_reason] : [],
+        character_count: lastExtractedInput?.text?.length || 0,
+      }));
+      form.append("session_id", sessionId);
+      form.append("language_hint", navigator.language.slice(0, 2));
+
+      const improveResp = await fetch("/api/v0/scan/improve", {
+        method: "POST",
+        body: form,
+      });
+
+      if (!improveResp.ok) {
+        const detail = await improveResp.json().catch(() => null);
+        throw new Error(detail?.detail || "Chetana could not improve this scan right now.");
+      }
+
+      const improved = (await improveResp.json()) as V0Verdict;
+      setResult(improved);
+      setEvidence(null);
+      setTrustBundle(null);
+      setDetailsOpen(false);
+      setShowFullBreakdown(false);
+      setStatus(
+        improved.runtime_source === "local + OCR fallback"
+          ? "Improved scan finished."
+          : "Use a clearer screenshot or paste the visible text.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Chetana could not improve this scan right now.";
+      setImproveError(message);
+      setStatus("Could not improve this scan.");
+    } finally {
+      setImproving(false);
     }
   };
 
@@ -819,6 +882,28 @@ export default function ChetanaV0Experience({
                 onToggleBreakdown={() => setShowFullBreakdown((current) => !current)}
                 showFullBreakdown={showFullBreakdown}
               />
+
+              <div className="v0-runtime-source">
+                <Check size={14} />
+                <span>{runtimeSourceLabel(result)}</span>
+              </div>
+
+              {result.can_improve_scan && file && mode !== "text" && (
+                <div className="v0-improve-panel">
+                  <div>
+                    <div className="v0-section-label">Improve scan</div>
+                    <strong>Try stronger text extraction</strong>
+                    <p>
+                      Chetana can send this screenshot for stronger text extraction. Do not use this for private IDs, passwords, or bank statements.
+                    </p>
+                    {improveError && <p className="v0-improve-error">{improveError}</p>}
+                  </div>
+                  <button className="v0-submit" onClick={runImproveScan} disabled={improving}>
+                    {improving ? "Improving..." : "Improve scan"}
+                    <Shield size={16} />
+                  </button>
+                </div>
+              )}
 
               <div className="v0-report-card">
                 <div className="v0-section-label">Guided response</div>

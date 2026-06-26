@@ -86,6 +86,27 @@ DeviceClass = Literal["android_phone", "ios_phone", "web", "desktop", "unknown"]
 ConsentClass = Literal["C0", "C1", "C2", "C3", "C4"]
 PayloadClass = Literal["derived_state", "cross_surface_signal", "save_intent", "export_artifact"]
 PersistenceClass = Literal["P0", "P1", "P2", "P3"]
+ActionRouteId = Literal[
+    "disconnect_now",
+    "stop_do_not_pay",
+    "hold_release",
+    "call_1930",
+    "contact_bank_or_upi_app",
+    "open_cybercrime_portal",
+    "check_ncrp_suspect_repository",
+    "check_ncrp_suspect_websites",
+    "report_ncrp_suspect",
+    "open_npci_upi_help",
+    "open_rbi_sachet",
+    "open_chakshu",
+    "verify_official_source",
+    "save_case_packet",
+    "share_with_family",
+    "scan_again",
+]
+ActionKind = Literal["call", "open_url", "hold", "save", "share", "scan_again"]
+ActionPriority = Literal["primary", "secondary"]
+ActionUrgency = Literal["immediate", "before_acting", "today", "monitor"]
 _DROP = object()
 METADATA_MAX_DEPTH = 2
 METADATA_MAX_KEYS = 24
@@ -1179,11 +1200,47 @@ class V0TrustBundle(StrictModel):
     recovery_packet: V0RecoveryPacket | None = None
 
 
+class V0ActionStep(StrictModel):
+    route_id: ActionRouteId
+    title: str
+    body: str
+    action_label: str
+    kind: ActionKind
+    priority: ActionPriority
+    urgency: ActionUrgency
+    href: str | None = None
+    official_rail_id: str | None = None
+
+
+class V0ActionRouteRequest(StrictModel):
+    verdict: V0Verdict
+    input_text: str = Field(default="", max_length=20000)
+    trust_bundle: V0TrustBundle | None = None
+    evidence_pack: V0EvidencePack | None = None
+    session_id: str | None = None
+
+
+class V0ActionRoute(StrictModel):
+    type: Literal["chetana_action_router_v0"] = "chetana_action_router_v0"
+    route_id: str
+    generated_at_utc: str
+    scan_id: str
+    session_id: str | None = None
+    headline: str
+    reason: str
+    primary_action: V0ActionStep
+    secondary_actions: list[V0ActionStep] = Field(default_factory=list, max_length=3)
+    case_packet: V0CasePacket
+    official_note: str
+    route_hash: str
+
+
 class V0LoopReceiptRequest(StrictModel):
     verdict: V0Verdict
     input_text: str = Field(default="", max_length=20000)
     evidence_pack: V0EvidencePack | None = None
     trust_bundle: V0TrustBundle | None = None
+    action_route: V0ActionRoute | None = None
     session_id: str | None = None
 
 
@@ -1233,6 +1290,7 @@ def build_v0_loop_receipt(payload: V0LoopReceiptRequest) -> V0LoopReceipt:
         "success_criteria": [
             "return a bounded scam-check verdict",
             "show a safe next step",
+            "route a practical official next step when available",
             "record the receipt without storing raw screenshot bytes",
         ],
         "validators": [
@@ -1302,6 +1360,10 @@ def build_v0_loop_receipt(payload: V0LoopReceiptRequest) -> V0LoopReceipt:
                 "recommended_actions": verdict.recommended_actions,
                 "share_shield_eligible": verdict.share_shield_eligible,
                 "evidence_pack_eligible": verdict.evidence_pack_eligible,
+                "action_route": payload.action_route.model_dump(
+                    exclude={"case_packet"},
+                ) if payload.action_route else None,
+                "action_route_hash": payload.action_route.route_hash if payload.action_route else None,
             },
         ),
         _loop_phase("verify", "pass" if status == "pass" else "fail", {"validator_results": validators}),
@@ -1329,7 +1391,14 @@ _TX_REFERENCE_RE = re.compile(
     r"\b(?:utr|txn|transaction|reference|ref(?:erence)?(?:\s*(?:no|id))?)[:#\s-]*([A-Z0-9-]{6,})\b",
     re.IGNORECASE,
 )
-_TRUST_RUNTIME_VERIFIED_ON = "2026-04-12"
+_TRUST_RUNTIME_VERIFIED_ON = "2026-06-26"
+NCRP_PORTAL_URL = "https://cybercrime.gov.in"
+NCRP_SUSPECT_REPOSITORY_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx"
+NCRP_SUSPECT_WEBSITES_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_websites.aspx"
+NCRP_REPORT_SUSPECT_URL = "https://www.cybercrime.gov.in/Webform/cyber_suspect.aspx"
+NPCI_UPI_HELP_URL = "https://upihelp.npci.org.in/"
+RBI_SACHET_URL = "https://sachet.rbi.org.in/"
+CHAKSHU_URL = "https://sancharsaathi.gov.in/sfc/"
 _OFFICIAL_RAILS: dict[RecoveryRailId, V0OfficialRail] = {
     "BANK_APP_SUPPORT": V0OfficialRail(
         rail_id="BANK_APP_SUPPORT",
@@ -1360,8 +1429,8 @@ _OFFICIAL_RAILS: dict[RecoveryRailId, V0OfficialRail] = {
         rail_id="NCRP_PORTAL",
         name="National Cybercrime Reporting Portal",
         channel="web",
-        contact="https://cybercrime.gov.in",
-        official_url="https://cybercrime.gov.in",
+        contact=NCRP_PORTAL_URL,
+        official_url=NCRP_PORTAL_URL,
         verified_on=_TRUST_RUNTIME_VERIFIED_ON,
         use_when=[
             "formal cyber fraud complaint",
@@ -1428,6 +1497,310 @@ def _build_case_packet(
         upi_ids=entities.upi_ids,
         merchant_names=entities.merchant_names,
         summary=summary,
+    )
+
+
+def _action_step(
+    route_id: ActionRouteId,
+    *,
+    title: str,
+    body: str,
+    action_label: str,
+    kind: ActionKind,
+    priority: ActionPriority,
+    urgency: ActionUrgency,
+    href: str | None = None,
+    official_rail_id: str | None = None,
+) -> V0ActionStep:
+    return V0ActionStep(
+        route_id=route_id,
+        title=title,
+        body=body,
+        action_label=action_label,
+        kind=kind,
+        priority=priority,
+        urgency=urgency,
+        href=href,
+        official_rail_id=official_rail_id,
+    )
+
+
+def _secondary_action_catalog() -> dict[ActionRouteId, V0ActionStep]:
+    return {
+        "call_1930": _action_step(
+            "call_1930",
+            title="Call 1930 if money, codes, or account access were exposed",
+            body="Use the national cybercrime helpline before continuing the conversation.",
+            action_label="Call 1930",
+            kind="call",
+            priority="secondary",
+            urgency="immediate",
+            href="tel:1930",
+            official_rail_id="CYBER_HELPLINE_1930",
+        ),
+        "contact_bank_or_upi_app": _action_step(
+            "contact_bank_or_upi_app",
+            title="Contact your bank or payment app",
+            body="Use the real app, bank branch, card-back number, or UPI complaint path. Do not use numbers from the suspicious message.",
+            action_label="Open UPI Help",
+            kind="open_url",
+            priority="secondary",
+            urgency="immediate",
+            href=NPCI_UPI_HELP_URL,
+            official_rail_id="NPCI_UPI_HELP",
+        ),
+        "open_cybercrime_portal": _action_step(
+            "open_cybercrime_portal",
+            title="File or continue the cybercrime report",
+            body="Use the official portal when you have screenshots, sender details, links, or transaction references ready.",
+            action_label="Open cybercrime.gov.in",
+            kind="open_url",
+            priority="secondary",
+            urgency="today",
+            href=NCRP_PORTAL_URL,
+            official_rail_id="NCRP_PORTAL",
+        ),
+        "save_case_packet": _action_step(
+            "save_case_packet",
+            title="Save the private report",
+            body="Keep the summary, identifiers, reasons, and next steps while the evidence is still fresh.",
+            action_label="Save report",
+            kind="save",
+            priority="secondary",
+            urgency="before_acting",
+            official_rail_id="CHETANA_CASE_PACKET",
+        ),
+        "share_with_family": _action_step(
+            "share_with_family",
+            title="Share the warning with someone you trust",
+            body="A second person can help you slow down, especially when the message is urgent or threatening.",
+            action_label="Share warning",
+            kind="share",
+            priority="secondary",
+            urgency="before_acting",
+            official_rail_id="FAMILY_SHARE_SHIELD",
+        ),
+        "verify_official_source": _action_step(
+            "verify_official_source",
+            title="Verify through an official source",
+            body="Use the official app, website, branch, or known number you already trust. Ignore contact details inside the suspicious message.",
+            action_label="Verified elsewhere",
+            kind="hold",
+            priority="secondary",
+            urgency="before_acting",
+            official_rail_id="OFFICIAL_SOURCE_VERIFY",
+        ),
+        "scan_again": _action_step(
+            "scan_again",
+            title="Scan again with more context",
+            body="Use a fuller chat, clearer screenshot, or exact payment payload before treating this as cleared.",
+            action_label="Scan again",
+            kind="scan_again",
+            priority="secondary",
+            urgency="monitor",
+            official_rail_id="CHETANA_SCAN",
+        ),
+    }
+
+
+def _append_action(actions: list[V0ActionStep], catalog: dict[ActionRouteId, V0ActionStep], route_id: ActionRouteId) -> None:
+    if route_id not in catalog:
+        return
+    if any(action.route_id == route_id for action in actions):
+        return
+    actions.append(catalog[route_id])
+
+
+def _has_identifier_targets(entities: V0Entities) -> bool:
+    return bool(entities.phone_numbers or entities.upi_ids or entities.urls)
+
+
+def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
+    verdict = payload.verdict
+    text = _normalize_text(payload.input_text)
+    entities = verdict.entities or V0Entities()
+    codes = _reason_codes(verdict)
+    catalog = _secondary_action_catalog()
+    secondaries: list[V0ActionStep] = []
+    summary = verdict.summary_plain_language or verdict.guidance.lead
+    case_packet = _build_case_packet(verdict, text, summary)
+
+    if verdict.incident_state == "device_access_requested" or "remote_access_request" in codes:
+        primary = _action_step(
+            "disconnect_now",
+            title="End the call or screen-share now",
+            body="Do not install apps, share your screen, or enter OTPs/PINs while someone is guiding you.",
+            action_label="I stopped the session",
+            kind="hold",
+            priority="primary",
+            urgency="immediate",
+            official_rail_id="DEVICE_ACCESS_STOP",
+        )
+        reason = "Device-control or remote-support pressure was detected."
+        _append_action(secondaries, catalog, "call_1930")
+        _append_action(secondaries, catalog, "contact_bank_or_upi_app")
+        _append_action(secondaries, catalog, "open_cybercrime_portal")
+    elif verdict.input_type == "payment_screenshot" or verdict.scam_type == "fake_payment_proof":
+        primary = _action_step(
+            "hold_release",
+            title="Do not release goods on this screenshot alone",
+            body="Verify the UTR, amount, payer, and ledger inside the real bank or PSP app before anything changes hands.",
+            action_label="Hold release",
+            kind="hold",
+            priority="primary",
+            urgency="immediate",
+            official_rail_id="MERCHANT_RELEASE_GUARD",
+        )
+        reason = "Payment screenshots are customer-controlled evidence until verified in the real ledger."
+        _append_action(secondaries, catalog, "contact_bank_or_upi_app")
+        _append_action(secondaries, catalog, "call_1930")
+        _append_action(secondaries, catalog, "save_case_packet")
+    elif verdict.scam_type == "investment_scam" or "suspicious_return_claim" in codes:
+        primary = _action_step(
+            "open_rbi_sachet",
+            title="Check the investment or deposit claim before paying",
+            body="Use RBI Sachet for suspicious deposit, lending, or investment solicitations. Do not send money based on the pitch.",
+            action_label="Open RBI Sachet",
+            kind="open_url",
+            priority="primary",
+            urgency="before_acting",
+            href=RBI_SACHET_URL,
+            official_rail_id="RBI_SACHET",
+        )
+        reason = "The message looks like an investment, deposit, or return-promise pitch."
+        _append_action(secondaries, catalog, "save_case_packet")
+        _append_action(secondaries, catalog, "share_with_family")
+        if verdict.verdict == "high_risk":
+            _append_action(secondaries, catalog, "open_cybercrime_portal")
+    elif verdict.verdict == "high_risk":
+        primary = _action_step(
+            "stop_do_not_pay",
+            title="Stop here. Do not pay, approve, or share codes",
+            body="Break the pressure loop first. If money, OTPs, bank access, or device control were exposed, use official help immediately.",
+            action_label="I will stop here",
+            kind="hold",
+            priority="primary",
+            urgency="immediate",
+            official_rail_id="CHETANA_HARD_STOP",
+        )
+        reason = "The scan found high-risk pressure, payment, identity, or link signals."
+        _append_action(secondaries, catalog, "call_1930")
+        _append_action(secondaries, catalog, "open_cybercrime_portal")
+        _append_action(secondaries, catalog, "save_case_packet")
+    elif verdict.verdict in {"caution", "needs_review"} and _has_identifier_targets(entities):
+        if entities.urls and not (entities.phone_numbers or entities.upi_ids):
+            primary = _action_step(
+                "check_ncrp_suspect_websites",
+                title="Check the website or app with the official suspect lookup",
+                body="Use this as a second check before trusting a suspicious website, app, or link.",
+                action_label="Check website / app",
+                kind="open_url",
+                priority="primary",
+                urgency="before_acting",
+                href=NCRP_SUSPECT_WEBSITES_URL,
+                official_rail_id="NCRP_SUSPECT_WEBSITES",
+            )
+            reason = "A suspicious website or link was present and needs independent checking."
+        else:
+            primary = _action_step(
+                "check_ncrp_suspect_repository",
+                title="Check the phone number or UPI ID with the official suspect lookup",
+                body="Use this as a second check before trusting an unknown caller, payment handle, or sender.",
+                action_label="Check mobile / UPI",
+                kind="open_url",
+                priority="primary",
+                urgency="before_acting",
+                href=NCRP_SUSPECT_REPOSITORY_URL,
+                official_rail_id="NCRP_SUSPECT_REPOSITORY",
+            )
+            reason = "An unknown phone number or UPI handle was present and needs independent checking."
+        _append_action(secondaries, catalog, "save_case_packet")
+        _append_action(secondaries, catalog, "share_with_family")
+        if verdict.verdict == "caution":
+            _append_action(secondaries, catalog, "open_cybercrime_portal")
+    elif verdict.verdict in {"caution", "needs_review"}:
+        primary = _action_step(
+            "verify_official_source",
+            title="Verify through an official source you already trust",
+            body="Use the real app, official website, branch, or known number. Do not use contacts inside the suspicious message.",
+            action_label="Verified elsewhere",
+            kind="hold",
+            priority="primary",
+            urgency="before_acting",
+            official_rail_id="OFFICIAL_SOURCE_VERIFY",
+        )
+        reason = "The scan has warning signs but needs stronger independent evidence."
+        _append_action(secondaries, catalog, "scan_again")
+        _append_action(secondaries, catalog, "share_with_family")
+        _append_action(secondaries, catalog, "save_case_packet")
+    else:
+        primary = _action_step(
+            "scan_again",
+            title="Get more context before trusting it",
+            body="Low signal is not a guarantee. Use a fuller chat, clearer screenshot, or official app view if money or identity is involved.",
+            action_label="Scan more context",
+            kind="scan_again",
+            priority="primary",
+            urgency="monitor",
+            official_rail_id="CHETANA_SCAN",
+        )
+        reason = "The scan did not find enough strong evidence to clear or condemn the material."
+        _append_action(secondaries, catalog, "verify_official_source")
+        _append_action(secondaries, catalog, "share_with_family")
+
+    if verdict.verdict != "low_signal" and bool(entities.phone_numbers or entities.upi_ids):
+        _append_action(
+            secondaries,
+            {
+                **catalog,
+                "open_chakshu": _action_step(
+                    "open_chakshu",
+                    title="Report suspicious calls, SMS, or WhatsApp to Chakshu",
+                    body="Use this when the fraud attempt arrived as a telecom communication and no money has moved yet.",
+                    action_label="Open Chakshu",
+                    kind="open_url",
+                    priority="secondary",
+                    urgency="today",
+                    href=CHAKSHU_URL,
+                    official_rail_id="SANCHAR_SAATHI_CHAKSHU",
+                ),
+            },
+            "open_chakshu",
+        )
+
+    unique_secondaries: list[V0ActionStep] = []
+    for action in secondaries:
+        if action.route_id == primary.route_id:
+            continue
+        if any(existing.route_id == action.route_id for existing in unique_secondaries):
+            continue
+        unique_secondaries.append(action)
+        if len(unique_secondaries) >= 3:
+            break
+
+    base_route = {
+        "scan_id": verdict.scan_id,
+        "session_id": payload.session_id,
+        "primary_action": primary.model_dump(),
+        "secondary_actions": [action.model_dump() for action in unique_secondaries],
+        "case_packet_hash": _stable_hash(case_packet.model_dump()),
+        "verdict": verdict.verdict,
+        "scam_type": verdict.scam_type,
+        "incident_state": verdict.incident_state,
+    }
+    route_hash = _stable_hash(base_route)
+    return V0ActionRoute(
+        route_id=f"chetana-action-{route_hash[:12]}",
+        generated_at_utc=now_utc(),
+        scan_id=verdict.scan_id,
+        session_id=payload.session_id,
+        headline=primary.title,
+        reason=reason,
+        primary_action=primary,
+        secondary_actions=unique_secondaries,
+        case_packet=case_packet,
+        official_note="Chetana does not file complaints automatically. It routes you to official rails and keeps a private derived report you can choose to use.",
+        route_hash=route_hash,
     )
 
 

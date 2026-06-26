@@ -70,6 +70,30 @@ Receipt rules:
 - Failed validators still produce a receipt and a next guard.
 - Receipts are suitable input for future eval/training proposals, but they are not a training loop by themselves.
 
+## Action Router v0.1
+
+After the verdict and trust bundle, Chetana builds one action route:
+
+```text
+verdict + entities + incident state
+  -> choose one primary action
+  -> show up to three official or private follow-up actions
+  -> link the route hash into the loop receipt
+```
+
+The public UI shows this as `Do this now`. It should not expose the OS language, route graph, or policy machinery.
+
+Route rules:
+
+- Device-control pressure routes first to stop the session.
+- Payment-proof cases route first to hold release until the real ledger confirms it.
+- High-risk payment or identity pressure routes first to stop payment, approval, or code sharing, with 1930 and cybercrime.gov.in as follow-up rails.
+- Investment or deposit pitches route to RBI Sachet before any payment.
+- Phone, UPI, website, or app identifiers can offer official suspect lookup or Chakshu reporting as a secondary action.
+- Low-signal scans route to more context and independent official verification, not a safety guarantee.
+
+The router does not file complaints, call helplines, or publish reports automatically. It only gives the user the next safest move and records derived hashes / route metadata.
+
 ## Runtime Units
 
 ### BrowserExtractionProvider

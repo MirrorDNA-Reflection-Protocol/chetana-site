@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { PageId } from "./types";
 import {
+  V0ActionRoute,
+  V0ActionStep,
   V0Mode,
   V0EvidencePack,
   V0EventName,
@@ -239,6 +241,15 @@ function deviceClass(): "web" | "desktop" {
   return window.innerWidth <= 960 ? "web" : "desktop";
 }
 
+function actionStepIcon(step: V0ActionStep, size = 14) {
+  if (step.kind === "call") return <Phone size={size} />;
+  if (step.kind === "save") return <Download size={size} />;
+  if (step.kind === "share") return <Copy size={size} />;
+  if (step.kind === "scan_again") return <ArrowRight size={size} />;
+  if (step.kind === "open_url") return <ExternalLink size={size} />;
+  return <Check size={size} />;
+}
+
 export default function ChetanaV0Experience({
   onNavigate,
   initialInput,
@@ -265,6 +276,7 @@ export default function ChetanaV0Experience({
   const [result, setResult] = useState<V0Verdict | null>(null);
   const [evidence, setEvidence] = useState<V0EvidencePack | null>(null);
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
+  const [actionRoute, setActionRoute] = useState<V0ActionRoute | null>(null);
   const [loopReceipt, setLoopReceipt] = useState<V0LoopReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
@@ -327,6 +339,7 @@ export default function ChetanaV0Experience({
     setResult(null);
     setEvidence(null);
     setTrustBundle(null);
+    setActionRoute(null);
     setLoopReceipt(null);
     setError(null);
     setImproveError(null);
@@ -375,6 +388,7 @@ export default function ChetanaV0Experience({
     extracted: string,
     evidencePack: V0EvidencePack | null,
     bundle: V0TrustBundle | null,
+    route: V0ActionRoute | null,
   ) => {
     try {
       const receiptResp = await fetch("/api/v0/loop/receipt", {
@@ -385,6 +399,7 @@ export default function ChetanaV0Experience({
           input_text: extracted,
           evidence_pack: evidencePack,
           trust_bundle: bundle,
+          action_route: route,
           session_id: sessionId,
         }),
       });
@@ -532,7 +547,29 @@ export default function ChetanaV0Experience({
         // The scan result is still useful even if the trust bundle request fails.
       }
 
-      await recordLoopReceipt(scanData, extracted, evidencePackForLoop, trustBundleForLoop);
+      let actionRouteForLoop: V0ActionRoute | null = null;
+      try {
+        const actionResp = await fetch("/api/v0/action-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict: scanData,
+            input_text: extracted,
+            trust_bundle: trustBundleForLoop,
+            evidence_pack: evidencePackForLoop,
+            session_id: sessionId,
+          }),
+        });
+        if (actionResp.ok) {
+          const actionData = (await actionResp.json()) as { action_route: V0ActionRoute };
+          actionRouteForLoop = actionData.action_route;
+          setActionRoute(actionData.action_route);
+        }
+      } catch {
+        // The scan result stays usable even if action routing fails.
+      }
+
+      await recordLoopReceipt(scanData, extracted, evidencePackForLoop, trustBundleForLoop, actionRouteForLoop);
       setStatus("Done. Read this before you reply or pay.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Chetana could not complete the check right now.";
@@ -579,6 +616,7 @@ export default function ChetanaV0Experience({
       const improved = (await improveResp.json()) as V0Verdict;
       setResult(improved);
       setEvidence(null);
+      setActionRoute(null);
       let improvedTrustBundle: V0TrustBundle | null = null;
       try {
         const trustResp = await fetch("/api/v0/trust/bundle", {
@@ -600,7 +638,28 @@ export default function ChetanaV0Experience({
       } catch {
         setTrustBundle(null);
       }
-      await recordLoopReceipt(improved, lastExtractedInput?.text || "", null, improvedTrustBundle);
+      let improvedActionRoute: V0ActionRoute | null = null;
+      try {
+        const actionResp = await fetch("/api/v0/action-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict: improved,
+            input_text: lastExtractedInput?.text || "",
+            trust_bundle: improvedTrustBundle,
+            evidence_pack: null,
+            session_id: sessionId,
+          }),
+        });
+        if (actionResp.ok) {
+          const actionData = (await actionResp.json()) as { action_route: V0ActionRoute };
+          improvedActionRoute = actionData.action_route;
+          setActionRoute(actionData.action_route);
+        }
+      } catch {
+        // Improved scan remains usable without the route card.
+      }
+      await recordLoopReceipt(improved, lastExtractedInput?.text || "", null, improvedTrustBundle, improvedActionRoute);
       setDetailsOpen(false);
       setShowFullBreakdown(false);
       setStatus(
@@ -748,6 +807,58 @@ export default function ChetanaV0Experience({
   const openOfficialExternal = (href: string, surface: string, options: RecoveryActionOptions = {}) => {
     window.open(href, href.startsWith("http") ? "_blank" : undefined, "noopener");
     trackReportAction(surface, { ...options, href });
+  };
+
+  const trackActionRouteStep = (step: V0ActionStep) => {
+    if (!result || !actionRoute) return;
+    void trackV0Event({
+      event_name: "report_tapped",
+      session_id: sessionId,
+      scan_id: result.scan_id,
+      input_type: result.input_type,
+      verdict: result.verdict,
+      report_target: step.href ? "manual_report" : "other",
+      device_class: deviceClass(),
+      language_hint: result.language_hint || navigator.language.slice(0, 2),
+      metadata: {
+        report_surface: "action_router",
+        recovery_step: step.route_id,
+        recovery_channel: step.kind,
+        official_rail_id: step.official_rail_id,
+        href: step.href || null,
+        route_hash: actionRoute.route_hash,
+        route_id: actionRoute.route_id,
+      },
+    }, {
+      dedupeTtlMs: TAP_EVENT_TTL_MS,
+      keepalive: true,
+    }).catch(() => {});
+  };
+
+  const runActionRouteStep = async (step: V0ActionStep) => {
+    trackActionRouteStep(step);
+    if (step.kind === "save") {
+      if (evidence) {
+        saveEvidence();
+      } else {
+        setDetailsOpen(true);
+      }
+      return;
+    }
+    if (step.kind === "share") {
+      await copyShareShield();
+      setDetailsOpen(true);
+      return;
+    }
+    if (step.kind === "scan_again") {
+      clearResult();
+      return;
+    }
+    if (step.href) {
+      window.open(step.href, step.href.startsWith("http") ? "_blank" : undefined, "noopener");
+      return;
+    }
+    setStatus(step.title);
   };
 
   const clearResult = () => {
@@ -950,6 +1061,43 @@ export default function ChetanaV0Experience({
                   <Shield size={14} />
                   <span>Safety loop recorded</span>
                   <small>{(loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
+                </div>
+              )}
+
+              {actionRoute && (
+                <div className={`v0-action-route ${actionRoute.primary_action.urgency}`}>
+                  <div className="v0-action-route-copy">
+                    <div className="v0-section-label">Do this now</div>
+                    <strong>{actionRoute.headline}</strong>
+                    <p>{actionRoute.reason}</p>
+                  </div>
+                  <div className="v0-action-route-controls">
+                    <button
+                      className="v0-action-primary"
+                      onClick={() => {
+                        void runActionRouteStep(actionRoute.primary_action);
+                      }}
+                    >
+                      {actionStepIcon(actionRoute.primary_action, 16)}
+                      {actionRoute.primary_action.action_label}
+                    </button>
+                    {actionRoute.secondary_actions.length > 0 && (
+                      <div className="v0-action-secondary">
+                        {actionRoute.secondary_actions.map((step) => (
+                          <button
+                            key={step.route_id}
+                            onClick={() => {
+                              void runActionRouteStep(step);
+                            }}
+                          >
+                            {actionStepIcon(step, 14)}
+                            {step.action_label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="v0-action-note">{actionRoute.official_note}</p>
                 </div>
               )}
 

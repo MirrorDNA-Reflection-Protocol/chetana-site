@@ -206,6 +206,51 @@ export interface V0TrustBundle {
   recovery_packet?: V0RecoveryPacket | null;
 }
 
+export type V0ActionRouteId =
+  | "disconnect_now"
+  | "stop_do_not_pay"
+  | "hold_release"
+  | "call_1930"
+  | "contact_bank_or_upi_app"
+  | "open_cybercrime_portal"
+  | "check_ncrp_suspect_repository"
+  | "check_ncrp_suspect_websites"
+  | "report_ncrp_suspect"
+  | "open_npci_upi_help"
+  | "open_rbi_sachet"
+  | "open_chakshu"
+  | "verify_official_source"
+  | "save_case_packet"
+  | "share_with_family"
+  | "scan_again";
+
+export interface V0ActionStep {
+  route_id: V0ActionRouteId;
+  title: string;
+  body: string;
+  action_label: string;
+  kind: "call" | "open_url" | "hold" | "save" | "share" | "scan_again";
+  priority: "primary" | "secondary";
+  urgency: "immediate" | "before_acting" | "today" | "monitor";
+  href?: string | null;
+  official_rail_id?: string | null;
+}
+
+export interface V0ActionRoute {
+  type: "chetana_action_router_v0";
+  route_id: string;
+  generated_at_utc: string;
+  scan_id: string;
+  session_id?: string | null;
+  headline: string;
+  reason: string;
+  primary_action: V0ActionStep;
+  secondary_actions: V0ActionStep[];
+  case_packet: V0CasePacket;
+  official_note: string;
+  route_hash: string;
+}
+
 export interface V0LoopReceipt {
   type: "chetana_scam_checker_loop_iteration";
   loop_id: string;

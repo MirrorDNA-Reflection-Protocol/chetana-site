@@ -4,7 +4,15 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": "http://localhost:8093",
+      "/health": "http://localhost:8093",
+      "/version.json": "http://localhost:8093",
+      "/.well-known": "http://localhost:8093",
+    },
+  },
   build: {
     rollupOptions: {
       output: {

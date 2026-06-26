@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
-  AlertBanner, BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
+  BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
   IncidentStepper, FamilyPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
@@ -12,7 +12,6 @@ import { threats, weather } from "./data";
 import ChetanaV0Experience from "./ChetanaV0Experience";
 import OpsAnalyticsPage from "./OpsAnalyticsPage";
 import { I18nProvider } from "./i18n";
-import PressureProofHome from "./PressureProofHome";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 function initialPageFromLocation(): PageId {
@@ -33,13 +32,7 @@ export default function App() {
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const startSeededScan = (input: string) => {
-    setSharedContent(input);
-    setSharedAttachment(null);
-    setPage("scan");
-  };
-
-  const syncPageUrl = (nextPage: PageId) => {
+  const syncPageUrl = (nextPage: PageId, replace = false) => {
     const params = new URLSearchParams(window.location.search);
     const nextPath = window.location.pathname === "/ops" ? "/" : window.location.pathname;
     if (nextPage === "ops") {
@@ -51,14 +44,18 @@ export default function App() {
     }
     const query = params.toString();
     const nextUrl = `${nextPath}${query ? `?${query}` : ""}`;
-    window.history.replaceState({}, "", nextUrl);
+    if (replace) {
+      window.history.replaceState({ page: nextPage }, "", nextUrl);
+    } else {
+      window.history.pushState({ page: nextPage }, "", nextUrl);
+    }
   };
 
   const setPage = (p: PageId) => {
     if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic" && p !== "ops") {
       setPendingPage(p);
       _setPage("proof");
-      syncPageUrl("proof");
+      syncPageUrl("proof", true); // replace: back should skip the gate
     } else {
       _setPage(p);
       syncPageUrl(p);
@@ -130,6 +127,18 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  // Browser back/forward support
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const target: PageId = event.state?.page || initialPageFromLocation();
+      _setPage(target);
+    };
+    window.addEventListener("popstate", onPopState);
+    // Seed initial state so the first back works
+    window.history.replaceState({ page }, "", window.location.href);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
@@ -234,10 +243,10 @@ export default function App() {
           <motion.div key={page} {...pageAnim}>
 
             {page === "home" && <>
-              <AlertBanner onNavigate={setPage} />
-              <PressureProofHome
+              <ChetanaV0Experience
                 onNavigate={setPage}
-                onStartScan={startSeededScan}
+                initialInput={sharedContent}
+                initialFile={sharedAttachment}
               />
             </>}
 
@@ -295,7 +304,7 @@ export default function App() {
                 onAccepted={() => {
                   setTermsAccepted(true);
                   _setPage(pendingPage);
-                  syncPageUrl(pendingPage);
+                  syncPageUrl(pendingPage, true); // replace: proof page exits history
                 }}
               />
             )}

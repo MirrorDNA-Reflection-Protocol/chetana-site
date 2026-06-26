@@ -129,7 +129,7 @@ const RadarAnim: React.FC<RadarAnimProps> = ({ size = 200 }) => {
         />
         <circle
           cx={cx - 45} cy={cy - 20} r="3"
-          fill="#EF4444"
+          fill="var(--danger)"
           style={{ animation: `${id}-dot2 4s linear infinite` }}
         />
         <circle
@@ -139,7 +139,7 @@ const RadarAnim: React.FC<RadarAnimProps> = ({ size = 200 }) => {
         />
         <circle
           cx={cx - 15} cy={cy + 50} r="3"
-          fill="#F59E0B"
+          fill="var(--primary)"
           style={{ animation: `${id}-dot4 4s linear infinite` }}
         />
 

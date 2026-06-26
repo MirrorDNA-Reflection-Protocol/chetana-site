@@ -14,9 +14,9 @@ interface CardData {
 
 const cards: CardData[] = [
   { icon: 'shield', text: 'Scam blocked', color: '#22C55E', delay: 0, xOffset: -20 },
-  { icon: 'alert', text: 'Fraud detected', color: '#EF4444', delay: 1.5, xOffset: 30 },
+  { icon: 'alert', text: 'Fraud detected', color: 'var(--danger)', delay: 1.5, xOffset: 30 },
   { icon: 'check', text: 'Number verified', color: '#3B82F6', delay: 3, xOffset: -10 },
-  { icon: 'block', text: 'Spam prevented', color: '#F59E0B', delay: 4.5, xOffset: 20 },
+  { icon: 'block', text: 'Spam prevented', color: 'var(--primary)', delay: 4.5, xOffset: 20 },
 ];
 
 const iconPaths: Record<string, string> = {

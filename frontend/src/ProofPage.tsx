@@ -85,6 +85,24 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div
+        style={{
+          background: "var(--primary-light)",
+          border: "1px solid rgba(212,162,78,0.2)",
+          borderRadius: 12,
+          padding: "10px 18px",
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 14,
+          color: "var(--primary-bright)",
+        }}
+      >
+        <ShieldCheck size={16} style={{ flexShrink: 0 }} />
+        <span>One quick setup step before your first check. Takes about 30 seconds.</span>
+      </div>
+
       <section className="page-intro" style={{ textAlign: "center", paddingBottom: 20 }}>
         <div className="kicker" style={{ justifyContent: "center" }}>
           <ShieldCheck size={14} />
@@ -102,8 +120,8 @@ export default function ProofPage({ onAccepted }: { onAccepted?: () => void } = 
           display: "grid",
           gap: 10,
           marginBottom: 18,
-          background: "rgba(239,68,68,0.1)",
-          borderColor: "rgba(239,68,68,0.2)",
+          background: "rgba(217, 138, 74,0.1)",
+          borderColor: "rgba(217, 138, 74,0.2)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--danger)", fontWeight: 700 }}>

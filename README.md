@@ -1,8 +1,8 @@
-# Chetana v0
+# Chetana
 
 **Live:** [chetana.activemirror.ai](https://chetana.activemirror.ai)
 
-Chetana v0 is a simple check-before-you-act tool for suspicious digital messages and payment requests in India.
+Chetana is a simple scam checker: screenshot anything suspicious, ask Chetana, and get the next safest step.
 
 It is intentionally narrow:
 
@@ -98,6 +98,35 @@ curl -X POST https://chetana.activemirror.ai/api/v0/scan \
 - **v0 runtime:** deterministic verdict engine plus local-first explanation, evidence, and event logging
 - **analytics engine:** canonical rollups from `~/.mirrordna/chetana/v0/events.jsonl` with funnel, daily, verdict, scam-type, and language summaries
 - **Infra:** FastAPI serves the built frontend
+
+## Model policy
+
+Chetana keeps the scam scan contract local-first.
+
+- primary local chat ladder: `sarvam-m`, `chetana-guard-fast`, `phi4-mini`, `qwen2.5:7b`, `llama3.2:3b`, `mirrorstudent`
+- local reserve models: `vajra-shield`, `sarvam-translate`, `qwen2.5vl`
+- cloud chat fallback: Anthropic first, then OpenAI
+- Gemini is intentionally not part of the Chetana chat ladder
+- caller-supplied model choice is blocked; the backend only accepts an allowlisted non-Gemini roster
+- local chat attempts are budget-capped before cloud fallback to avoid hanging on dead models
+
+Relevant backend env vars:
+
+```bash
+CHETANA_OLLAMA_CHAT_MODELS=hf.co/Mungert/sarvam-m-GGUF:Q4_K_M,chetana-guard-fast,phi4-mini,qwen2.5:7b,llama3.2:3b,mirrorstudent:latest
+CHETANA_CLOUD_FALLBACK=true
+CHETANA_ENABLE_ANTHROPIC=true
+CHETANA_ENABLE_OPENAI=true
+CHETANA_ANTHROPIC_MODEL=claude-3-5-haiku-latest
+CHETANA_OPENAI_MODEL=gpt-4.1-mini
+CHETANA_CHAT_MAX_REQUESTS=12
+CHETANA_CHAT_WINDOW_S=60
+CHETANA_LOCAL_LLM_BUDGET_S=14
+CHETANA_LLM_MAX_INPUT_CHARS=1200
+CHETANA_LLM_MAX_OUTPUT_TOKENS=400
+```
+
+The public chat route is rate-limited and does not allow caller-supplied model selection, tool use, arbitrary model injection, or Gemini fallback. Inspect `/api/llm/status` to verify the bounded live roster.
 
 ## Local dev
 

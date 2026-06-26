@@ -1,13 +1,13 @@
 {
-  "name": "Chetana — scam help for India",
+  "name": "Chetana — screenshot scam checker",
   "short_name": "Chetana",
-  "description": "Paste a suspicious message, screenshot, link, or payment request and get the next safe step.",
+  "description": "Screenshot anything suspicious, ask Chetana, and get the next safest step.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#060610",
-  "theme_color": "#3b82f6",
+  "theme_color": "#00d4aa",
   "lang": "en-IN",
   "categories": ["security", "utilities"],
   "icons": [

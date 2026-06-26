@@ -65,9 +65,9 @@ const ScanAnim: React.FC<ScanAnimProps> = ({ size = 200 }) => {
       <svg viewBox="0 0 200 200" width={size} height={size}>
         <defs>
           <linearGradient id={`${id}-scanLine`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(245,166,35,0)" />
-            <stop offset="40%" stopColor="rgba(245,166,35,0.4)" />
-            <stop offset="100%" stopColor="rgba(245,166,35,0.8)" />
+            <stop offset="0%" stopColor="rgba(201, 163, 94,0)" />
+            <stop offset="40%" stopColor="rgba(201, 163, 94,0.4)" />
+            <stop offset="100%" stopColor="rgba(201, 163, 94,0.8)" />
           </linearGradient>
           <clipPath id={`${id}-phoneClip`}>
             <rect x="55" y="20" width="90" height="160" rx="12" />
@@ -114,7 +114,7 @@ const ScanAnim: React.FC<ScanAnimProps> = ({ size = 200 }) => {
         {/* Threat dots */}
         <circle
           cx="90" cy="65" r="5"
-          fill="#EF4444"
+          fill="var(--danger)"
           style={{
             animation: `${id}-threat1 2.5s ease-in-out infinite`,
             transformOrigin: '90px 65px',
@@ -122,7 +122,7 @@ const ScanAnim: React.FC<ScanAnimProps> = ({ size = 200 }) => {
         />
         <circle
           cx="115" cy="95" r="4"
-          fill="#F59E0B"
+          fill="var(--primary)"
           style={{
             animation: `${id}-threat2 2.5s ease-in-out infinite`,
             transformOrigin: '115px 95px',
@@ -130,7 +130,7 @@ const ScanAnim: React.FC<ScanAnimProps> = ({ size = 200 }) => {
         />
         <circle
           cx="85" cy="130" r="5"
-          fill="#EF4444"
+          fill="var(--danger)"
           style={{
             animation: `${id}-threat3 2.5s ease-in-out infinite`,
             transformOrigin: '85px 130px',

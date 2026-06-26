@@ -140,7 +140,7 @@
             <ul style="margin-top: 0.5rem;">
                 <li>No accounts. No login. No sign-up.</li>
                 <li>Your scans are checked and <strong>not stored</strong>.</li>
-                <li>Your scan and chat data is processed by <strong>local AI models on our servers</strong> &mdash; not sent to external LLM providers.</li>
+                <li>Your scam scans stay on <strong>local AI models on our servers</strong>. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
                 <li>We collect <strong>zero personal information</strong>.</li>
                 <li>We track only anonymous scan counts (e.g., "400 scans today") for service health.</li>
             </ul>
@@ -158,7 +158,16 @@
             <li>No logs of individual scans are kept</li>
         </ul>
 
-        <h3>3.2 Anonymous Analytics (Aggregated Only)</h3>
+        <h3>3.2 During Chat (Not Stored by Chetana)</h3>
+        <p>When you send a chat message for guidance:</p>
+        <ul>
+            <li>Chetana tries local allowlisted models first</li>
+            <li>If the operator has enabled fallback and the local chat ladder does not respond in time, the chat message may be sent to Anthropic or OpenAI to produce a reply</li>
+            <li>Gemini is not used for Chetana chat</li>
+            <li>Chetana does not retain the chat content after the response is sent</li>
+        </ul>
+
+        <h3>3.3 Anonymous Analytics (Aggregated Only)</h3>
         <table>
             <thead>
                 <tr>
@@ -218,12 +227,13 @@
         <p>When you submit something for scanning:</p>
         <ol>
             <li>Your text reaches our server over an encrypted connection (HTTPS)</li>
-            <li>Our <strong>local AI models</strong> (Ollama, running on our own infrastructure) and pattern-matching rules analyze it</li>
+            <li>Our <strong>local AI models</strong> (Ollama, running on our own infrastructure) and pattern-matching rules analyze scam scans</li>
+            <li>Chat uses a local-first allowlisted model ladder and only falls back to Anthropic or OpenAI if that operator setting is enabled and the local chat ladder does not respond</li>
             <li>A risk score and explanation are generated</li>
             <li>The result is sent back to you</li>
             <li>The submitted text and result are <strong>discarded</strong> &mdash; not written to any database or log file</li>
         </ol>
-        <p><strong>Scan and chat data are not sent to external LLM APIs.</strong> Chetana keeps its core analysis on our own infrastructure.</p>
+        <p><strong>Core scam scan analysis stays on Chetana's own infrastructure.</strong> If chat fallback is active, the specific chat message may be sent to Anthropic or OpenAI for that reply. Gemini is excluded from Chetana chat.</p>
 
         <!-- 7 -->
         <h2>7. Cookies and Local Storage</h2>
@@ -254,6 +264,16 @@
                     <td>Telegram Bot API</td>
                     <td>Powers the @chetnaShieldBot</td>
                     <td>Your Telegram user ID and message text (governed by <a href="https://telegram.org/privacy">Telegram's privacy policy</a>)</td>
+                </tr>
+                <tr>
+                    <td>Anthropic API</td>
+                    <td>Optional fallback for chat replies when local chat models do not respond</td>
+                    <td>Only the chat message needed for that reply. Scam scan payloads stay local.</td>
+                </tr>
+                <tr>
+                    <td>OpenAI API</td>
+                    <td>Optional fallback for chat replies when local chat models do not respond</td>
+                    <td>Only the chat message needed for that reply. Scam scan payloads stay local.</td>
                 </tr>
             </tbody>
         </table>
@@ -330,14 +350,15 @@
         <h2>12. Data Security (IT Act Section 43A)</h2>
         <ul>
             <li>All connections to Chetana use HTTPS encryption</li>
-            <li>AI processing happens on our own infrastructure in India</li>
+            <li>Core scam scan processing happens on our own infrastructure in India</li>
+            <li>Optional chat fallback is limited to bounded Anthropic or OpenAI replies when the local chat ladder does not respond</li>
             <li>No user data is stored in cloud databases</li>
             <li>No remote access to any stored data</li>
         </ul>
 
         <!-- 13 -->
         <h2>13. Cross-Border Data Transfer</h2>
-        <p>Chetana processes all scan data on servers in India. Cloudflare (CDN) may route your web request through servers outside India as part of standard internet delivery, but no personal data is stored by Cloudflare on our behalf.</p>
+        <p>Chetana processes all scam scan data on servers in India. Cloudflare (CDN) may route your web request through servers outside India as part of standard internet delivery. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI outside India. Gemini is not used for Chetana chat.</p>
 
         <!-- 14 -->
         <h2>14. Data Breach Notification</h2>

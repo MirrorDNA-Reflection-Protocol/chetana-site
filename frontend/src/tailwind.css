@@ -2,17 +2,15 @@
 
 @layer tailwind {
   @theme {
-    --color-bg: #060610;
-    --color-bg-raised: rgba(15, 20, 42, 0.5);
-    --color-bg-card: rgba(15, 23, 50, 0.4);
-    --color-primary: #f5a623;
-    --color-primary-bright: #ff8a50;
-    --color-saffron: #f59e0b;
-    --color-violet: #e65100;
-    --color-teal: #14b8a6;
-    --color-safe: #10b981;
-    --color-danger: #ef4444;
+    --color-bg: #0b0a08;
+    --color-bg-raised: rgba(14, 13, 10, 0.92);
+    --color-bg-card: rgba(255, 255, 255, 0.014);
+    --color-primary: #c9a35e;
+    --color-primary-bright: #c9a35e;
+    --color-saffron: #c9a35e;
+    --color-violet: #a68840;
+    --color-teal: #6aa6d9;
+    --color-safe: #5fd08a;
+    --color-danger: #d98a4a;
   }
 }
-
-/* Tailwind preflight scoped to .tw- prefix to avoid conflicts with existing CSS */

@@ -105,7 +105,7 @@ export default function StoryPage() {
           The Build
         </h2>
         <p style={{ color: "#b0b0c0", fontSize: "1rem", lineHeight: 1.7, margin: "0 0 24px", maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
-          Built on local hardware from Day 1. No cloud. Here's a walkthrough of the live sovereign system that powers Chetana.
+          Built on local hardware from Day 1. No cloud. Here's a walkthrough of the live system that powers Chetana.
         </p>
         <div style={{
           position: "relative",
@@ -138,7 +138,7 @@ export default function StoryPage() {
           The Founder
         </p>
         <p style={{ color: "#b0b0c0", fontSize: "1.0625rem", lineHeight: 1.8, maxWidth: 560, margin: "0 auto" }}>
-          Paul Desai builds sovereign AI systems from Goa, India. Chetana is his answer to the scam epidemic — free, local-first, and built to protect the people who need it most.
+          Paul Desai builds verifiable AI products from Goa, India. Chetana is his answer to the scam epidemic — free, local-first, and built to protect the people who need it most.
         </p>
       </motion.div>
 

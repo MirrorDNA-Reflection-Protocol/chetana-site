@@ -6,8 +6,8 @@ export default function BorderBeam({
   size = 200,
   duration = 8,
   delay = 0,
-  color = "#f5a623",
-  colorTo = "#e65100",
+  color = "var(--primary)",
+  colorTo = "var(--primary)",
 }: {
   size?: number;
   duration?: number;

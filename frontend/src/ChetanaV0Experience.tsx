@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -212,6 +213,14 @@ const RESULT_PREVIEW_REASONS = [
   "Urgency language",
   "Unknown sender",
 ];
+
+const SIMPLE_STEPS = [
+  { label: "1", title: "Screenshot it", body: "Chat, SMS, email, QR, profile, link, payment proof." },
+  { label: "2", title: "Ask Chetana", body: "Upload it here. Paste text only if that is easier." },
+  { label: "3", title: "Act safely", body: "See the risk, why it was flagged, and the safest next step." },
+];
+
+const DEMO_FLAGS = ["Urgency", "Payment request", "Unknown link"];
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
 const EXPORT_EVENT_TTL_MS = 10_000;
@@ -240,10 +249,12 @@ export default function ChetanaV0Experience({
   presetMode?: V0Mode;
   showHero?: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
-  const [mode, setMode] = useState<V0Mode>(presetMode || (initialFile ? "screenshot" : "text"));
+  const defaultMode: V0Mode = presetMode || (initialFile ? "screenshot" : initialInput ? "text" : "screenshot");
+  const [mode, setMode] = useState<V0Mode>(defaultMode);
   const [text, setText] = useState(initialInput || "");
   const [file, setFile] = useState<File | null>(initialFile || null);
   const [loading, setLoading] = useState(false);
@@ -290,6 +301,7 @@ export default function ChetanaV0Experience({
   const composerCopy = useMemo(() => COMPOSER_COPY[mode], [mode]);
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
+  const hasInput = Boolean(text.trim() || file);
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
   const suspectLookupState = useMemo(() => {
     const entities = result?.entities;
@@ -626,203 +638,163 @@ export default function ChetanaV0Experience({
   };
 
   return (
-    <section className="v0-shell">
+    <section className="v0-shell v0-shell-simple">
       {showHero && (
-        <div className="v0-hero-shell">
-          <div className="v0-hero-panel">
-            <div className="v0-hero">
-              <div className="v0-kicker">{hero.kicker}</div>
-              <h1>
-                <span className="v0-hero-line">{hero.title}</span>
-              </h1>
-              <p>{hero.body}</p>
-              <div className="v0-hero-actions">
-                <button className="v0-submit" onClick={scrollToComposer}>
-                  Check a message
-                  <ArrowRight size={16} />
-                </button>
-                <button className="v0-ghost-button" onClick={loadSample}>
-                  Try an example
-                </button>
-              </div>
-              <div className="v0-trust-strip">
-                {FRONT_DOOR_TRUST.map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-            </div>
-
-            <div className="v0-metric-grid">
-              {FRONT_DOOR_METRICS.map((item) => (
-                <div key={item.label} className="v0-metric-card">
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
-                </div>
-              ))}
+        <div className="v0-simple-hero">
+          <div className="v0-simple-copy">
+            <h1>Screenshot anything. Ask Chetana.</h1>
+            <p>Upload a screenshot or paste a message. Chetana checks the visible risk signals and gives one next safest step.</p>
+            <div className="v0-simple-actions">
+              <button className="v0-submit" onClick={scrollToComposer}>
+                Upload screenshot
+                <Upload size={16} />
+              </button>
+              <button className="v0-ghost-button" onClick={() => openModeLane("text")}>
+                Paste text instead
+              </button>
             </div>
           </div>
 
-          <div className="v0-hero-visual-stack">
-            <div className="v0-hero-photo-card">
-              <img
-                src="/01-hero-grandmother.png"
-                alt="Woman checking a suspicious message on her phone"
-                className="v0-hero-photo"
-              />
-              <div className="v0-hero-photo-copy">
-                <div className="v0-section-label">Built for real panic, not ideal users</div>
-                <strong>Messages, QR requests, screenshots, and fake payment proof.</strong>
-                <p>Start with the smallest safe move. Escalate fast if money already moved.</p>
+          <motion.div
+            className="v0-visual-demo"
+            initial={{ opacity: 0, x: 14 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.38, ease: "easeOut" }}
+            aria-label="Animated example of asking Chetana about a suspicious screenshot"
+          >
+            <div className="v0-demo-topline">Screenshot check</div>
+            <motion.div
+              className="v0-demo-shot"
+              animate={reduceMotion ? { y: 0 } : { y: [0, -5, 0] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="v0-demo-window">
+                <span />
+                <span />
+                <span />
               </div>
-            </div>
-
-            <div className="v0-hero-proof-grid">
-              {HERO_CASES.map((item) => (
-                <article key={item.title} className="v0-hero-proof-card">
-                  <img src={item.image} alt={item.title} />
-                  <div className="v0-hero-proof-copy">
-                    <strong>{item.title}</strong>
-                    <p>{item.body}</p>
-                    {item.mode ? (
-                      <button onClick={() => openModeLane(item.mode!)}>
-                        {item.actionLabel}
-                        <ArrowRight size={14} />
-                      </button>
-                    ) : (
-                      <a href={item.href} target="_blank" rel="noreferrer">
-                        {item.actionLabel}
-                        <ArrowRight size={14} />
-                      </a>
-                    )}
-                  </div>
-                </article>
+              <strong>Bank KYC expires today</strong>
+              <p>Pay Rs 499 now or your account will be blocked.</p>
+              <small>secure-kyc-update.top</small>
+            </motion.div>
+            <motion.div
+              className="v0-demo-ask"
+              animate={reduceMotion ? { opacity: 1 } : { opacity: [0.72, 1, 0.72] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <Upload size={15} />
+              Ask Chetana
+              <ArrowRight size={15} />
+            </motion.div>
+            <motion.div
+              className="v0-demo-result"
+              animate={reduceMotion ? { scale: 1 } : { scale: [1, 1.012, 1] }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <ShieldAlert size={18} />
+              <div>
+                <strong>Likely scam</strong>
+                <p>Do not pay. Verify in the official bank app.</p>
+              </div>
+            </motion.div>
+            <div className="v0-demo-flags">
+              {DEMO_FLAGS.map((flag) => (
+                <span key={flag}>
+                  <Check size={12} />
+                  {flag}
+                </span>
               ))}
             </div>
-          </div>
+          </motion.div>
+
+          <motion.div
+            className="v0-simple-steps"
+            initial="hidden"
+            animate="show"
+            variants={{ show: { transition: { staggerChildren: 0.12 } } }}
+          >
+            {SIMPLE_STEPS.map((step) => (
+              <motion.div
+                className="v0-simple-step"
+                key={step.title}
+                variants={{
+                  hidden: { opacity: 0, y: 10 },
+                  show: { opacity: 1, y: 0 },
+                }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+              >
+                <span>{step.label}</span>
+                <strong>{step.title}</strong>
+                <p>{step.body}</p>
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       )}
 
       <div className={`v0-grid${result ? " v0-grid-result" : ""}`}>
         <div className="v0-main">
-          <div className="v0-mode-grid">
-            {V0_MODE_CARDS.map((card) => {
-              const active = card.mode === mode;
-              const icon =
-                card.mode === "text"
-                  ? <Type size={18} />
-                  : card.mode === "screenshot"
-                  ? <ImageIcon size={18} />
-                  : card.mode === "qr_image"
-                  ? <QrCode size={18} />
-                  : <CreditCard size={18} />;
-              return (
-                <button
-                  key={card.mode}
-                  className={`v0-mode-card${active ? " active" : ""}`}
-                  onClick={() => selectMode(card.mode)}
-                >
-                  <div className="v0-mode-top">
-                    <span className="v0-mode-icon">{icon}</span>
-                    <span className="v0-mode-label">{card.label}</span>
-                  </div>
-                  <strong>{card.title}</strong>
-                  <p>{card.description}</p>
-                </button>
-              );
-            })}
-          </div>
-
           <div className="v0-composer" id="chetana-scan-box" ref={composerRef}>
             <div className="v0-composer-head">
               <div>
-                <div className="v0-section-label">Scan box</div>
-                <h2>{composerCopy.title}</h2>
-                <p className="v0-composer-copy">{composerCopy.body}</p>
+                <div className="v0-section-label">Ask Chetana</div>
+                <h2>{mode === "text" ? "Paste the message" : "Upload the screenshot"}</h2>
+                <p className="v0-composer-copy">
+                  {mode === "text"
+                    ? "Paste the suspicious message, link, UPI ID, or payment request."
+                    : "Use a screenshot from WhatsApp, SMS, email, a QR code, payment proof, or any suspicious screen."}
+                </p>
               </div>
               <div className="v0-status">{status}</div>
             </div>
 
-            <div className="v0-quick-row">
-              <button className="v0-quick-chip" onClick={loadSample}>
-                Try an example
+            <div className="v0-simple-tabs" aria-label="Choose input type">
+              <button className={mode !== "text" ? "active" : ""} onClick={() => selectMode("screenshot")}>
+                <ImageIcon size={16} />
+                Screenshot
               </button>
-              {mode === "text" && (
-                <span className="v0-quick-note">You can paste a link, UPI ID, or payment request here too.</span>
-              )}
+              <button className={mode === "text" ? "active" : ""} onClick={() => selectMode("text")}>
+                <Type size={16} />
+                Text
+              </button>
             </div>
 
+            {mode !== "text" && (
+              <label className="v0-upload v0-upload-large">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                />
+                <span className="v0-upload-inner">
+                  <Upload size={20} />
+                  {file ? file.name : "Choose screenshot"}
+                </span>
+              </label>
+            )}
+
             <label className="v0-input-label">
-              {mode === "text" ? "Paste the message" : "Add any visible text or context"}
+              {mode === "text" ? "Paste the message" : "Add a note if needed"}
             </label>
             <textarea
               className="v0-textarea"
               value={text}
               onChange={(event) => setText(event.target.value)}
               placeholder={DEFAULT_PROMPTS[mode]}
-              rows={mode === "text" ? 7 : 4}
+              rows={mode === "text" ? 6 : 3}
             />
-
-            {mode !== "text" && (
-              <>
-                <label className="v0-input-label">Upload an image</label>
-                <label className="v0-upload">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => setFile(event.target.files?.[0] || null)}
-                  />
-                  <span className="v0-upload-inner">
-                    <Upload size={18} />
-                    {file ? file.name : "Choose an image"}
-                  </span>
-                </label>
-              </>
-            )}
 
             <div className="v0-composer-foot">
               <div className="v0-limit-note">
-                Private advisory tool. Not a government service. If money moved already, call 1930 first and contact your bank right away.
+                Private advisory tool. If money moved already, call 1930 first and contact your bank.
               </div>
-              <button className="v0-submit" onClick={runScan} disabled={loading}>
-                {loading ? "Checking..." : "Check now"}
+              <button className="v0-submit" onClick={runScan} disabled={loading || !hasInput}>
+                {loading ? "Checking..." : "Ask Chetana"}
                 <ArrowRight size={16} />
               </button>
             </div>
             {error && <div className="v0-error">{error}</div>}
           </div>
-
-          {showHero && !result && (
-            <div className="v0-founder-card">
-              <div className="v0-section-label">Proof and demos</div>
-              <div className="v0-founder-media">
-                <video
-                  className="v0-founder-video"
-                  src="/founder-intro.mp4"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-                <div className="v0-founder-copy">
-                  <strong>Don&apos;t guess. Don&apos;t click. Don&apos;t pay.</strong>
-                  <p>Just scan it with Chetana. Check karo, pause karo.</p>
-                  <span>Built for families, workers, and shopkeepers who need a fast second opinion.</span>
-                  <div className="v0-inline-actions">
-                    <a href="/founder-intro.mp4" target="_blank" rel="noreferrer">
-                      <ExternalLink size={14} /> Watch founder intro
-                    </a>
-                    <a href="/chetana_short_final.mp4" target="_blank" rel="noreferrer">
-                      <ExternalLink size={14} /> Watch demo short
-                    </a>
-                    <button onClick={() => openModeLane("payment_screenshot")}>
-                      <CreditCard size={14} /> Check payment proof
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {result && (
             <div ref={resultRef} className={`v0-result-card ${result.verdict}`}>
@@ -1090,45 +1062,50 @@ export default function ChetanaV0Experience({
                   )}
                   {result.notes && <p className="v0-note">{result.notes}</p>}
 
-                  <div className="v0-evidence-card v0-context-card">
-                    <div className="v0-section-label">After the urgent part</div>
-                    <strong>Want stronger protection across tools?</strong>
-                    <p>Create a Mirror Seed after you have handled the immediate risk. It carries trusted context and safer defaults across future checks.</p>
-                    <div className="v0-inline-actions">
-                      <a href="https://id.activemirror.ai/" target="_blank" rel="noreferrer">
-                        <ExternalLink size={14} /> Create Mirror Seed
-                      </a>
+                  {result.verdict === "low_signal" && (
+                    <div className="v0-evidence-card v0-context-card">
+                      <div className="v0-section-label">After the urgent part</div>
+                      <strong>Want stronger protection across tools?</strong>
+                      <p>Create a Mirror Seed after you have handled the immediate risk. It carries trusted context and safer defaults across future checks.</p>
+                      <div className="v0-inline-actions">
+                        <a href="https://id.activemirror.ai/" target="_blank" rel="noreferrer">
+                          <ExternalLink size={14} /> Create Mirror Seed
+                        </a>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {!result && (
-          <aside className="v0-side">
-            <div className="v0-side-card v0-preview-card">
-              <div className="v0-section-label">Result preview</div>
-              <strong>What a high-risk result looks like</strong>
-              <div className="v0-badge high_risk">
-                <ShieldAlert size={14} />
-                High risk
+        <aside className="v0-side">
+          {!result && (
+            <div className="v0-side-card">
+              <div className="v0-section-label">Send any screenshot</div>
+              <strong>Chetana can check what is visible and explain the risk in plain language.</strong>
+              <ul>
+                <li>WhatsApp, SMS, email, Telegram, and suspicious links.</li>
+                <li>QR codes, UPI requests, and payment screenshots.</li>
+                <li>Profiles, fake notices, delivery messages, or bank warnings.</li>
+              </ul>
+              <p className="v0-side-note">Installed app: share screenshots into Chetana from the Android share sheet.</p>
+              <div className="v0-inline-actions">
+                <button onClick={loadSample}>Try example</button>
+                <button onClick={() => openModeLane("payment_screenshot")}>
+                  <CreditCard size={14} /> Payment proof
+                </button>
               </div>
-              <div className="v0-preview-chips">
-                {RESULT_PREVIEW_REASONS.map((reason) => (
-                  <span key={reason} className="v0-preview-chip">{reason}</span>
-                ))}
-              </div>
-              <p>Next step: warn family before anyone clicks or pays.</p>
             </div>
+          )}
 
+          {/* Emergency card always visible — before and after result */}
           <div className="v0-side-card danger">
             <div className="v0-section-label">If money already went</div>
-            <strong>Do not waste time proving the scammer wrong.</strong>
+            <strong>Call 1930 now. Then call your bank.</strong>
             <ul>
-              <li>Call 1930 immediately.</li>
-              <li>Call your bank and ask for a freeze or block if needed.</li>
+              <li>Do not keep chatting with the sender.</li>
               <li>Keep screenshots, transaction IDs, UPI IDs, and call logs.</li>
             </ul>
             <div className="v0-inline-actions">
@@ -1140,76 +1117,9 @@ export default function ChetanaV0Experience({
               )}
             </div>
           </div>
-
-          <div className="v0-side-card">
-            <div className="v0-section-label">What Chetana checks</div>
-            <strong>Messages, links, QR requests, UPI payment requests, screenshots, and payment proof.</strong>
-            <ul>
-              <li>WhatsApp, SMS, Telegram, email, and suspicious links.</li>
-              <li>QR screenshots and payment requests before you scan.</li>
-              <li>Payment screenshots before you hand over goods.</li>
-              <li>Common India-facing scam patterns that pressure people to act fast.</li>
-            </ul>
-            <div className="v0-inline-actions">
-              <button onClick={() => openModeLane("payment_screenshot")}>
-                <CreditCard size={14} /> Payment proof lane
-              </button>
-              <button onClick={() => openModeLane("qr_image")}>
-                <QrCode size={14} /> QR request check
-              </button>
-            </div>
-          </div>
-
-          <div className="v0-side-card">
-            <div className="v0-section-label">How it works</div>
-            <strong>Rules first. Model help only when the input is messy or visual.</strong>
-            <ul>
-              <li>Chetana returns four evidence states: high risk, caution, needs review, or low signal.</li>
-              <li>Low signal does not mean safe. It means the current material was too thin for a stronger call.</li>
-              <li>The result explains why and gives the next safest action.</li>
-              <li>You can share a warning or save the evidence while details are fresh.</li>
-            </ul>
-            {onNavigate && (
-              <div className="v0-inline-actions">
-                <button onClick={() => onNavigate("trust")}>
-                  <FileText size={14} /> How it works
-                </button>
-                <a href="/chetana_short_final.mp4" target="_blank" rel="noreferrer">
-                  <ExternalLink size={14} /> Watch demo
-                </a>
-              </div>
-            )}
-          </div>
-          </aside>
-        )}
+        </aside>
       </div>
 
-      {showHero && !result && (
-        <button className="v0-mobile-cta" onClick={scrollToComposer}>
-          Check a message
-          <ArrowRight size={16} />
-        </button>
-      )}
-
-      {/* Redesign 2026-04: Feature strip */}
-      {showHero && !result && (
-        <div className="feature-strip">
-          {[
-            { icon: "🆓", label: "Always free" },
-            { icon: "🔒", label: "Private" },
-            { icon: "🇮🇳", label: "12 Languages" },
-            { icon: "⚡", label: "Instant" },
-            { icon: "🤖", label: "AI-powered" },
-          ].map((f) => (
-            <div className="feature-strip-item" key={f.label}>
-              <div className="feature-strip-icon">{f.icon}</div>
-              <div className="feature-strip-text">{f.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Redesign 2026-04: Emergency helpline bar */}
       <div className="emergency-bar">
         Need help now?{" "}
         <a href="tel:1930">Cybercrime Helpline 1930</a> ·{" "}
@@ -1217,23 +1127,7 @@ export default function ChetanaV0Experience({
         <a href="tel:181">Women Helpline 181</a>
       </div>
 
-      {!result && (
-        <a
-          href="https://wa.me/?text=Check%20suspicious%20messages%20free%20at%20chetana.activemirror.ai%20%F0%9F%9B%A1%EF%B8%8F%20Works%20in%2012%20Indian%20languages."
-          target="_blank"
-          rel="noopener noreferrer"
-          className="wa-float"
-          aria-label="Share on WhatsApp"
-        >
-          <svg viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.496A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.326-.735-6.012-1.978l-.42-.312-2.647.888.886-2.644-.343-.433A9.961 9.961 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
-          </svg>
-        </a>
-      )}
-
-      {/* Redesign 2026-04: Ambient glow */}
-      <div className="glow-overlay" />
+      {/* glow-overlay removed — clean background */}
     </section>
   );
 }

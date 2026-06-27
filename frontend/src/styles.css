@@ -350,44 +350,95 @@ main {
 }
 
 .v0-shell-simple {
-  max-width: 1040px;
-  margin: 0 auto;
-  gap: 18px;
-  padding-top: 16px;
+  max-width: 760px;
+  margin: 48px auto 24px;
+  gap: 16px;
+  padding: 46px 48px 48px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(139,92,246,0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)),
+    rgba(6,6,8,0.94);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.34);
+  font-family: var(--sans);
 }
 
 .v0-simple-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
   gap: 18px;
 }
 
 .v0-simple-copy {
   display: grid;
-  gap: 14px;
-  max-width: 780px;
+  justify-items: center;
+  gap: 13px;
+  width: 100%;
+  max-width: 620px;
+}
+
+.v0-app-mark {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  color: var(--heading);
+  font-size: 0.84rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.v0-app-glyph {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 22px;
+  color: #f8fafc;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  box-shadow: 0 18px 44px rgba(0,0,0,0.25);
 }
 
 .v0-simple-copy h1 {
+  max-width: 11ch;
   margin: 0;
   color: var(--heading);
-  font-size: clamp(2.8rem, 8vw, 5.8rem);
+  font-family: var(--sans);
+  font-size: clamp(2.55rem, 5.6vw, 4.25rem);
+  font-style: normal;
+  font-weight: 850;
   line-height: 0.94;
   letter-spacing: 0;
+  text-wrap: balance;
 }
 
 .v0-simple-copy p {
-  max-width: 58ch;
+  max-width: 46ch;
   color: var(--text);
-  font-size: clamp(1.05rem, 2vw, 1.28rem);
-  line-height: 1.55;
+  font-size: clamp(1.02rem, 1.8vw, 1.18rem);
+  line-height: 1.5;
+}
+
+.v0-app-privacy {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .v0-simple-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  width: min(100%, 390px);
   gap: 10px;
+  padding-top: 8px;
+}
+
+.v0-simple-actions button {
+  width: 100%;
+  min-height: 56px;
 }
 
 .v0-simple-steps {
@@ -434,11 +485,29 @@ main {
 
 .v0-shell-simple .v0-grid {
   grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
 }
 
 .v0-shell-simple .v0-main {
-  gap: 14px;
+  gap: 16px;
+}
+
+.v0-shell-simple .v0-composer {
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)),
+    rgba(255,255,255,0.02);
+  box-shadow: none;
+}
+
+.v0-shell-simple .v0-submit {
+  border-color: rgba(168,85,247,0.42);
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  box-shadow: 0 14px 32px rgba(124,58,237,0.22);
+}
+
+.v0-shell-simple .v0-ghost-button {
+  background: rgba(255,255,255,0.035);
 }
 
 .v0-simple-tabs {
@@ -956,7 +1025,10 @@ main {
 .v0-result-card h3 {
   color: var(--heading);
   margin-top: 4px;
+  font-family: var(--sans);
+  font-style: normal;
   font-size: 1.55rem;
+  font-weight: 800;
   line-height: 1.08;
 }
 
@@ -967,10 +1039,12 @@ main {
 }
 
 .v0-status {
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 0.88rem;
   max-width: 220px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .v0-quick-row {
@@ -1048,6 +1122,7 @@ main {
   color: #f8fafc;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .v0-submit:disabled {
@@ -1501,11 +1576,14 @@ main {
   }
 
   .v0-shell-simple {
-    padding-top: 8px;
+    margin: 14px 12px 18px;
+    padding: 26px 18px 22px;
+    border-radius: 24px;
   }
 
   .v0-simple-copy h1 {
-    font-size: clamp(2.45rem, 13vw, 4.2rem);
+    max-width: 100%;
+    font-size: clamp(2.35rem, 10vw, 2.85rem);
   }
 
   .v0-simple-actions,
@@ -1514,6 +1592,23 @@ main {
   .v0-composer-foot,
   .v0-composer-foot button {
     width: 100%;
+  }
+
+  .v0-quick-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .v0-quick-chip,
+  .v0-upload-inner {
+    width: 100%;
+  }
+
+  .v0-upload-inner {
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
   }
 
   .v0-hero h1 {

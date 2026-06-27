@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,7 +12,6 @@ import {
   Phone,
   QrCode,
   Shield,
-  ShieldAlert,
   Type,
   Upload,
 } from "lucide-react";
@@ -219,7 +217,6 @@ const RESULT_PREVIEW_REASONS = [
   "Unknown sender",
 ];
 
-const DEMO_FLAGS = ["Urgency", "Payment request", "Unknown link"];
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
 const EXPORT_EVENT_TTL_MS = 10_000;
@@ -257,7 +254,6 @@ export default function ChetanaV0Experience({
   presetMode?: V0Mode;
   showHero?: boolean;
 }) {
-  const reduceMotion = useReducedMotion();
   const composerRef = useRef<HTMLDivElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
@@ -310,7 +306,6 @@ export default function ChetanaV0Experience({
     }).catch(() => {});
   }, [sessionId]);
 
-  const hero = useMemo(() => HERO_COPY[mode], [mode]);
   const composerCopy = useMemo(() => COMPOSER_COPY[mode], [mode]);
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
@@ -867,11 +862,20 @@ export default function ChetanaV0Experience({
       {showHero && (
         <div className="v0-simple-hero">
           <div className="v0-simple-copy">
-            <h1>Screenshot anything. Ask Chetana.</h1>
-            <p>Upload a screenshot or paste a message. Chetana checks the visible risk signals and gives one next safest step.</p>
+            <div className="v0-app-mark" aria-label="Chetana scam checker">
+              <span className="v0-app-glyph">
+                <Shield size={26} />
+              </span>
+              <strong>Chetana</strong>
+            </div>
+            <h1>Ask Chetana</h1>
+            <p>Upload a suspicious screenshot or paste the message. Chetana checks the visible risk signals and gives one safest next step.</p>
+            <div className="v0-app-privacy">
+              Private by default. No login required.
+            </div>
             <div className="v0-simple-actions">
               <button className="v0-submit" onClick={scrollToComposer}>
-                Upload screenshot
+                Check a screenshot
                 <Upload size={16} />
               </button>
               <button className="v0-ghost-button" onClick={() => openModeLane("text")}>
@@ -879,58 +883,6 @@ export default function ChetanaV0Experience({
               </button>
             </div>
           </div>
-
-          <motion.div
-            className="v0-visual-demo"
-            initial={{ opacity: 0, x: 14 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.38, ease: "easeOut" }}
-            aria-label="Animated example of asking Chetana about a suspicious screenshot"
-          >
-            <div className="v0-demo-topline">Screenshot check</div>
-            <motion.div
-              className="v0-demo-shot"
-              animate={reduceMotion ? { y: 0 } : { y: [0, -5, 0] }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <div className="v0-demo-window">
-                <span />
-                <span />
-                <span />
-              </div>
-              <strong>Bank KYC expires today</strong>
-              <p>Pay Rs 499 now or your account will be blocked.</p>
-              <small>secure-kyc-update.top</small>
-            </motion.div>
-            <motion.div
-              className="v0-demo-ask"
-              animate={reduceMotion ? { opacity: 1 } : { opacity: [0.72, 1, 0.72] }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Upload size={15} />
-              Ask Chetana
-              <ArrowRight size={15} />
-            </motion.div>
-            <motion.div
-              className="v0-demo-result"
-              animate={reduceMotion ? { scale: 1 } : { scale: [1, 1.012, 1] }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <ShieldAlert size={18} />
-              <div>
-                <strong>Likely scam</strong>
-                <p>Do not pay. Verify in the official bank app.</p>
-              </div>
-            </motion.div>
-            <div className="v0-demo-flags">
-              {DEMO_FLAGS.map((flag) => (
-                <span key={flag}>
-                  <Check size={12} />
-                  {flag}
-                </span>
-              ))}
-            </div>
-          </motion.div>
         </div>
       )}
 

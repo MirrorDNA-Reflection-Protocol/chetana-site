@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   Check,
   Copy,
-  CreditCard,
   Download,
   ExternalLink,
   FileText,
   ImageIcon,
   Phone,
-  QrCode,
   Shield,
   Type,
   Upload,
@@ -44,7 +41,6 @@ import {
   verdictLabel,
   verdictSummary,
   V0ExtractedInput,
-  V0_MODE_CARDS,
 } from "./chetanaV0";
 import ChetanaResultScreen, { riskFromVerdict } from "./ChetanaResultScreen";
 
@@ -54,92 +50,6 @@ const DEFAULT_PROMPTS: Record<V0Mode, string> = {
   qr_image: "Upload the QR screenshot or paste the payment payload you can read.",
   payment_screenshot: "Upload the payment screenshot. Add any note that explains the context.",
 };
-
-const COMPOSER_COPY: Record<V0Mode, { title: string; body: string }> = {
-  text: {
-    title: "Paste the message, link, or payment request",
-    body: "Add the exact message if you can. Extra context is optional, not required.",
-  },
-  screenshot: {
-    title: "Upload the screenshot and add any useful context",
-    body: "Use this when the suspicious content is already on your screen or mixed into a longer chat.",
-  },
-  qr_image: {
-    title: "Upload the QR image or paste the payment payload",
-    body: "Use whatever detail you can read before you scan, pay, or share it forward.",
-  },
-  payment_screenshot: {
-    title: "Upload the payment proof before you trust it",
-    body: "This lane is for merchants, delivery staff, sellers, and anyone verifying a transfer screenshot.",
-  },
-};
-
-const HERO_COPY: Record<V0Mode, { kicker: string; title: string; body: string }> = {
-  text: {
-    kicker: "FREE SCAM CHECKER FOR INDIA",
-    title: "Got a suspicious message? Check it now.",
-    body: "Paste any SMS, WhatsApp forward, link, UPI ID, phone number, or upload a screenshot. Chetana explains the risk and the safest next step without pretending certainty.",
-  },
-  screenshot: {
-    kicker: "FREE SCAM CHECKER FOR INDIA",
-    title: "Upload the screenshot and see what risk signals show up.",
-    body: "Useful when the message is already on your phone screen or came through WhatsApp, SMS, or email.",
-  },
-  qr_image: {
-    kicker: "FREE SCAM CHECKER FOR INDIA",
-    title: "Check the QR or payment payload before you scan and pay.",
-    body: "Upload the QR image or paste the payment payload you can read.",
-  },
-  payment_screenshot: {
-    kicker: "FREE SCAM CHECKER FOR INDIA",
-    title: "Check payment proof before you hand over goods.",
-    body: "Built for shopkeepers, delivery staff, and sellers who need a fast second opinion.",
-  },
-};
-
-const FRONT_DOOR_TRUST = [
-  "Free",
-  "No login",
-  "Built for India",
-];
-
-const FRONT_DOOR_METRICS: Array<{ value: string; label: string }> = [
-  { value: "12", label: "Indian languages" },
-  { value: "4", label: "evidence states" },
-  { value: "1930", label: "recovery first step" },
-  { value: "0", label: "sign-up required" },
-];
-
-const HERO_CASES: Array<{
-  title: string;
-  body: string;
-  image: string;
-  actionLabel: string;
-  mode?: V0Mode;
-  href?: string;
-}> = [
-  {
-    title: "Suspicious message check",
-    body: "Paste the message, link, or bank scare text and get the safest next move.",
-    image: "/01-hero-grandmother.png",
-    actionLabel: "Start text check",
-    mode: "text",
-  },
-  {
-    title: "Payment proof lane",
-    body: "Use the merchant lane before you hand over goods or trust a screenshot.",
-    image: "/04-safe-hands.png",
-    actionLabel: "Check payment proof",
-    mode: "payment_screenshot",
-  },
-  {
-    title: "Demo short",
-    body: "Watch the live product reel instead of guessing from a static page.",
-    image: "/03-family-kitchen.png",
-    actionLabel: "Watch demo",
-    href: "/chetana_short_final.mp4",
-  },
-];
 
 const SAMPLE_SCAM_TEXT =
   "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
@@ -210,12 +120,6 @@ type RecoveryActionOptions = {
   officialRailId?: string;
   href?: string;
 };
-
-const RESULT_PREVIEW_REASONS = [
-  "Suspicious payment request",
-  "Urgency language",
-  "Unknown sender",
-];
 
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
@@ -306,7 +210,6 @@ export default function ChetanaV0Experience({
     }).catch(() => {});
   }, [sessionId]);
 
-  const composerCopy = useMemo(() => COMPOSER_COPY[mode], [mode]);
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
   const hasInput = Boolean(text.trim() || file);
@@ -346,11 +249,6 @@ export default function ChetanaV0Experience({
       setFile(null);
     }
     resetScanState();
-  };
-
-  const openModeLane = (nextMode: V0Mode) => {
-    selectMode(nextMode);
-    window.requestAnimationFrame(scrollToComposer);
   };
 
   const scrollToComposer = () => {
@@ -873,15 +771,6 @@ export default function ChetanaV0Experience({
             <div className="v0-app-privacy">
               Private by default. No login required.
             </div>
-            <div className="v0-simple-actions">
-              <button className="v0-submit" onClick={scrollToComposer}>
-                Check a screenshot
-                <Upload size={16} />
-              </button>
-              <button className="v0-ghost-button" onClick={() => openModeLane("text")}>
-                Paste text instead
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -903,10 +792,7 @@ export default function ChetanaV0Experience({
             </div>
 
             <div className="v0-quick-row">
-              <button className="v0-quick-chip" onClick={loadSample}>Try an example</button>
-              <button className="v0-quick-chip" onClick={() => selectMode("payment_screenshot")}>
-                <CreditCard size={14} /> Check payment proof
-              </button>
+              <button className="v0-quick-chip" onClick={loadSample}>Try a sample message</button>
             </div>
 
             <div className="v0-simple-tabs" aria-label="Choose input type">
@@ -1308,32 +1194,15 @@ export default function ChetanaV0Experience({
           )}
         </div>
 
-        <aside className="v0-side">
-          {/* Emergency card always visible — before and after result */}
-          <div className="v0-side-card danger">
-            <div className="v0-section-label">If money already went</div>
-            <strong>Call 1930 now. Then call your bank.</strong>
-            <ul>
-              <li>Do not keep chatting with the sender.</li>
-              <li>Keep screenshots, transaction IDs, UPI IDs, and call logs.</li>
-            </ul>
-            <div className="v0-inline-actions">
-              <a href="tel:1930"><Phone size={14} /> Call 1930</a>
-              {onNavigate && (
-                <button onClick={() => onNavigate("panic")}>
-                  <Shield size={14} /> Help steps
-                </button>
-              )}
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <div className="emergency-bar">
-        Need help now?{" "}
-        <a href="tel:1930">Cybercrime Helpline 1930</a> ·{" "}
-        <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">cybercrime.gov.in</a> ·{" "}
-        <a href="tel:181">Women Helpline 181</a>
+        <div className="v0-recovery-strip">
+          <span>If money already moved, stop chatting and use official help.</span>
+          <a href="tel:1930"><Phone size={14} /> Call 1930</a>
+          {onNavigate && (
+            <button onClick={() => onNavigate("panic")}>
+              <Shield size={14} /> Help steps
+            </button>
+          )}
+        </div>
       </div>
 
       {/* glow-overlay removed — clean background */}

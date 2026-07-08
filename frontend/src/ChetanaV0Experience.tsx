@@ -183,6 +183,20 @@ function voiceCaptureSupported(): boolean {
   );
 }
 
+function clipboardImageSupported(): boolean {
+  return Boolean(
+    typeof navigator !== "undefined" &&
+      typeof navigator.clipboard?.read === "function",
+  );
+}
+
+function imageExtensionForType(type: string): string {
+  if (type.includes("png")) return "png";
+  if (type.includes("jpeg") || type.includes("jpg")) return "jpg";
+  if (type.includes("webp")) return "webp";
+  return "png";
+}
+
 function formatVoiceDuration(ms: number): string {
   const seconds = Math.max(1, Math.round(ms / 1000));
   return `${seconds}s`;
@@ -394,6 +408,7 @@ export default function ChetanaV0Experience({
     setLoopReceipt(null);
     setError(null);
     setImproveError(null);
+    setVoiceError(null);
     setImproving(false);
     setLastExtractedInput(null);
     setDetailsOpen(false);
@@ -524,6 +539,35 @@ export default function ChetanaV0Experience({
   const stopVoiceCapture = () => {
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
+    }
+  };
+
+  const pasteScreenshotFromClipboard = async () => {
+    setVoiceError(null);
+    if (!clipboardImageSupported()) {
+      setVoiceError("Clipboard screenshot paste is not available in this browser. Choose screenshot instead.");
+      return;
+    }
+
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        const pastedFile = new File(
+          [blob],
+          `pasted-screenshot-${Date.now()}.${imageExtensionForType(imageType)}`,
+          { type: imageType },
+        );
+        setMode("screenshot");
+        setFile(pastedFile);
+        resetScanState("Screenshot pasted. Tap what happened or ask Chetana.");
+        return;
+      }
+      setVoiceError("No screenshot image was found on the clipboard. Choose screenshot instead.");
+    } catch {
+      setVoiceError("Could not read the clipboard. Choose screenshot instead.");
     }
   };
 
@@ -1125,6 +1169,16 @@ export default function ChetanaV0Experience({
                       ? "Record again"
                       : "Record voice"}
                 </button>
+                <button
+                  className="v0-voice-button"
+                  onClick={() => {
+                    void pasteScreenshotFromClipboard();
+                  }}
+                  disabled={loading}
+                >
+                  <Copy size={16} />
+                  Paste screenshot
+                </button>
                 {voiceBlobUrl && (
                   <div className="v0-voice-preview">
                     <audio controls src={voiceBlobUrl} />
@@ -1159,6 +1213,7 @@ export default function ChetanaV0Experience({
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={(event) => setFile(event.target.files?.[0] || null)}
                 />
                 <span className="v0-upload-inner">

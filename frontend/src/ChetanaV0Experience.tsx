@@ -194,6 +194,7 @@ export default function ChetanaV0Experience({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [showFullBreakdown, setShowFullBreakdown] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [casePacketCopied, setCasePacketCopied] = useState(false);
   const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
 
   useEffect(() => {
@@ -288,6 +289,26 @@ export default function ChetanaV0Experience({
       },
     ];
   }, [actionRoute?.case_packet, result]);
+  const casePacketText = useMemo(() => {
+    if (!result || casePacketRows.length === 0) return "";
+    return [
+      "Chetana recovery summary",
+      `Scan: ${result.scan_id}`,
+      `Verdict: ${verdictLabel(result.verdict)} - ${scamTypeLabel(result.scam_type)}`,
+      `Summary: ${result.guidance?.lead || verdictSummary(result)}`,
+      "",
+      "What happened: money, OTP, account access, or screen access may have been exposed.",
+      "",
+      "Details for 1930, bank/payment app, or cybercrime.gov.in:",
+      ...casePacketRows.map((row) => `- ${row.label}: ${row.value}`),
+      "",
+      "Immediate steps:",
+      "- Call 1930 now.",
+      "- Contact your bank or payment app through the official app or a known number.",
+      "- File or continue the report on cybercrime.gov.in.",
+      "- Preserve screenshots, UTR/transaction ID, phone numbers, UPI IDs, links, and chat history.",
+    ].join("\n");
+  }, [casePacketRows, result]);
 
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
@@ -302,6 +323,7 @@ export default function ChetanaV0Experience({
     setDetailsOpen(false);
     setShowFullBreakdown(false);
     setShareCopied(false);
+    setCasePacketCopied(false);
     setMoneyMovedAnswer(null);
     setStatus(nextStatus);
   };
@@ -712,6 +734,34 @@ export default function ChetanaV0Experience({
     }).catch(() => {});
   };
 
+  const copyCasePacket = async () => {
+    if (!result || !casePacketText) return;
+    try {
+      await navigator.clipboard.writeText(casePacketText);
+      setCasePacketCopied(true);
+      window.setTimeout(() => setCasePacketCopied(false), 1800);
+      void trackV0Event({
+        event_name: "evidence_saved",
+        session_id: sessionId,
+        scan_id: result.scan_id,
+        input_type: result.input_type,
+        verdict: result.verdict,
+        device_class: deviceClass(),
+        language_hint: result.language_hint || navigator.language.slice(0, 2),
+        metadata: {
+          recovery_step: "case_packet_copy",
+          recovery_channel: "clipboard",
+          artifact_kind: "text_case_packet",
+        },
+      }, {
+        dedupeTtlMs: EXPORT_EVENT_TTL_MS,
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      setStatus("Could not copy. Select the checklist text manually.");
+    }
+  };
+
   const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
     if (!result) return;
     const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
@@ -990,13 +1040,19 @@ export default function ChetanaV0Experience({
                   <div className="v0-choice-row" role="group" aria-label="Choose incident state">
                     <button
                       className={moneyMovedAnswer === "yes" ? "v0-choice-button active" : "v0-choice-button"}
-                      onClick={() => setMoneyMovedAnswer("yes")}
+                      onClick={() => {
+                        setMoneyMovedAnswer("yes");
+                        setCasePacketCopied(false);
+                      }}
                     >
                       Yes, show recovery checklist
                     </button>
                     <button
                       className={moneyMovedAnswer === "no" ? "v0-choice-button active" : "v0-choice-button"}
-                      onClick={() => setMoneyMovedAnswer("no")}
+                      onClick={() => {
+                        setMoneyMovedAnswer("no");
+                        setCasePacketCopied(false);
+                      }}
                     >
                       No, report the message
                     </button>
@@ -1015,6 +1071,9 @@ export default function ChetanaV0Experience({
                         ))}
                       </div>
                       <div className="v0-inline-actions">
+                        <button onClick={copyCasePacket}>
+                          <Copy size={14} /> {casePacketCopied ? "Copied report summary" : "Copy report summary"}
+                        </button>
                         <a
                           href="tel:1930"
                           onClick={() => trackReportAction("call_1930", { href: "tel:1930" })}

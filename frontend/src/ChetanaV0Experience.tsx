@@ -7,10 +7,13 @@ import {
   ExternalLink,
   FileText,
   ImageIcon,
+  Mic,
   Phone,
   Shield,
+  Square,
   Type,
   Upload,
+  X,
 } from "lucide-react";
 import { PageId } from "./types";
 import {
@@ -54,6 +57,17 @@ const DEFAULT_PROMPTS: Record<V0Mode, string> = {
 
 const SAMPLE_SCAM_TEXT =
   "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
+
+const QUICK_CONTEXT_OPTIONS = [
+  { id: "otp", label: "OTP or code", text: "Urgent bank, KYC, SIM, Aadhaar, or wallet warning: they are asking for OTP, PIN, CVV, password, or verification code now, and say the account may be blocked." },
+  { id: "upi", label: "UPI request", text: "Urgent payment or refund request: they asked me to approve a UPI collect request, scan a QR code, transfer money, or send payment now." },
+  { id: "kyc", label: "KYC block", text: "Urgent bank KYC, Aadhaar, PAN, SIM, or wallet update: they say service will be blocked, suspended, frozen, or penalized today." },
+  { id: "parcel", label: "Parcel fee", text: "Parcel, courier, customs, or delivery message asks for urgent payment, fee, reschedule charge, or link action today." },
+  { id: "job_loan", label: "Job or loan", text: "Job, loan, refund, investment, or easy-money offer asks for processing fee, security deposit, advance fee, guaranteed return, or payment before approval." },
+  { id: "screen", label: "App install", text: "Caller or message asked me to install an app or APK, use AnyDesk, TeamViewer, QuickSupport, share screen, enable accessibility permission, or give remote access." },
+  { id: "money_sent", label: "Money sent", text: "Money may already have been sent by UPI, bank, wallet, card, or netbanking, or OTP, password, account access, or remote access may already have been shared." },
+  { id: "pressure", label: "Rushing me", text: "Caller or message is rushing or threatening me now with police, RBI, bank, legal action, arrest, jail, penalty, account freeze, or account blocking." },
+] as const;
 
 const NCRP_SUSPECT_REPOSITORY_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx";
 const NCRP_SUSPECT_WEBSITES_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_websites.aspx";
@@ -135,6 +149,7 @@ type CasePacketRow = {
   value: string;
   hint: string;
 };
+type VoiceCaptureState = "idle" | "recording" | "recorded";
 
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
@@ -160,6 +175,19 @@ function actionStepIcon(step: V0ActionStep, size = 14) {
   return <Check size={size} />;
 }
 
+function voiceCaptureSupported(): boolean {
+  return Boolean(
+    typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getUserMedia === "function" &&
+      typeof MediaRecorder !== "undefined",
+  );
+}
+
+function formatVoiceDuration(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return `${seconds}s`;
+}
+
 export default function ChetanaV0Experience({
   onNavigate,
   initialInput,
@@ -175,11 +203,21 @@ export default function ChetanaV0Experience({
 }) {
   const composerRef = useRef<HTMLDivElement | null>(null);
   const resultRef = useRef<HTMLDivElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStartedAtRef = useRef<number | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
   const defaultMode: V0Mode = presetMode || (initialFile ? "screenshot" : initialInput ? "text" : "screenshot");
   const [mode, setMode] = useState<V0Mode>(defaultMode);
   const [text, setText] = useState(initialInput || "");
   const [file, setFile] = useState<File | null>(initialFile || null);
+  const [quickContextIds, setQuickContextIds] = useState<string[]>([]);
+  const [voiceState, setVoiceState] = useState<VoiceCaptureState>("idle");
+  const [voiceBlobUrl, setVoiceBlobUrl] = useState<string | null>(null);
+  const [voiceDurationMs, setVoiceDurationMs] = useState(0);
+  const [voiceElapsedMs, setVoiceElapsedMs] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Ready when you are.");
   const [result, setResult] = useState<V0Verdict | null>(null);
@@ -215,6 +253,32 @@ export default function ChetanaV0Experience({
   }, [presetMode]);
 
   useEffect(() => {
+    if (voiceState !== "recording") return undefined;
+    const interval = window.setInterval(() => {
+      const startedAt = voiceStartedAtRef.current;
+      if (startedAt) {
+        setVoiceElapsedMs(Date.now() - startedAt);
+      }
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [voiceState]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (voiceBlobUrl) URL.revokeObjectURL(voiceBlobUrl);
+    };
+  }, [voiceBlobUrl]);
+
+  useEffect(() => {
     void trackV0Event({
       event_name: "app_open",
       session_id: sessionId,
@@ -229,7 +293,19 @@ export default function ChetanaV0Experience({
 
   const shareText = result ? shareShieldText(result) : "";
   const evidenceName = result ? `chetana-evidence-${result.scan_id}.json` : "chetana-evidence.json";
-  const hasInput = Boolean(text.trim() || file);
+  const selectedQuickContext = useMemo(
+    () => QUICK_CONTEXT_OPTIONS.filter((option) => quickContextIds.includes(option.id)),
+    [quickContextIds],
+  );
+  const quickContextText = selectedQuickContext.length
+    ? `Quick context from user taps:\n${selectedQuickContext.map((option) => `- ${option.text}`).join("\n")}`
+    : "";
+  const voiceContextText = voiceState === "recorded"
+    ? `Voice note captured locally for the user (${formatVoiceDuration(voiceDurationMs)}). Audio was not transcribed or uploaded. Use the screenshot, typed note, and tapped context above for this verdict.`
+    : "";
+  const actionableScanText = [text.trim(), quickContextText].filter(Boolean).join("\n\n");
+  const scanTextForInput = [actionableScanText, actionableScanText || file ? voiceContextText : ""].filter(Boolean).join("\n\n");
+  const hasInput = Boolean(actionableScanText.trim() || file);
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
   const suspectLookupState = useMemo(() => {
     const entities = result?.entities;
@@ -351,8 +427,104 @@ export default function ChetanaV0Experience({
     setMode("text");
     setText(SAMPLE_SCAM_TEXT);
     setFile(null);
+    setQuickContextIds([]);
     resetScanState("Sample loaded. Edit it if you want, then scan.");
     window.requestAnimationFrame(scrollToComposer);
+  };
+
+  const toggleQuickContext = (contextId: string) => {
+    setQuickContextIds((current) => (
+      current.includes(contextId)
+        ? current.filter((id) => id !== contextId)
+        : [...current, contextId]
+    ));
+    if (result) resetScanState("Context changed. Ask Chetana again when ready.");
+  };
+
+  const stopVoiceTracks = () => {
+    voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceStreamRef.current = null;
+  };
+
+  const clearVoiceCapture = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    mediaRecorderRef.current = null;
+    stopVoiceTracks();
+    voiceChunksRef.current = [];
+    voiceStartedAtRef.current = null;
+    setVoiceState("idle");
+    setVoiceDurationMs(0);
+    setVoiceElapsedMs(0);
+    setVoiceError(null);
+    setVoiceBlobUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  };
+
+  const startVoiceCapture = async () => {
+    setVoiceError(null);
+    if (!voiceCaptureSupported()) {
+      setVoiceError("Voice recording is not available in this browser. Tap what happened or paste the message.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stopVoiceTracks();
+      voiceStreamRef.current = stream;
+      voiceChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      voiceStartedAtRef.current = Date.now();
+      setVoiceBlobUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setVoiceDurationMs(0);
+      setVoiceElapsedMs(0);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          voiceChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const startedAt = voiceStartedAtRef.current;
+        const durationMs = startedAt ? Date.now() - startedAt : voiceElapsedMs;
+        const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (blob.size > 0) {
+          setVoiceBlobUrl((current) => {
+            if (current) URL.revokeObjectURL(current);
+            return URL.createObjectURL(blob);
+          });
+          setVoiceDurationMs(durationMs);
+          setVoiceState("recorded");
+          setStatus("Voice captured. Tap what happened or add a screenshot before asking Chetana.");
+        } else {
+          setVoiceState("idle");
+          setVoiceError("No voice was captured. Try again or tap what happened.");
+        }
+        voiceStartedAtRef.current = null;
+        stopVoiceTracks();
+      };
+
+      recorder.start();
+      setVoiceState("recording");
+      setStatus("Listening. Stop when you are done.");
+    } catch {
+      setVoiceError("Could not use the microphone. Tap what happened or paste the message.");
+      stopVoiceTracks();
+      setVoiceState("idle");
+    }
+  };
+
+  const stopVoiceCapture = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   const recordLoopReceipt = async (
@@ -388,18 +560,23 @@ export default function ChetanaV0Experience({
     setLoading(true);
     resetScanState();
     const started = performance.now();
+    const effectiveMode: V0Mode = file || mode === "text" ? mode : "text";
 
     try {
       void trackV0Event({
         event_name: "scan_started",
         session_id: sessionId,
-        input_type: mode,
+        input_type: effectiveMode,
         device_class: deviceClass(),
         language_hint: navigator.language.slice(0, 2),
+        metadata: {
+          quick_context_ids: quickContextIds,
+          voice_context: voiceState === "recorded" ? "local_audio_not_transcribed" : "none",
+        },
       }).catch(() => {});
 
-      setStatus(mode === "text" ? "Reading the message..." : "Extracting what is visible...");
-      const extractedInput = await extractScanInputForMode(mode, file, text);
+      setStatus(effectiveMode === "text" ? "Reading what you shared..." : "Extracting what is visible...");
+      const extractedInput = await extractScanInputForMode(effectiveMode, file, scanTextForInput);
       const extracted = extractedInput.text;
       if (!extracted) {
         throw new Error("Please paste the message or upload an image first.");
@@ -411,7 +588,7 @@ export default function ChetanaV0Experience({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input_type: mode,
+          input_type: effectiveMode,
           text: extracted,
           language_hint: navigator.language.slice(0, 2),
           source_name: file?.name || null,
@@ -864,6 +1041,8 @@ export default function ChetanaV0Experience({
   const clearResult = () => {
     setText("");
     setFile(null);
+    setQuickContextIds([]);
+    clearVoiceCapture();
     resetScanState();
     window.requestAnimationFrame(scrollToComposer);
   };
@@ -880,7 +1059,7 @@ export default function ChetanaV0Experience({
               <strong>Chetana</strong>
             </div>
             <h1>Ask Chetana</h1>
-            <p>Upload a suspicious screenshot or paste the message. Chetana checks the visible risk signals and gives one safest next step.</p>
+            <p>Upload a screenshot, record a quick voice note, or tap what happened. Chetana checks the risk signals and gives one safest next step.</p>
             <div className="v0-app-privacy">
               Private by default. No login required.
             </div>
@@ -894,11 +1073,11 @@ export default function ChetanaV0Experience({
             <div className="v0-composer-head">
               <div>
                 <div className="v0-section-label">Ask Chetana</div>
-                <h2>{mode === "text" ? "Paste the message" : "Upload the screenshot"}</h2>
+                <h2>{mode === "text" ? "Paste or tap context" : "Screenshot or quick context"}</h2>
                 <p className="v0-composer-copy">
                   {mode === "text"
-                    ? "Paste the suspicious message, link, UPI ID, or payment request."
-                    : "Use a screenshot from WhatsApp, SMS, email, a QR code, payment proof, or any suspicious screen."}
+                    ? "Paste the suspicious message, tap what happened, or record a local voice note."
+                    : "Use a screenshot from WhatsApp, SMS, email, QR, payment proof, or tap what happened if you are in a hurry."}
                 </p>
               </div>
               <div className="v0-status">{status}</div>
@@ -919,6 +1098,62 @@ export default function ChetanaV0Experience({
               </button>
             </div>
 
+            <div className="v0-lazy-panel">
+              <div className="v0-lazy-copy">
+                <div className="v0-section-label">Fast path</div>
+                <strong>No perfect prompt needed.</strong>
+                <p>Tap what happened. Add a screenshot if you have one. Voice stays on this page and is not transcribed yet.</p>
+              </div>
+
+              <div className="v0-voice-row">
+                <button
+                  className={voiceState === "recording" ? "v0-voice-button recording" : "v0-voice-button"}
+                  onClick={() => {
+                    if (voiceState === "recording") {
+                      stopVoiceCapture();
+                    } else {
+                      if (voiceState === "recorded") clearVoiceCapture();
+                      void startVoiceCapture();
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  {voiceState === "recording" ? <Square size={16} /> : <Mic size={16} />}
+                  {voiceState === "recording"
+                    ? `Stop ${formatVoiceDuration(voiceElapsedMs)}`
+                    : voiceState === "recorded"
+                      ? "Record again"
+                      : "Record voice"}
+                </button>
+                {voiceBlobUrl && (
+                  <div className="v0-voice-preview">
+                    <audio controls src={voiceBlobUrl} />
+                    <span>{formatVoiceDuration(voiceDurationMs)} saved locally</span>
+                    <button onClick={clearVoiceCapture} aria-label="Remove voice note">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              {voiceError && <div className="v0-voice-error">{voiceError}</div>}
+
+              <div className="v0-context-grid" aria-label="Tap what happened">
+                {QUICK_CONTEXT_OPTIONS.map((option) => {
+                  const active = quickContextIds.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      className={active ? "v0-context-chip active" : "v0-context-chip"}
+                      onClick={() => toggleQuickContext(option.id)}
+                      aria-pressed={active}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {mode !== "text" && (
               <label className="v0-upload v0-upload-large">
                 <input
@@ -934,7 +1169,7 @@ export default function ChetanaV0Experience({
             )}
 
             <label className="v0-input-label">
-              {mode === "text" ? "Paste the message" : "Add a note if needed"}
+              {mode === "text" ? "Paste the message if you have it" : "Optional note"}
             </label>
             <textarea
               className="v0-textarea"

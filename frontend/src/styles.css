@@ -1327,6 +1327,100 @@ main {
   font-size: 0.86rem !important;
 }
 
+.v0-money-flow {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.035);
+}
+
+.v0-money-flow-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.v0-money-flow-copy strong,
+.v0-case-checklist strong {
+  color: var(--heading);
+}
+
+.v0-money-flow-copy p,
+.v0-case-checklist p {
+  max-width: 68ch;
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.v0-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.v0-choice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-bright);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-bright);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 760;
+}
+
+.v0-choice-button.active {
+  background: rgba(248,250,252,0.92);
+  color: #0f172a;
+}
+
+.v0-case-checklist {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(217,138,74,0.18);
+  border-radius: 16px;
+  background: rgba(217,138,74,0.07);
+}
+
+.v0-prevention-checklist {
+  border-color: rgba(96,165,250,0.18);
+  background: rgba(96,165,250,0.07);
+}
+
+.v0-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.v0-case-row {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  background: rgba(0,0,0,0.16);
+}
+
+.v0-case-row span,
+.v0-case-row small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.v0-case-row strong {
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
 .v0-improve-panel {
   display: flex;
   align-items: center;
@@ -1600,8 +1694,13 @@ main {
 
   .v0-action-primary,
   .v0-action-secondary,
-  .v0-action-secondary button {
+  .v0-action-secondary button,
+  .v0-choice-button {
     width: 100%;
+  }
+
+  .v0-case-grid {
+    grid-template-columns: 1fr;
   }
 
   .v0-status,

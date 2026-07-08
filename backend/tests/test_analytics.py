@@ -211,6 +211,35 @@ class AnalyticsSummaryTests(unittest.TestCase):
         self.assertEqual(live["scan_types_used"], 2)
         self.assertEqual(live["languages"], 2)
 
+    def test_summary_maps_chakshu_report_surface(self) -> None:
+        now = datetime.now(UTC).isoformat()
+        events = [
+            {
+                "event_name": "report_tapped",
+                "session_id": "prod-chakshu",
+                "timestamp_utc": now,
+                "scan_id": "scan-chakshu",
+                "device_class": "web",
+                "metadata": {
+                    "report_surface": "chakshu",
+                    "event_version": "chetana.v0.analytics.v2",
+                },
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            events_path = Path(temp_dir) / "events.jsonl"
+            with events_path.open("w", encoding="utf-8") as handle:
+                for event in events:
+                    handle.write(json.dumps(event) + "\n")
+
+            summary = build_v0_analytics_summary(events_path=events_path, trailing_days=7)
+
+        self.assertEqual(summary.breakdowns.report_surfaces, {"chakshu": 1})
+        self.assertEqual(summary.breakdowns.recovery_steps, {"suspected_fraud_communication_report": 1})
+        self.assertEqual(summary.breakdowns.recovery_channels, {"web": 1})
+        self.assertEqual(summary.breakdowns.official_rails, {"SANCHAR_SAATHI_CHAKSHU": 1})
+
     def test_summary_flags_orphan_completions_without_exceeding_hundred_percent(self) -> None:
         now = datetime.now(UTC).isoformat()
         events = [

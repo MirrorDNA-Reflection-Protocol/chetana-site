@@ -132,8 +132,20 @@ export interface V0EvidencePack {
   user_notes?: string | null;
 }
 
+export type V0OfficialRailId =
+  | "BANK_APP_SUPPORT"
+  | "CYBER_HELPLINE_1930"
+  | "NCRP_PORTAL"
+  | "RBI_CMS"
+  | "SANCHAR_SAATHI_CHAKSHU"
+  | "NCRP_SUSPECT_REPOSITORY"
+  | "NCRP_SUSPECT_WEBSITES"
+  | "NCRP_REPORT_SUSPECT"
+  | "NPCI_UPI_HELP"
+  | "RBI_SACHET";
+
 export interface V0OfficialRail {
-  rail_id: "BANK_APP_SUPPORT" | "CYBER_HELPLINE_1930" | "NCRP_PORTAL" | "RBI_CMS";
+  rail_id: V0OfficialRailId;
   name: string;
   channel: string;
   contact?: string | null;

@@ -1122,7 +1122,13 @@ RecoveryIncidentType = Literal[
     "REMOTE_ACCESS_OR_DEVICE_COMPROMISE",
     "CREDENTIAL_THEFT_EXPOSURE",
 ]
-RecoveryRailId = Literal["BANK_APP_SUPPORT", "CYBER_HELPLINE_1930", "NCRP_PORTAL", "RBI_CMS"]
+RecoveryRailId = Literal[
+    "BANK_APP_SUPPORT",
+    "CYBER_HELPLINE_1930",
+    "NCRP_PORTAL",
+    "RBI_CMS",
+    "SANCHAR_SAATHI_CHAKSHU",
+]
 
 
 class V0OfficialRail(StrictModel):
@@ -1437,6 +1443,19 @@ _OFFICIAL_RAILS: dict[RecoveryRailId, V0OfficialRail] = {
             "online reporting and status tracking",
         ],
     ),
+    "SANCHAR_SAATHI_CHAKSHU": V0OfficialRail(
+        rail_id="SANCHAR_SAATHI_CHAKSHU",
+        name="Sanchar Saathi Chakshu",
+        channel="web",
+        contact=CHAKSHU_URL,
+        official_url=CHAKSHU_URL,
+        verified_on="2026-07-08",
+        use_when=[
+            "suspected fraud communication by call, SMS, or WhatsApp",
+            "no money has moved yet",
+            "report telecom abuse before complaint filing",
+        ],
+    ),
     "RBI_CMS": V0OfficialRail(
         rail_id="RBI_CMS",
         name="RBI Complaint Management System",
@@ -1560,6 +1579,17 @@ def _secondary_action_catalog() -> dict[ActionRouteId, V0ActionStep]:
             href=NCRP_PORTAL_URL,
             official_rail_id="NCRP_PORTAL",
         ),
+        "open_chakshu": _action_step(
+            "open_chakshu",
+            title="Report the call, SMS, or WhatsApp on Chakshu",
+            body="Use this when the fraud attempt arrived as a telecom communication and no money has moved yet.",
+            action_label="Open Chakshu",
+            kind="open_url",
+            priority="secondary",
+            urgency="today",
+            href=CHAKSHU_URL,
+            official_rail_id="SANCHAR_SAATHI_CHAKSHU",
+        ),
         "save_case_packet": _action_step(
             "save_case_packet",
             title="Save the private report",
@@ -1615,6 +1645,26 @@ def _has_identifier_targets(entities: V0Entities) -> bool:
     return bool(entities.phone_numbers or entities.upi_ids or entities.urls)
 
 
+_CHAKSHU_SURFACE_RE = re.compile(
+    r"\b(?:whatsapp|sms|text message|message|call|caller|phone|mobile|number|otp|kyc|sim|airtel|jio|vi|telecom)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_chakshu_relevant(verdict: V0Verdict, text: str, entities: V0Entities) -> bool:
+    if verdict.verdict == "low_signal":
+        return False
+    if entities.phone_numbers:
+        return True
+    if _CHAKSHU_SURFACE_RE.search(text):
+        return True
+    return verdict.scam_type in {
+        "fake_kyc",
+        "remote_support_scam",
+        "impersonation_pressure_scam",
+    }
+
+
 def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
     verdict = payload.verdict
     text = _normalize_text(payload.input_text)
@@ -1624,6 +1674,7 @@ def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
     secondaries: list[V0ActionStep] = []
     summary = verdict.summary_plain_language or verdict.guidance.lead
     case_packet = _build_case_packet(verdict, text, summary)
+    chakshu_relevant = _is_chakshu_relevant(verdict, text, entities)
 
     if verdict.incident_state == "device_access_requested" or "remote_access_request" in codes:
         primary = _action_step(
@@ -1686,6 +1737,8 @@ def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
         reason = "The scan found high-risk pressure, payment, identity, or link signals."
         _append_action(secondaries, catalog, "call_1930")
         _append_action(secondaries, catalog, "open_cybercrime_portal")
+        if chakshu_relevant:
+            _append_action(secondaries, catalog, "open_chakshu")
         _append_action(secondaries, catalog, "save_case_packet")
     elif verdict.verdict in {"caution", "needs_review"} and _has_identifier_targets(entities):
         if entities.urls and not (entities.phone_numbers or entities.upi_ids):
@@ -1714,6 +1767,8 @@ def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
                 official_rail_id="NCRP_SUSPECT_REPOSITORY",
             )
             reason = "An unknown phone number or UPI handle was present and needs independent checking."
+        if chakshu_relevant:
+            _append_action(secondaries, catalog, "open_chakshu")
         _append_action(secondaries, catalog, "save_case_packet")
         _append_action(secondaries, catalog, "share_with_family")
         if verdict.verdict == "caution":
@@ -1730,6 +1785,8 @@ def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
             official_rail_id="OFFICIAL_SOURCE_VERIFY",
         )
         reason = "The scan has warning signs but needs stronger independent evidence."
+        if chakshu_relevant:
+            _append_action(secondaries, catalog, "open_chakshu")
         _append_action(secondaries, catalog, "scan_again")
         _append_action(secondaries, catalog, "share_with_family")
         _append_action(secondaries, catalog, "save_case_packet")
@@ -1747,26 +1804,6 @@ def build_v0_action_route(payload: V0ActionRouteRequest) -> V0ActionRoute:
         reason = "The scan did not find enough strong evidence to clear or condemn the material."
         _append_action(secondaries, catalog, "verify_official_source")
         _append_action(secondaries, catalog, "share_with_family")
-
-    if verdict.verdict != "low_signal" and bool(entities.phone_numbers or entities.upi_ids):
-        _append_action(
-            secondaries,
-            {
-                **catalog,
-                "open_chakshu": _action_step(
-                    "open_chakshu",
-                    title="Report suspicious calls, SMS, or WhatsApp to Chakshu",
-                    body="Use this when the fraud attempt arrived as a telecom communication and no money has moved yet.",
-                    action_label="Open Chakshu",
-                    kind="open_url",
-                    priority="secondary",
-                    urgency="today",
-                    href=CHAKSHU_URL,
-                    official_rail_id="SANCHAR_SAATHI_CHAKSHU",
-                ),
-            },
-            "open_chakshu",
-        )
 
     unique_secondaries: list[V0ActionStep] = []
     for action in secondaries:

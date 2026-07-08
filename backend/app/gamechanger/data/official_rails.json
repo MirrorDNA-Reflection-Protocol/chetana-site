@@ -44,6 +44,20 @@
     "source_url": "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx"
   },
   {
+    "rail_id": "SANCHAR_SAATHI_CHAKSHU",
+    "name": "Sanchar Saathi Chakshu",
+    "channel": "web",
+    "url": "https://sancharsaathi.gov.in/sfc/",
+    "contact": null,
+    "use_when": [
+      "suspected fraud communication by call, SMS, or WhatsApp",
+      "report telecom abuse before money moves",
+      "fraud attempt received through a phone or messaging channel"
+    ],
+    "verified_on": "2026-07-08",
+    "source_url": "https://sancharsaathi.gov.in/sfc/"
+  },
+  {
     "rail_id": "RBI_CMS",
     "name": "RBI Complaint Management System",
     "channel": "web",

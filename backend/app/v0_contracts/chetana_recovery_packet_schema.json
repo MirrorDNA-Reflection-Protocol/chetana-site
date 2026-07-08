@@ -75,7 +75,8 @@
               "BANK_APP_SUPPORT",
               "CYBER_HELPLINE_1930",
               "NCRP_PORTAL",
-              "RBI_CMS"
+              "RBI_CMS",
+              "SANCHAR_SAATHI_CHAKSHU"
             ]
           },
           "name": { "type": "string" },

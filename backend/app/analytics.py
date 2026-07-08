@@ -202,6 +202,12 @@ def _infer_recovery_fields(event: dict[str, Any]) -> tuple[str, str, str]:
             channel or "web",
             official_rail or "RBI_CMS",
         )
+    if surface == "chakshu":
+        return (
+            step or "suspected_fraud_communication_report",
+            channel or "web",
+            official_rail or "SANCHAR_SAATHI_CHAKSHU",
+        )
     return step, channel, official_rail
 
 

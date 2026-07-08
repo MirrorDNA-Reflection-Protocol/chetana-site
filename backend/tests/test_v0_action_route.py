@@ -36,6 +36,18 @@ def test_action_route_hard_stop_for_high_risk_kyc_payment() -> None:
     assert route.route_hash
 
 
+def test_action_route_surfaces_chakshu_for_suspicious_telecom_message() -> None:
+    text = "WhatsApp alert: your bank KYC expires today. Click http://secure-kyc-update.top now or account will block."
+    verdict = analyze_scan(V0ScanInput(input_type="text", text=text, language_hint="en", session_id="test-session"))
+
+    route = build_v0_action_route(V0ActionRouteRequest(verdict=verdict, input_text=text, session_id="test-session"))
+
+    chakshu = next((action for action in route.secondary_actions if action.route_id == "open_chakshu"), None)
+    assert chakshu is not None
+    assert chakshu.href == "https://sancharsaathi.gov.in/sfc/"
+    assert chakshu.official_rail_id == "SANCHAR_SAATHI_CHAKSHU"
+
+
 def test_action_route_merchant_payment_screenshot_holds_release() -> None:
     text = "Payment successful screenshot attached. Pay Rs 5000 now. Merchant: Test Store."
     verdict = analyze_scan(

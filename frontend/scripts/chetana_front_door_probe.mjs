@@ -41,12 +41,19 @@ async function main() {
     throw new Error("Probe did not receive a verdict and primary action.");
   }
 
+  const secondaryActions = route.action_route.secondary_actions || [];
+  const hasChakshu = secondaryActions.some((action) => action.route_id === "open_chakshu");
+  if (!hasChakshu) {
+    throw new Error("Probe did not receive the Chakshu secondary action.");
+  }
+
   console.log(JSON.stringify({
     status: "pass",
     base_url: baseUrl,
     verdict: verdict.verdict,
     scam_type: verdict.scam_type,
     primary_action: route.action_route.primary_action.action_label,
+    secondary_actions: secondaryActions.map((action) => action.route_id),
     headline: route.action_route.headline,
   }, null, 2));
 }

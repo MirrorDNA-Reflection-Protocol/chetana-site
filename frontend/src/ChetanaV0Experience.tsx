@@ -16,6 +16,7 @@ import { PageId } from "./types";
 import {
   V0ActionRoute,
   V0ActionStep,
+  V0CasePacket,
   V0Mode,
   V0EvidencePack,
   V0EventName,
@@ -57,11 +58,13 @@ const SAMPLE_SCAM_TEXT =
 const NCRP_SUSPECT_REPOSITORY_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx";
 const NCRP_SUSPECT_WEBSITES_URL = "https://www.cybercrime.gov.in/Webform/suspect_search_websites.aspx";
 const NCRP_REPORT_SUSPECT_URL = "https://www.cybercrime.gov.in/Webform/cyber_suspect.aspx";
+const CHAKSHU_URL = "https://sancharsaathi.gov.in/sfc/";
 const OFFICIAL_RAIL_EVENT_SURFACES: Record<string, string> = {
   BANK_APP_SUPPORT: "bank_app_support",
   CYBER_HELPLINE_1930: "call_1930",
   NCRP_PORTAL: "cybercrime_portal",
   RBI_CMS: "rbi_cms",
+  SANCHAR_SAATHI_CHAKSHU: "chakshu",
 };
 const RECOVERY_SURFACE_DEFAULTS: Record<string, {
   recoveryStep: string;
@@ -93,6 +96,12 @@ const RECOVERY_SURFACE_DEFAULTS: Record<string, {
     officialRailId: "RBI_CMS",
     reportTarget: "manual_report",
   },
+  chakshu: {
+    recoveryStep: "suspected_fraud_communication_report",
+    recoveryChannel: "web",
+    officialRailId: "SANCHAR_SAATHI_CHAKSHU",
+    reportTarget: "manual_report",
+  },
   ncrp_suspect_repository: {
     recoveryStep: "suspect_lookup",
     recoveryChannel: "web",
@@ -119,6 +128,12 @@ type RecoveryActionOptions = {
   recoveryChannel?: string;
   officialRailId?: string;
   href?: string;
+};
+type MoneyMovedAnswer = "yes" | "no" | null;
+type CasePacketRow = {
+  label: string;
+  value: string;
+  hint: string;
 };
 
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
@@ -179,6 +194,7 @@ export default function ChetanaV0Experience({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [showFullBreakdown, setShowFullBreakdown] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
 
   useEffect(() => {
     if (initialInput) setText(initialInput);
@@ -226,6 +242,52 @@ export default function ChetanaV0Experience({
       },
     };
   }, [result?.entities]);
+  const casePacketRows = useMemo<CasePacketRow[]>(() => {
+    if (!result) return [];
+    const packet: V0CasePacket | undefined = actionRoute?.case_packet;
+    const entities = result.entities;
+    const identifiers = [
+      ...(packet?.phone_numbers || entities?.phone_numbers || []),
+      ...(packet?.upi_ids || entities?.upi_ids || []),
+      ...(packet?.urls || entities?.urls || []),
+    ];
+    const merchants = packet?.merchant_names?.length
+      ? packet.merchant_names
+      : entities?.merchant_names || [];
+
+    return [
+      {
+        label: "Amount",
+        value: packet?.amount_inr ? `Rs ${packet.amount_inr}` : entities?.amounts?.[0] || "Amount paid",
+        hint: "Use the exact value from the bank or payment app.",
+      },
+      {
+        label: "UTR / transaction ID",
+        value: packet?.transaction_reference || "UTR, transaction ID, or reference number",
+        hint: "Copy it from the bank, wallet, or UPI app.",
+      },
+      {
+        label: "Bank / app / merchant",
+        value: merchants.length ? merchants.join(", ") : "Bank, wallet, UPI app, or merchant",
+        hint: "Use the official app or statement, not the suspicious message.",
+      },
+      {
+        label: "Time",
+        value: "Date and time of transfer or contact",
+        hint: "Include the first message and the payment time if they differ.",
+      },
+      {
+        label: "Sender details",
+        value: identifiers.length ? identifiers.slice(0, 3).join(", ") : "Phone number, UPI ID, link, handle, or account number",
+        hint: "Preserve screenshots before blocking.",
+      },
+      {
+        label: "Evidence",
+        value: "Message screenshots, payment screen, profile/contact page",
+        hint: "Keep originals on your phone while reporting.",
+      },
+    ];
+  }, [actionRoute?.case_packet, result]);
 
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
@@ -240,6 +302,7 @@ export default function ChetanaV0Experience({
     setDetailsOpen(false);
     setShowFullBreakdown(false);
     setShareCopied(false);
+    setMoneyMovedAnswer(null);
     setStatus(nextStatus);
   };
 
@@ -917,6 +980,81 @@ export default function ChetanaV0Experience({
                 </div>
               )}
 
+              {result.verdict === "high_risk" && (
+                <div className="v0-money-flow">
+                  <div className="v0-money-flow-copy">
+                    <div className="v0-section-label">One question</div>
+                    <strong>Did you send money, share an OTP, or give screen access?</strong>
+                    <p>This decides whether Chetana should stay in prevention mode or switch you into recovery steps.</p>
+                  </div>
+                  <div className="v0-choice-row" role="group" aria-label="Choose incident state">
+                    <button
+                      className={moneyMovedAnswer === "yes" ? "v0-choice-button active" : "v0-choice-button"}
+                      onClick={() => setMoneyMovedAnswer("yes")}
+                    >
+                      Yes, show recovery checklist
+                    </button>
+                    <button
+                      className={moneyMovedAnswer === "no" ? "v0-choice-button active" : "v0-choice-button"}
+                      onClick={() => setMoneyMovedAnswer("no")}
+                    >
+                      No, report the message
+                    </button>
+                  </div>
+
+                  {moneyMovedAnswer === "yes" && (
+                    <div className="v0-case-checklist">
+                      <strong>Have this ready before you call or file.</strong>
+                      <div className="v0-case-grid">
+                        {casePacketRows.map((row) => (
+                          <div className="v0-case-row" key={row.label}>
+                            <span>{row.label}</span>
+                            <strong>{row.value}</strong>
+                            <small>{row.hint}</small>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="v0-inline-actions">
+                        <a
+                          href="tel:1930"
+                          onClick={() => trackReportAction("call_1930", { href: "tel:1930" })}
+                        >
+                          <Phone size={14} /> Call 1930
+                        </a>
+                        <a
+                          href="https://cybercrime.gov.in"
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => trackReportAction("cybercrime_portal", { href: "https://cybercrime.gov.in" })}
+                        >
+                          <ExternalLink size={14} /> Open cybercrime.gov.in
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {moneyMovedAnswer === "no" && (
+                    <div className="v0-case-checklist v0-prevention-checklist">
+                      <strong>No money moved yet.</strong>
+                      <p>Do not reply, click, pay, scan, install, approve a collect request, or share codes. If it arrived by call, SMS, or WhatsApp, report the communication on Chakshu, then block the sender.</p>
+                      <div className="v0-inline-actions">
+                        <a
+                          href={CHAKSHU_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => trackReportAction("chakshu", { href: CHAKSHU_URL })}
+                        >
+                          <ExternalLink size={14} /> Open Chakshu
+                        </a>
+                        <button onClick={clearResult}>
+                          <ArrowRight size={14} /> Check another message
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {result.can_improve_scan && file && mode !== "text" && (
                 <div className="v0-improve-panel">
                   <div>
@@ -962,7 +1100,10 @@ export default function ChetanaV0Experience({
                 <div className="v0-report-card v0-primary-support-card">
                   <div className="v0-section-label">Official help</div>
                   <strong>If money moved already, call 1930 first.</strong>
-                  <p>Then contact your bank and finish the report on cybercrime.gov.in. Do not keep arguing with the scammer.</p>
+                  <p>
+                    If this is only a suspicious call, SMS, or WhatsApp message and no money moved, report the communication on Chakshu.
+                    If money, codes, or account access were exposed, use 1930 and cybercrime.gov.in first.
+                  </p>
                   <p className="v0-report-script">{reportScript(result)}</p>
                   <div className="v0-inline-actions">
                     <a
@@ -978,6 +1119,14 @@ export default function ChetanaV0Experience({
                       onClick={() => trackReportAction("cybercrime_portal", { href: "https://cybercrime.gov.in" })}
                     >
                       <ExternalLink size={14} /> Open cybercrime.gov.in
+                    </a>
+                    <a
+                      href={CHAKSHU_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => trackReportAction("chakshu", { href: CHAKSHU_URL })}
+                    >
+                      <ExternalLink size={14} /> Open Chakshu
                     </a>
                   </div>
                 </div>

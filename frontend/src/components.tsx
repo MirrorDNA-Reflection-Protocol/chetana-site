@@ -52,6 +52,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
   const items: { id: PageId; label: string; activeOn: PageId[]; urgent?: boolean }[] = [
     { id: "scan", label: t("nav_check"), activeOn: ["home", "scan", "consumer"] },
     { id: "merchant", label: t("nav_shops"), activeOn: ["merchant"] },
+    { id: "partners", label: "Partners", activeOn: ["partners", "nexus"] },
     { id: "panic", label: t("nav_help"), activeOn: ["panic", "incident"], urgent: true },
   ];
   const navigate = (id: PageId) => { setPage(id); setOpen(false); };
@@ -3457,6 +3458,127 @@ export function FamilyPage() {
   );
 }
 
+/* ── Institutional Partner Page ──────────────────────────────── */
+export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+  const contactHref = "mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot&body=We%20would%20like%20to%20discuss%20a%20Chetana%20pilot%20or%20sponsorship.";
+  const pilots = [
+    {
+      icon: <CreditCard size={18} />,
+      title: "Bank and PSP pilot",
+      text: "Add a pre-action scam check to customer education, support intake, UPI-risk awareness, or dispute teams.",
+    },
+    {
+      icon: <Users size={18} />,
+      title: "CSR digital safety",
+      text: "Sponsor regional-language scam checks and awareness for seniors, families, students, and small merchants.",
+    },
+    {
+      icon: <Phone size={18} />,
+      title: "Helpline support",
+      text: "Turn citizen reports into a clearer summary, evidence checklist, and official next step without auto-filing complaints.",
+    },
+    {
+      icon: <Building2 size={18} />,
+      title: "Merchant association",
+      text: "Help shops check fake payment screenshots before goods leave the counter.",
+    },
+  ];
+  const metrics = [
+    "Scans completed",
+    "High-risk actions routed",
+    "1930 / cybercrime handoffs",
+    "Languages used",
+    "Recovery packets copied",
+    "False-safe complaints",
+  ];
+
+  return (
+    <section className="partner-page">
+      <div className="partner-hero">
+        <div className="kicker kicker-glow">
+          <ShieldCheck size={14} />
+          Institutional pilots
+        </div>
+        <h1>Help people check a scam before money moves.</h1>
+        <p>
+          Chetana is an independent scam checker for India. Banks, CSR teams, public-sector programs,
+          and merchant networks can sponsor access, awareness, and pilot integrations that route users
+          to safer action before they click, pay, scan, install, or share an OTP.
+        </p>
+        <div className="partner-actions">
+          <a className="partner-primary" href={contactHref}>
+            <MessageCircle size={17} />
+            Start a pilot
+          </a>
+          <button className="partner-secondary" onClick={() => onNavigate("nexus")}>
+            <FileText size={17} />
+            Partner API
+          </button>
+        </div>
+        <div className="partner-boundary">
+          <Info size={14} />
+          Chetana is not a government service and does not claim bank, RBI, NPCI, I4C, or law-enforcement affiliation.
+        </div>
+      </div>
+
+      <div className="partner-band">
+        <div>
+          <span>Why sponsor</span>
+          <strong>It is cheaper to slow a risky action than recover money after it moves.</strong>
+        </div>
+        <p>
+          The pilot promise is simple: more people pause, understand the risk, preserve the right evidence,
+          and reach the correct official rail faster.
+        </p>
+      </div>
+
+      <div className="partner-grid">
+        {pilots.map((pilot) => (
+          <div className="partner-card" key={pilot.title}>
+            <div className="partner-card-icon">{pilot.icon}</div>
+            <h3>{pilot.title}</h3>
+            <p>{pilot.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="partner-proof">
+        <div>
+          <div className="kicker">Pilot proof</div>
+          <h2>What a sponsor gets measured</h2>
+          <p>
+            Chetana should be bought on outcomes, not vague AI claims. Every institutional pilot needs
+            a small proof packet that a bank, CSR committee, or public team can review.
+          </p>
+        </div>
+        <div className="partner-metric-grid">
+          {metrics.map((metric) => (
+            <span key={metric}>{metric}</span>
+          ))}
+        </div>
+      </div>
+
+      <div className="partner-steps">
+        <div className="partner-step">
+          <span>01</span>
+          <strong>Public sponsor page</strong>
+          <p>Make the opportunity easy to find from Chetana without distracting consumers from scanning.</p>
+        </div>
+        <div className="partner-step">
+          <span>02</span>
+          <strong>90-day pilot</strong>
+          <p>Run one region, one language cluster, or one merchant/bank workflow with weekly proof reports.</p>
+        </div>
+        <div className="partner-step">
+          <span>03</span>
+          <strong>Procurement or CSR route</strong>
+          <p>Move through GeM, a bank innovation team, CSR sponsorship, or a public-sector awareness program.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   return (
@@ -3478,6 +3600,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
             <button onClick={() => onNavigate("home")}>Scan now</button>
             <button onClick={() => onNavigate("family")}>For family</button>
             <button onClick={() => onNavigate("merchant")}>For shops</button>
+            <button onClick={() => onNavigate("partners")}>For banks & govt</button>
           </div>
           <div className="footer-col">
             <h4>Understand</h4>

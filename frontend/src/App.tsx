@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
-  IncidentStepper, FamilyPage, Footer
+  IncidentStepper, FamilyPage, PartnerPage, Footer
 } from "./components";
 import ProofPage from "./ProofPage";
 import VigilancePage from "./VigilancePage";
@@ -20,6 +20,9 @@ function initialPageFromLocation(): PageId {
   if (requestedPage === "ops" || params.get("ops") === "1" || window.location.pathname === "/ops") {
     return "ops";
   }
+  if (requestedPage === "partners" || window.location.pathname === "/partners") {
+    return "partners";
+  }
   return "home";
 }
 
@@ -34,9 +37,11 @@ export default function App() {
 
   const syncPageUrl = (nextPage: PageId, replace = false) => {
     const params = new URLSearchParams(window.location.search);
-    const nextPath = window.location.pathname === "/ops" ? "/" : window.location.pathname;
-    if (nextPage === "ops") {
-      params.set("page", "ops");
+    const nextPath = window.location.pathname === "/ops" || window.location.pathname === "/partners"
+      ? "/"
+      : window.location.pathname;
+    if (nextPage === "ops" || nextPage === "partners") {
+      params.set("page", nextPage);
     } else {
       params.delete("page");
       params.delete("ops");
@@ -52,7 +57,7 @@ export default function App() {
   };
 
   const setPage = (p: PageId) => {
-    if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic" && p !== "ops") {
+    if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic" && p !== "ops" && p !== "partners") {
       setPendingPage(p);
       _setPage("proof");
       syncPageUrl("proof", true); // replace: back should skip the gate
@@ -275,6 +280,8 @@ export default function App() {
               />
             </>}
 
+            {page === "partners" && <PartnerPage onNavigate={setPage} />}
+
             {page === "nexus" && <>
               <section className="page-intro" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
                 <div>
@@ -320,7 +327,7 @@ export default function App() {
       {page !== "ops" && <Footer onNavigate={setPage} />}
 
       {/* FAB — goes to scan page (with proof gate) */}
-      {page !== "home" && page !== "scan" && page !== "proof" && page !== "ops" && (
+      {page !== "home" && page !== "scan" && page !== "proof" && page !== "ops" && page !== "partners" && (
         <button className="sw-fab" onClick={() => setPage("scan")}>
           <span style={{ fontSize: 20 }}>🛡️</span>
           <span className="sw-fab-label">Scan now</span>

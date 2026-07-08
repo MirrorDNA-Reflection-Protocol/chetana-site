@@ -146,6 +146,14 @@ If you've been scammed:
 
 Act within the first hour for the best chance of recovery.
 
+## Institutional pilots
+
+Chetana has a bank, CSR, government, and merchant-network sponsorship path at `?page=partners`.
+
+The current source-backed sweep is in [docs/CHETANA_INSTITUTIONAL_PARTNERSHIP_SWEEP_2026_07_08.md](docs/CHETANA_INSTITUTIONAL_PARTNERSHIP_SWEEP_2026_07_08.md).
+
+The position is intentionally narrow: Chetana is an independent scam checker and partner API, not a government service or official fraud-intelligence authority.
+
 ## Legal
 
 Advisory tool only. Verdicts are automated assessments — not legal determinations.

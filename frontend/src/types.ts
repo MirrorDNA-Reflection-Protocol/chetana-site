@@ -2,6 +2,7 @@ export type PageId =
   | "home"
   | "consumer"
   | "merchant"
+  | "partners"
   | "nexus"
   | "ops"
   | "weather"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ClipboardEvent, DragEvent } from "react";
 import {
   ArrowRight,
   Check,
@@ -150,6 +151,7 @@ type CasePacketRow = {
   hint: string;
 };
 type VoiceCaptureState = "idle" | "recording" | "recorded";
+type IntakeSource = "chooser" | "clipboard" | "drop";
 
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
@@ -197,6 +199,15 @@ function imageExtensionForType(type: string): string {
   return "png";
 }
 
+function imageFileFromBlob(blob: Blob, source: IntakeSource): File {
+  const type = blob.type || "image/png";
+  return new File(
+    [blob],
+    `${source}-screenshot-${Date.now()}.${imageExtensionForType(type)}`,
+    { type },
+  );
+}
+
 function formatVoiceDuration(ms: number): string {
   const seconds = Math.max(1, Math.round(ms / 1000));
   return `${seconds}s`;
@@ -232,6 +243,7 @@ export default function ChetanaV0Experience({
   const [voiceDurationMs, setVoiceDurationMs] = useState(0);
   const [voiceElapsedMs, setVoiceElapsedMs] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Ready when you are.");
   const [result, setResult] = useState<V0Verdict | null>(null);
@@ -320,6 +332,12 @@ export default function ChetanaV0Experience({
   const actionableScanText = [text.trim(), quickContextText].filter(Boolean).join("\n\n");
   const scanTextForInput = [actionableScanText, actionableScanText || file ? voiceContextText : ""].filter(Boolean).join("\n\n");
   const hasInput = Boolean(actionableScanText.trim() || file);
+  const intakeEvidence = [
+    file ? { label: "Screenshot", value: file.name } : null,
+    selectedQuickContext.length ? { label: "Context", value: `${selectedQuickContext.length} tap${selectedQuickContext.length === 1 ? "" : "s"}` } : null,
+    text.trim() ? { label: "Note", value: `${Math.min(text.trim().length, 999)} chars` } : null,
+    voiceState === "recorded" ? { label: "Voice", value: `${formatVoiceDuration(voiceDurationMs)} local only` } : null,
+  ].filter((item): item is { label: string; value: string } => Boolean(item));
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
   const suspectLookupState = useMemo(() => {
     const entities = result?.entities;
@@ -456,6 +474,18 @@ export default function ChetanaV0Experience({
     if (result) resetScanState("Context changed. Ask Chetana again when ready.");
   };
 
+  const acceptScreenshotFile = (nextFile: File, source: IntakeSource) => {
+    if (!nextFile.type.startsWith("image/")) {
+      setVoiceError("That file is not an image. Use a screenshot image.");
+      return;
+    }
+    setMode("screenshot");
+    setFile(nextFile);
+    setDragActive(false);
+    const label = source === "clipboard" ? "pasted" : source === "drop" ? "dropped" : "selected";
+    resetScanState(`Screenshot ${label}. Tap what happened or ask Chetana.`);
+  };
+
   const stopVoiceTracks = () => {
     voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     voiceStreamRef.current = null;
@@ -555,20 +585,34 @@ export default function ChetanaV0Experience({
         const imageType = item.types.find((type) => type.startsWith("image/"));
         if (!imageType) continue;
         const blob = await item.getType(imageType);
-        const pastedFile = new File(
-          [blob],
-          `pasted-screenshot-${Date.now()}.${imageExtensionForType(imageType)}`,
-          { type: imageType },
-        );
-        setMode("screenshot");
-        setFile(pastedFile);
-        resetScanState("Screenshot pasted. Tap what happened or ask Chetana.");
+        acceptScreenshotFile(imageFileFromBlob(blob, "clipboard"), "clipboard");
         return;
       }
       setVoiceError("No screenshot image was found on the clipboard. Choose screenshot instead.");
     } catch {
       setVoiceError("Could not read the clipboard. Choose screenshot instead.");
     }
+  };
+
+  const handleComposerPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const items = Array.from(event.clipboardData.items || []);
+    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    if (!imageItem) return;
+    const blob = imageItem.getAsFile();
+    if (!blob) return;
+    event.preventDefault();
+    acceptScreenshotFile(imageFileFromBlob(blob, "clipboard"), "clipboard");
+  };
+
+  const handleComposerDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const droppedFile = Array.from(event.dataTransfer.files || []).find((item) => item.type.startsWith("image/"));
+    if (!droppedFile) {
+      setDragActive(false);
+      setVoiceError("Drop a screenshot image, not a document or folder.");
+      return;
+    }
+    acceptScreenshotFile(droppedFile, "drop");
   };
 
   const recordLoopReceipt = async (
@@ -1113,7 +1157,19 @@ export default function ChetanaV0Experience({
 
       <div className={`v0-grid${result ? " v0-grid-result" : ""}`}>
         <div className="v0-main">
-          <div className="v0-composer" id="chetana-scan-box" ref={composerRef}>
+          <div
+            className={dragActive ? "v0-composer v0-composer-drop-active" : "v0-composer"}
+            id="chetana-scan-box"
+            ref={composerRef}
+            onPaste={handleComposerPaste}
+            onDragEnter={() => setDragActive(true)}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (!dragActive) setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleComposerDrop}
+          >
             <div className="v0-composer-head">
               <div>
                 <div className="v0-section-label">Ask Chetana</div>
@@ -1208,13 +1264,34 @@ export default function ChetanaV0Experience({
               </div>
             </div>
 
+            {dragActive && (
+              <div className="v0-drop-hint">
+                <Upload size={16} />
+                Drop the screenshot here
+              </div>
+            )}
+
+            {intakeEvidence.length > 0 && (
+              <div className="v0-intake-evidence" aria-label="Evidence ready for Chetana">
+                {intakeEvidence.map((item) => (
+                  <span key={item.label}>
+                    <strong>{item.label}</strong>
+                    {item.value}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {mode !== "text" && (
               <label className="v0-upload v0-upload-large">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                  onChange={(event) => {
+                    const selected = event.target.files?.[0];
+                    if (selected) acceptScreenshotFile(selected, "chooser");
+                  }}
                 />
                 <span className="v0-upload-inner">
                   <Upload size={20} />

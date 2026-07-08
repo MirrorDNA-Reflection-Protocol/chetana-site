@@ -547,6 +547,11 @@ main {
   background: var(--primary-bright);
 }
 
+.v0-composer-drop-active {
+  outline: 2px dashed rgba(201,163,94,0.7);
+  outline-offset: 8px;
+}
+
 .v0-lazy-panel {
   display: grid;
   gap: 14px;
@@ -674,6 +679,52 @@ main {
   border-color: rgba(201,163,94,0.55);
   background: rgba(201,163,94,0.16);
   color: var(--heading);
+}
+
+.v0-drop-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px dashed rgba(201,163,94,0.54);
+  border-radius: 14px;
+  background: rgba(201,163,94,0.1);
+  color: var(--heading);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.v0-intake-evidence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.v0-intake-evidence span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(100%, 320px);
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v0-intake-evidence strong {
+  color: var(--text-bright);
+  font-size: 0.78rem;
+  text-transform: uppercase;
 }
 
 .v0-upload-large .v0-upload-inner {

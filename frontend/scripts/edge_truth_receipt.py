@@ -124,6 +124,12 @@ def collect_watch_state(repo_root: Path, watch_paths: list[str], exclude_names: 
     newest_path = ""
     newest_mtime = 0.0
     for path in sorted(files):
+        if not path.exists():
+            try:
+                missing.append(str(path.relative_to(repo_root)))
+            except ValueError:
+                missing.append(str(path))
+            continue
         rel = relative_to(path, repo_root)
         digest.update(rel.encode("utf-8"))
         digest.update(b"\0")

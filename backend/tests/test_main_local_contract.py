@@ -26,6 +26,18 @@ class MainLocalContractTests(unittest.TestCase):
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
 
+    def test_health_reports_embedded_kavach_seed_without_legacy_service(self) -> None:
+        with patch("httpx.get", side_effect=Exception("legacy Kavach parked")):
+            resp = self.client.get("/health")
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "healthy")
+        self.assertEqual(data["backend"], "showcase")
+        self.assertEqual(data["kavach"], "local_seed")
+        self.assertEqual(data["kavach_mode"], "embedded_local_seed")
+        self.assertEqual(data["legacy_kavach"], "down")
+
     def test_privacy_route_exposes_local_scan_memory_clear_control(self) -> None:
         resp = self.client.get("/privacy")
         self.assertEqual(resp.status_code, 200)

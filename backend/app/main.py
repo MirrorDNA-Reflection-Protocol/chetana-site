@@ -89,6 +89,7 @@ from app.whatsapp_webhook import whatsapp_router  # noqa: E402
 
 KAVACH_URL = "http://127.0.0.1:8790"
 TELEGRAM_API = "https://api.telegram.org"
+KAVACH_LOCAL_SEED_PATH = Path(__file__).parent / "gamechanger" / "data" / "kavach_local_seed.json"
 
 
 # ── Telegram notification (fire-and-forget) ───────────────────────────
@@ -490,18 +491,21 @@ class OracleVerifyRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    kavach_ok = False
+    legacy_kavach_ok = False
     try:
         import httpx as _httpx
 
         resp = _httpx.get(f"{KAVACH_URL}/ui", timeout=3.0)
-        kavach_ok = resp.status_code == 200
+        legacy_kavach_ok = resp.status_code == 200
     except Exception:
-        kavach_ok = False
+        legacy_kavach_ok = False
+    local_seed_ok = KAVACH_LOCAL_SEED_PATH.exists() and KAVACH_LOCAL_SEED_PATH.stat().st_size > 0
     return {
-        "status": "healthy" if kavach_ok else "degraded",
+        "status": "healthy" if local_seed_ok else "degraded",
         "backend": "showcase",
-        "kavach": "up" if kavach_ok else "down",
+        "kavach": "local_seed" if local_seed_ok else "down",
+        "kavach_mode": "embedded_local_seed",
+        "legacy_kavach": "up" if legacy_kavach_ok else "down",
         "port": 8093,
     }
 

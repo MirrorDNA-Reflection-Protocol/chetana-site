@@ -97,11 +97,40 @@ async function main() {
     "Chetana 30-Day Fraud Pause Pilot",
     "Harness loop",
     "Source-tagged link brings a user to the scam checker.",
+    "Open field harness",
     "View PilotTrace",
   ];
   const missingPilotPageNeedles = pilotPageNeedles.filter((needle) => !pilotPage.includes(needle));
   if (missingPilotPageNeedles.length > 0) {
     throw new Error(`30-day pilot page missing strings: ${missingPilotPageNeedles.join(", ")}`);
+  }
+
+  const fieldHarness = await fetchText("/partners/field-harness");
+  const fieldHarnessNeedles = [
+    "Chetana 30-Day Field Harness",
+    "chetana.field_harness.v0.1",
+    "source=bank_qr&amp;action=scam_check",
+    "source=merchant_counter&amp;action=scam_check",
+    "Aggregate by default",
+    "Open JSON contract",
+  ];
+  const missingFieldHarnessNeedles = fieldHarnessNeedles.filter((needle) => !fieldHarness.includes(needle));
+  if (missingFieldHarnessNeedles.length > 0) {
+    throw new Error(`Field harness missing strings: ${missingFieldHarnessNeedles.join(", ")}`);
+  }
+
+  const fieldHarnessJson = await fetchJson("/api/v1/partners/field-harness");
+  if (fieldHarnessJson.schema_version !== "chetana.field_harness.v0.1" || fieldHarnessJson.sponsor_safe !== true) {
+    throw new Error("Field harness JSON contract is missing sponsor-safe schema markers.");
+  }
+  const fieldSources = new Set((fieldHarnessJson.campaign_links || []).map((item) => item.source));
+  for (const source of ["bank_qr", "gov_qr", "whatsapp_forward", "merchant_counter"]) {
+    if (!fieldSources.has(source)) {
+      throw new Error(`Field harness JSON is missing source tag: ${source}`);
+    }
+  }
+  if (!(fieldHarnessJson.feedback_buckets || []).every((bucket) => bucket.free_text === false)) {
+    throw new Error("Field harness feedback buckets must stay free-text disabled.");
   }
 
   const pilotTrace = await fetchText("/partners/pilottrace");
@@ -136,6 +165,9 @@ async function main() {
   }
   if (!sitemap.includes("https://chetana.activemirror.ai/partners/30-day-pilot")) {
     throw new Error("Sitemap does not include /partners/30-day-pilot");
+  }
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/field-harness")) {
+    throw new Error("Sitemap does not include /partners/field-harness");
   }
   if (!sitemap.includes("https://chetana.activemirror.ai/partners/packet")) {
     throw new Error("Sitemap does not include /partners/packet");

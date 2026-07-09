@@ -6,4 +6,11 @@
   <url><loc>https://chetana.activemirror.ai/#weather</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/#atlas</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/#trust</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/india-kit</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/30-day-pilot</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/field-harness</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
 </urlset>

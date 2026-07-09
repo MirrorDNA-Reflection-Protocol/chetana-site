@@ -313,6 +313,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
       <a class="primary" href="https://chetana.activemirror.ai/api/v1/partners/pilottrace">Open JSON report</a>
       <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request 30-day pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Back to partner page</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/field-harness">Open field harness</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
     </div>
     <section class="grid">

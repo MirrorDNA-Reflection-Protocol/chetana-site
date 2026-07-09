@@ -94,12 +94,23 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("Chetana 30-Day Fraud Pause Pilot", pilot_html)
         self.assertIn("Harness loop", pilot_html)
         self.assertIn("Source-tagged link brings a user to the scam checker.", pilot_html)
+        self.assertIn("Open field harness", pilot_html)
+
+        harness_resp = self.client.get("/partners/field-harness")
+        self.assertEqual(harness_resp.status_code, 200)
+        harness_html = harness_resp.text
+        self.assertIn("Chetana 30-Day Field Harness", harness_html)
+        self.assertIn("chetana.field_harness.v0.1", harness_html)
+        self.assertIn("source=bank_qr&amp;action=scam_check", harness_html)
+        self.assertIn("source=merchant_counter&amp;action=scam_check", harness_html)
+        self.assertIn("Aggregate by default", harness_html)
 
         sitemap_resp = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap_resp.status_code, 200)
         self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/india-kit", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/30-day-pilot", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/field-harness", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/outreach-kit", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/pilottrace", sitemap_resp.text)
@@ -169,6 +180,31 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertEqual(data["event"]["event_name"], "feedback_submitted")
         self.assertEqual(data["event"]["metadata"]["feedback_type"], "missed_scam")
         self.assertTrue(data["event"]["metadata"]["no_free_text_collected"])
+
+    def test_partner_field_harness_api_is_sponsor_safe(self) -> None:
+        resp = self.client.get("/api/v1/partners/field-harness")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["schema_version"], "chetana.field_harness.v0.1")
+        self.assertTrue(data["sponsor_safe"])
+        self.assertEqual(data["consent_rule"], "Aggregate by default; raw examples only with explicit opt-in.")
+
+        sources = {item["source"]: item for item in data["campaign_links"]}
+        self.assertIn("bank_qr", sources)
+        self.assertIn("gov_qr", sources)
+        self.assertIn("whatsapp_forward", sources)
+        self.assertIn("merchant_counter", sources)
+        self.assertEqual(sources["bank_qr"]["tracked_params"], {"source": "bank_qr", "action": "scam_check"})
+        self.assertIn("source=bank_qr&action=scam_check", sources["bank_qr"]["url"])
+
+        self.assertIn("No raw scan text is included in sponsor reporting.", data["privacy_boundary"])
+        self.assertIn("source_params", data["pilottrace_metrics"])
+        self.assertIn("feedback_submitted with feedback_type only", data["event_contract"])
+        self.assertTrue(all(bucket["free_text"] is False for bucket in data["feedback_buckets"]))
+
+        serialized = json.dumps(data)
+        self.assertNotIn("raw_scan_text\":", serialized)
+        self.assertNotIn("screenshot_bytes", serialized)
 
     def test_pilottrace_report_exposes_sponsor_safe_aggregates(self) -> None:
         original_log = main_module.PARTNER_INQUIRIES_LOG

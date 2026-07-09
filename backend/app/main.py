@@ -62,6 +62,7 @@ from app.v0_runtime import (  # noqa: E402
     log_event as log_v0_event,
 )
 from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary  # noqa: E402
+from app.field_harness import FIELD_SOURCE_TAGS, build_field_harness, render_field_harness_html  # noqa: E402
 from app.pilottrace import build_pilottrace_report, render_pilottrace_html  # noqa: E402
 from app.llm_router import build_llm_status, generate_chat_reply  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
@@ -208,13 +209,7 @@ _CHAT_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
-CHETANA_SOURCE_TAGS = {
-    "whatsapp_forward": "WhatsApp forward",
-    "branch_poster": "Branch poster",
-    "bank_qr": "Bank QR",
-    "gov_qr": "Government QR",
-    "csr_qr": "CSR QR",
-}
+CHETANA_SOURCE_TAGS = {item["source"]: item["label"] for item in FIELD_SOURCE_TAGS}
 
 
 class PartnerInquiryRequest(BaseModel):
@@ -1945,6 +1940,12 @@ async def partner_pilottrace(days: int = Query(default=14, ge=1, le=90)):
     return report.model_dump()
 
 
+@app.get("/api/v1/partners/field-harness")
+async def partner_field_harness():
+    """Return the source-tagged field deployment contract for Chetana pilots."""
+    return build_field_harness(CHETANA_PUBLIC_ORIGIN)
+
+
 @app.get("/api/v1/rails", response_model=list[GamechangerOfficialRail])
 async def gamechanger_rails():
     """Return the verified official recovery rails used by the gamechanger runtime."""
@@ -2302,6 +2303,7 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/india-kit</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/30-day-pilot</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/field-harness</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
@@ -2401,6 +2403,7 @@ async def partners_india_kit():
       <a class="primary" href="{html_lib.escape(_scam_check_link('branch_poster'), quote=True)}">Open scam checker</a>
       <a class="primary" href="{html_lib.escape(_whatsapp_forward_link(), quote=True)}">Forward on WhatsApp</a>
       <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/30-day-pilot">Open 30-day pilot</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/field-harness">Open field harness</a>
       <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/pilottrace">View PilotTrace</a>
     </div>
 
@@ -2517,6 +2520,7 @@ async def partners_30_day_pilot():
     <div class="cta">
       <a class="primary" href="{CHETANA_PUBLIC_ORIGIN}/partners#pilot-inquiry">Request pilot contact</a>
       <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">Open India kit</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/field-harness">Open field harness</a>
       <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/pilottrace">View PilotTrace</a>
       <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/packet">Open packet</a>
     </div>
@@ -2563,6 +2567,15 @@ async def partners_30_day_pilot():
   </main>
 </body>
 </html>""",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/partners/field-harness", include_in_schema=False)
+async def partners_field_harness():
+    harness = build_field_harness(CHETANA_PUBLIC_ORIGIN)
+    return HTMLResponse(
+        content=render_field_harness_html(harness),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 
@@ -2627,6 +2640,7 @@ async def partners_packet():
       <a class="primary" href="mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot">Start a pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Open partner page</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/india-kit">Open India kit</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/field-harness">Open field harness</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/outreach-kit">Open outreach kit</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/30-day-pilot">Open 30-day pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
@@ -2733,6 +2747,7 @@ async def partners_outreach_kit():
       <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request pilot contact</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/india-kit">Open India kit</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/30-day-pilot">Open 30-day pilot</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/field-harness">Open field harness</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>

@@ -61,6 +61,7 @@ from app.v0_runtime import (  # noqa: E402
     log_event as log_v0_event,
 )
 from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary  # noqa: E402
+from app.pilottrace import build_pilottrace_report, render_pilottrace_html  # noqa: E402
 from app.llm_router import build_llm_status, generate_chat_reply  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
     analyze_request as analyze_gamechanger_request,
@@ -1913,6 +1914,14 @@ async def analytics_summary(days: int = Query(default=14, ge=1, le=90)):
     return summary.model_dump()
 
 
+@app.get("/api/v1/partners/pilottrace")
+async def partner_pilottrace(days: int = Query(default=14, ge=1, le=90)):
+    """Return sponsor-safe aggregate proof for institutional pilots."""
+    summary = build_v0_analytics_summary(trailing_days=days)
+    report = build_pilottrace_report(summary, partner_inquiries_path=PARTNER_INQUIRIES_LOG)
+    return report.model_dump()
+
+
 @app.get("/api/v1/rails", response_model=list[GamechangerOfficialRail])
 async def gamechanger_rails():
     """Return the verified official recovery rails used by the gamechanger runtime."""
@@ -2270,6 +2279,7 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
 </urlset>"""
     return PlainTextResponse(xml, media_type="application/xml")
 
@@ -2358,6 +2368,7 @@ async def partners_packet():
       <a class="primary" href="mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot">Start a pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Open partner page</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/outreach-kit">Open outreach kit</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
     </div>
 
@@ -2460,6 +2471,7 @@ async def partners_outreach_kit():
     <div class="cta">
       <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request pilot contact</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
     </div>
 
@@ -2543,6 +2555,16 @@ No raw scan text, screenshots, UPI IDs, phone numbers, or user profiles are incl
   </main>
 </body>
 </html>""",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/partners/pilottrace", include_in_schema=False)
+async def partners_pilottrace(days: int = Query(default=14, ge=1, le=90)):
+    summary = build_v0_analytics_summary(trailing_days=days)
+    report = build_pilottrace_report(summary, partner_inquiries_path=PARTNER_INQUIRIES_LOG)
+    return HTMLResponse(
+        content=render_pilottrace_html(report),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 

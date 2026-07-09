@@ -46,6 +46,8 @@ const servedSafetyNudgeChecks = [
   "Request pilot contact",
   "Outreach kit",
   "No raw scam scan text",
+  "PilotTrace report",
+  "View PilotTrace report",
 ];
 
 async function fetchText(pathOrUrl) {

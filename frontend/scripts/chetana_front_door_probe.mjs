@@ -24,6 +24,15 @@ async function fetchText(path) {
   return text;
 }
 
+async function fetchJson(path) {
+  const response = await fetch(`${baseUrl}${path}`);
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(`${path} returned ${response.status}: ${JSON.stringify(data)}`);
+  }
+  return data;
+}
+
 async function main() {
   await fetchText("/");
   const partners = await fetchText("/partners");
@@ -44,6 +53,7 @@ async function main() {
     "No account. No profile database.",
     "Sample case packet",
     "Open outreach kit",
+    "View PilotTrace report",
   ];
   const missingPacketNeedles = packetNeedles.filter((needle) => !packet.includes(needle));
   if (missingPacketNeedles.length > 0) {
@@ -56,10 +66,28 @@ async function main() {
     "Bank / PSP email",
     "Government / public program email",
     "Weekly pilot proof report",
+    "View PilotTrace report",
   ];
   const missingOutreachNeedles = outreachNeedles.filter((needle) => !outreachKit.includes(needle));
   if (missingOutreachNeedles.length > 0) {
     throw new Error(`Partner outreach kit missing strings: ${missingOutreachNeedles.join(", ")}`);
+  }
+
+  const pilotTrace = await fetchText("/partners/pilottrace");
+  const pilotTraceNeedles = [
+    "Chetana PilotTrace v0.1 Sponsor Proof Report",
+    "Sponsor-safe proof report.",
+    "No raw scan text is included.",
+    "Open JSON report",
+  ];
+  const missingPilotTraceNeedles = pilotTraceNeedles.filter((needle) => !pilotTrace.includes(needle));
+  if (missingPilotTraceNeedles.length > 0) {
+    throw new Error(`PilotTrace report missing strings: ${missingPilotTraceNeedles.join(", ")}`);
+  }
+
+  const pilotTraceJson = await fetchJson("/api/v1/partners/pilottrace");
+  if (pilotTraceJson.schema_version !== "chetana.pilottrace.v0.1" || pilotTraceJson.sponsor_safe !== true) {
+    throw new Error("PilotTrace JSON contract is missing sponsor-safe schema markers.");
   }
 
   const sitemap = await fetchText("/sitemap.xml");
@@ -68,6 +96,9 @@ async function main() {
   }
   if (!sitemap.includes("https://chetana.activemirror.ai/partners/outreach-kit")) {
     throw new Error("Sitemap does not include /partners/outreach-kit");
+  }
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/pilottrace")) {
+    throw new Error("Sitemap does not include /partners/pilottrace");
   }
 
   const verdict = await postJson("/api/v0/scan", {

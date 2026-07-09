@@ -1,7 +1,7 @@
 import json
 import tempfile
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -66,6 +66,7 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/outreach-kit", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/pilottrace", sitemap_resp.text)
 
     def test_partner_inquiry_endpoint_records_local_lead(self) -> None:
         original_log = main_module.PARTNER_INQUIRIES_LOG
@@ -98,6 +99,127 @@ class MainLocalContractTests(unittest.TestCase):
                 self.assertEqual(payload["status"], "new")
             finally:
                 main_module.PARTNER_INQUIRIES_LOG = original_log
+
+    def test_pilottrace_report_exposes_sponsor_safe_aggregates(self) -> None:
+        original_log = main_module.PARTNER_INQUIRIES_LOG
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            events_path = root / "events.jsonl"
+            inquiries_path = root / "partners" / "inquiries.jsonl"
+            inquiries_path.parent.mkdir(parents=True, exist_ok=True)
+            now = datetime.now(UTC)
+            old = now - timedelta(days=40)
+            with events_path.open("w", encoding="utf-8") as handle:
+                for payload in [
+                    {
+                        "event_name": "scan_completed",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-a",
+                        "input_type": "text",
+                        "verdict": "high_risk",
+                        "scam_type": "fake_kyc",
+                        "language_hint": "en",
+                        "device_class": "web",
+                    },
+                    {
+                        "event_name": "report_tapped",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-a",
+                        "input_type": "text",
+                        "verdict": "high_risk",
+                        "report_target": "manual_report",
+                        "metadata": {
+                            "report_surface": "call_1930",
+                            "official_rail_id": "CYBER_HELPLINE_1930",
+                            "recovery_step": "hotline_call",
+                        },
+                    },
+                    {
+                        "event_name": "evidence_saved",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-a",
+                        "input_type": "text",
+                        "verdict": "high_risk",
+                        "metadata": {
+                            "recovery_step": "case_packet_copy",
+                            "recovery_channel": "clipboard",
+                        },
+                    },
+                    {
+                        "event_name": "local_scan_memory_cleared",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "metadata": {"privacy_action": "clear_scan_memory"},
+                    },
+                    {
+                        "event_name": "scan_completed",
+                        "session_id": "qa-synthetic",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-qa",
+                        "input_type": "text",
+                        "verdict": "high_risk",
+                    },
+                ]:
+                    handle.write(json.dumps(payload) + "\n")
+
+            inquiries_path.write_text(
+                "\n".join([
+                    json.dumps({
+                        "inquiry_id": "chetana-partner-a",
+                        "received_at_utc": now.isoformat(),
+                        "organization": "Example Bank",
+                        "email": "private@example.com",
+                        "pilot_type": "bank_psp",
+                        "message": "Do not expose this raw message.",
+                    }),
+                    json.dumps({
+                        "inquiry_id": "chetana-partner-old",
+                        "received_at_utc": old.isoformat(),
+                        "pilot_type": "csr_digital_safety",
+                    }),
+                    "{not-json",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            main_module.PARTNER_INQUIRIES_LOG = inquiries_path
+
+            try:
+                with patch(
+                    "app.main.build_v0_analytics_summary",
+                    side_effect=lambda trailing_days=14: build_v0_analytics_summary(
+                        events_path=events_path,
+                        trailing_days=trailing_days,
+                    ),
+                ):
+                    json_resp = self.client.get("/api/v1/partners/pilottrace?days=7")
+                    html_resp = self.client.get("/partners/pilottrace?days=7")
+            finally:
+                main_module.PARTNER_INQUIRIES_LOG = original_log
+
+        self.assertEqual(json_resp.status_code, 200)
+        data = json_resp.json()
+        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.1")
+        self.assertTrue(data["sponsor_safe"])
+        self.assertEqual(data["totals"]["scans_completed"], 1)
+        self.assertEqual(data["totals"]["high_risk_pauses"], 1)
+        self.assertEqual(data["totals"]["official_rail_taps"], 1)
+        self.assertEqual(data["totals"]["case_packets_copied"], 1)
+        self.assertEqual(data["totals"]["privacy_controls_used"], 1)
+        self.assertEqual(data["totals"]["partner_inquiries"], 1)
+        self.assertEqual(data["breakdowns"]["partner_inquiry_types"], {"bank_psp": 1})
+        self.assertEqual(data["quality"]["invalid_inquiry_rows"], 1)
+        self.assertEqual(data["quality"]["out_of_window_inquiry_rows"], 1)
+        serialized = json.dumps(data)
+        self.assertNotIn("private@example.com", serialized)
+        self.assertNotIn("Do not expose this raw message.", serialized)
+
+        self.assertEqual(html_resp.status_code, 200)
+        self.assertIn("Chetana PilotTrace v0.1 Sponsor Proof Report", html_resp.text)
+        self.assertIn("No raw scan text is included.", html_resp.text)
+        self.assertIn("false_safe_complaints_not_instrumented_yet", html_resp.text)
 
     @patch("app.main._notify_telegram", new_callable=AsyncMock, return_value=False)
     @patch(

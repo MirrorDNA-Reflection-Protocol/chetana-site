@@ -4085,6 +4085,11 @@ select { appearance: none; cursor: pointer; }
   line-height: 1.5;
 }
 
+.partner-proof-actions {
+  grid-column: 2;
+  margin-top: 0;
+}
+
 .partner-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4378,6 +4383,7 @@ select { appearance: none; cursor: pointer; }
   .partner-source-grid { grid-template-columns: 1fr; }
   .partner-metric-grid { grid-template-columns: 1fr; }
   .partner-metrics-note { grid-column: auto; }
+  .partner-proof-actions { grid-column: auto; }
   .partner-case-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {

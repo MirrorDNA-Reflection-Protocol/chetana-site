@@ -3537,6 +3537,7 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
     "Languages used",
     "Recovery packets copied",
     "Privacy controls used",
+    "PilotTrace report",
     "False-safe complaints",
   ];
   const sourceLadder = [
@@ -3788,6 +3789,10 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
               <Share2 size={17} />
               Open outreach kit
             </a>
+            <a className="partner-secondary" href="/partners/pilottrace" target="_blank" rel="noreferrer">
+              <BarChart3 size={17} />
+              View PilotTrace report
+            </a>
           </div>
         </div>
         <div className="partner-case-packet" aria-label="Sample Chetana case packet">
@@ -3856,6 +3861,16 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
         </div>
         <div className="partner-metrics-note">
           No raw scan text, UPI ID, phone number, screenshot, or user profile is needed for sponsor metrics.
+        </div>
+        <div className="partner-actions partner-proof-actions">
+          <a className="partner-primary" href="/partners/pilottrace" target="_blank" rel="noreferrer">
+            <BarChart3 size={17} />
+            View PilotTrace report
+          </a>
+          <a className="partner-secondary" href="/api/v1/partners/pilottrace" target="_blank" rel="noreferrer">
+            <FileText size={17} />
+            Open JSON proof
+          </a>
         </div>
       </div>
 

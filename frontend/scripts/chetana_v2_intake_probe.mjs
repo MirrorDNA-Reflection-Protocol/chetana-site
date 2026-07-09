@@ -52,6 +52,9 @@ const servedSafetyNudgeChecks = [
   "No message text is sent.",
   "Missed a scam",
   "I was scammed",
+  "Send to someone I trust",
+  "I already lost money",
+  "Follow through",
 ];
 
 async function fetchText(pathOrUrl) {

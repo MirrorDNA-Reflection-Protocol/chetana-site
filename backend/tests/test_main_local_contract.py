@@ -183,6 +183,15 @@ class MainLocalContractTests(unittest.TestCase):
                         },
                     },
                     {
+                        "event_name": "share_completed",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-a",
+                        "input_type": "text",
+                        "verdict": "high_risk",
+                        "share_channel": "whatsapp",
+                    },
+                    {
                         "event_name": "local_scan_memory_cleared",
                         "session_id": "session-a",
                         "timestamp_utc": now.isoformat(),
@@ -251,14 +260,18 @@ class MainLocalContractTests(unittest.TestCase):
 
         self.assertEqual(json_resp.status_code, 200)
         data = json_resp.json()
-        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.2")
+        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.3")
         self.assertTrue(data["sponsor_safe"])
         self.assertEqual(data["totals"]["scans_completed"], 1)
         self.assertEqual(data["totals"]["high_risk_pauses"], 1)
+        self.assertEqual(data["totals"]["follow_through_actions"], 3)
+        self.assertEqual(data["totals"]["follow_through_sessions"], 1)
+        self.assertEqual(data["rates"]["follow_through_rate_from_high_risk_pct"], 100.0)
         self.assertEqual(data["totals"]["false_safe_complaints"], 1)
         self.assertEqual(data["totals"]["feedback_submissions"], 1)
         self.assertEqual(data["totals"]["official_rail_taps"], 1)
         self.assertEqual(data["totals"]["case_packets_copied"], 1)
+        self.assertEqual(data["totals"]["share_completes"], 1)
         self.assertEqual(data["totals"]["privacy_controls_used"], 1)
         self.assertEqual(data["totals"]["partner_inquiries"], 1)
         self.assertEqual(data["breakdowns"]["feedback_types"], {"missed_scam": 1})
@@ -271,7 +284,8 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertNotIn("Do not expose this correction note.", serialized)
 
         self.assertEqual(html_resp.status_code, 200)
-        self.assertIn("Chetana PilotTrace v0.2 Sponsor Proof Report", html_resp.text)
+        self.assertIn("Chetana PilotTrace v0.3 Sponsor Proof Report", html_resp.text)
+        self.assertIn("Follow-through rate", html_resp.text)
         self.assertIn("No raw scan text is included.", html_resp.text)
         self.assertIn("False-safe complaints", html_resp.text)
         self.assertIn("Request 30-day pilot", html_resp.text)

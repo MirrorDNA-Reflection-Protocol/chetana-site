@@ -75,9 +75,10 @@ async function main() {
 
   const pilotTrace = await fetchText("/partners/pilottrace");
   const pilotTraceNeedles = [
-    "Chetana PilotTrace v0.2 Sponsor Proof Report",
+    "Chetana PilotTrace v0.3 Sponsor Proof Report",
     "Sponsor-safe proof report.",
     "No raw scan text is included.",
+    "Follow-through rate",
     "False-safe complaints",
     "Request 30-day pilot",
     "Open JSON report",
@@ -88,11 +89,14 @@ async function main() {
   }
 
   const pilotTraceJson = await fetchJson("/api/v1/partners/pilottrace");
-  if (pilotTraceJson.schema_version !== "chetana.pilottrace.v0.2" || pilotTraceJson.sponsor_safe !== true) {
+  if (pilotTraceJson.schema_version !== "chetana.pilottrace.v0.3" || pilotTraceJson.sponsor_safe !== true) {
     throw new Error("PilotTrace JSON contract is missing sponsor-safe schema markers.");
   }
   if (!Object.prototype.hasOwnProperty.call(pilotTraceJson.totals || {}, "false_safe_complaints")) {
     throw new Error("PilotTrace JSON contract is missing false-safe feedback totals.");
+  }
+  if (!Object.prototype.hasOwnProperty.call(pilotTraceJson.rates || {}, "follow_through_rate_from_high_risk_pct")) {
+    throw new Error("PilotTrace JSON contract is missing follow-through rate.");
   }
 
   const sitemap = await fetchText("/sitemap.xml");

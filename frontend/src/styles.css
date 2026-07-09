@@ -1715,6 +1715,84 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
+.v0-followthrough-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(300px, 1.4fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 16px;
+  border: 1px solid rgba(92,185,122,0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(92,185,122,0.12), rgba(255,255,255,0.02)),
+    rgba(255,255,255,0.03);
+}
+
+.v0-followthrough-copy {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v0-followthrough-copy strong {
+  color: var(--heading);
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.v0-followthrough-copy p {
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+
+.v0-followthrough-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.v0-followthrough-grid button,
+.v0-followthrough-grid a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text-bright);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.v0-followthrough-grid svg {
+  flex: 0 0 auto;
+}
+
+.v0-followthrough-grid .v0-followthrough-main {
+  grid-column: 1 / -1;
+  min-height: 48px;
+  background: rgba(248,250,252,0.92);
+  color: #0f172a;
+}
+
+.v0-followthrough-grid .v0-followthrough-danger {
+  border-color: rgba(248,113,113,0.28);
+  color: #fecaca;
+  background: rgba(248,113,113,0.08);
+}
+
 .v0-feedback-card {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(260px, 1.35fr);
@@ -2451,6 +2529,14 @@ main {
   }
 
   .v0-feedback-card {
+    grid-template-columns: 1fr;
+  }
+
+  .v0-followthrough-card {
+    grid-template-columns: 1fr;
+  }
+
+  .v0-followthrough-grid {
     grid-template-columns: 1fr;
   }
 

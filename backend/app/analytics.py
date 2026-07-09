@@ -47,12 +47,14 @@ class V0AnalyticsFunnel(BaseModel):
     recovery_support_sessions: int = 0
     share_completed_sessions: int = 0
     feedback_submitted_sessions: int = 0
+    follow_through_sessions: int = 0
     start_rate_from_open_pct: float = 0.0
     completion_rate_from_start_pct: float = 0.0
     report_rate_from_complete_pct: float = 0.0
     evidence_rate_from_complete_pct: float = 0.0
     recovery_support_rate_from_complete_pct: float = 0.0
     share_rate_from_complete_pct: float = 0.0
+    follow_through_rate_from_complete_pct: float = 0.0
 
 
 class V0AnalyticsBreakdowns(BaseModel):
@@ -499,6 +501,7 @@ def build_v0_analytics_summary(
     completed_after_start = funnel_sessions["scan_started"] & funnel_sessions["scan_completed"]
     orphan_completed = funnel_sessions["scan_completed"] - funnel_sessions["scan_started"]
     recovery_support_sessions = funnel_sessions["report_tapped"] | funnel_sessions["evidence_saved"]
+    follow_through_sessions = recovery_support_sessions | funnel_sessions["share_completed"]
 
     funnel = V0AnalyticsFunnel(
         app_open_sessions=len(funnel_sessions["app_open"]),
@@ -511,12 +514,14 @@ def build_v0_analytics_summary(
         recovery_support_sessions=len(recovery_support_sessions),
         share_completed_sessions=len(funnel_sessions["share_completed"]),
         feedback_submitted_sessions=len(funnel_sessions["feedback_submitted"]),
+        follow_through_sessions=len(follow_through_sessions),
         start_rate_from_open_pct=_pct(len(funnel_sessions["scan_started"]), len(funnel_sessions["app_open"])),
         completion_rate_from_start_pct=_pct(len(completed_after_start), len(funnel_sessions["scan_started"])),
         report_rate_from_complete_pct=_pct(len(funnel_sessions["report_tapped"]), len(funnel_sessions["scan_completed"])),
         evidence_rate_from_complete_pct=_pct(len(funnel_sessions["evidence_saved"]), len(funnel_sessions["scan_completed"])),
         recovery_support_rate_from_complete_pct=_pct(len(recovery_support_sessions), len(funnel_sessions["scan_completed"])),
         share_rate_from_complete_pct=_pct(len(funnel_sessions["share_completed"]), len(funnel_sessions["scan_completed"])),
+        follow_through_rate_from_complete_pct=_pct(len(follow_through_sessions), len(funnel_sessions["scan_completed"])),
     )
 
     breakdowns = V0AnalyticsBreakdowns(

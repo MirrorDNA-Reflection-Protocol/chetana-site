@@ -16,6 +16,8 @@ from app.v0_runtime import now_utc
 class PilotTraceTotals(BaseModel):
     scans_completed: int = 0
     high_risk_pauses: int = 0
+    follow_through_actions: int = 0
+    follow_through_sessions: int = 0
     false_safe_complaints: int = 0
     false_alarm_reports: int = 0
     scam_confirmations: int = 0
@@ -38,14 +40,20 @@ class PilotTraceQuality(BaseModel):
     out_of_window_inquiry_rows: int = 0
 
 
+class PilotTraceRates(BaseModel):
+    follow_through_rate_from_high_risk_pct: float = 0.0
+    follow_through_rate_from_scans_pct: float = 0.0
+
+
 class PilotTraceReport(BaseModel):
-    schema_version: str = "chetana.pilottrace.v0.2"
+    schema_version: str = "chetana.pilottrace.v0.3"
     generated_at_utc: str
     trailing_days: int
     source: str = "v0_event_ledger_and_partner_inquiry_log"
     sponsor_safe: bool = True
     status: str
     totals: PilotTraceTotals
+    rates: PilotTraceRates = Field(default_factory=PilotTraceRates)
     breakdowns: dict[str, dict[str, int]] = Field(default_factory=dict)
     daily: list[dict[str, Any]] = Field(default_factory=list)
     quality: PilotTraceQuality
@@ -66,6 +74,12 @@ def _parse_date(timestamp_utc: Any) -> date | None:
 
 def _sorted_counts(counter: Counter[str]) -> dict[str, int]:
     return {key: count for key, count in counter.most_common() if key}
+
+
+def _pct(part: int, whole: int) -> float:
+    if whole <= 0:
+        return 0.0
+    return round((part / whole) * 100.0, 1)
 
 
 def _read_partner_inquiries(path: Path, start_date: date, end_date: date) -> tuple[Counter[str], int, int]:
@@ -117,9 +131,12 @@ def build_pilottrace_report(
         + recovery_steps.get("linked_thread_case_packet_copy", 0)
     )
     official_rail_taps = sum(summary.breakdowns.official_rails.values())
+    follow_through_actions = official_rail_taps + case_packets_copied + summary.totals.share_completes
     totals = PilotTraceTotals(
         scans_completed=summary.totals.scan_completes,
         high_risk_pauses=summary.totals.risky_verdicts,
+        follow_through_actions=follow_through_actions,
+        follow_through_sessions=summary.funnel.follow_through_sessions,
         false_safe_complaints=summary.totals.false_safe_complaints,
         false_alarm_reports=summary.totals.false_alarm_reports,
         scam_confirmations=summary.totals.scam_confirmations,
@@ -151,6 +168,10 @@ def build_pilottrace_report(
         trailing_days=summary.trailing_days,
         status=status,
         totals=totals,
+        rates=PilotTraceRates(
+            follow_through_rate_from_high_risk_pct=_pct(summary.funnel.follow_through_sessions, summary.totals.risky_verdicts),
+            follow_through_rate_from_scans_pct=_pct(summary.funnel.follow_through_sessions, summary.totals.scan_completes),
+        ),
         breakdowns={
             "verdicts": summary.breakdowns.verdicts,
             "scam_types": summary.breakdowns.scam_types,
@@ -199,6 +220,7 @@ def build_pilottrace_report(
         proof_notes=[
             "PilotTrace is derived from the Chetana v0 event ledger and the local partner inquiry log.",
             "This is an aggregate sponsor-safe report, not a fraud determination database.",
+            "Follow-through sessions count at least one share, official rail tap, evidence save, or case-packet copy after a scan.",
             "False-safe complaints are user-submitted correction signals and require review before being treated as confirmed misses.",
             "Chetana routes users to official rails; it does not auto-file complaints.",
         ],
@@ -207,6 +229,10 @@ def build_pilottrace_report(
 
 def _metric_tile(label: str, value: int) -> str:
     return f"<div class=\"tile\"><span>{html.escape(label)}</span><strong>{value:,}</strong></div>"
+
+
+def _value_tile(label: str, value: str) -> str:
+    return f"<div class=\"tile\"><span>{html.escape(label)}</span><strong>{html.escape(value)}</strong></div>"
 
 
 def _count_rows(title: str, counts: dict[str, int], empty_label: str = "No rows yet.") -> str:
@@ -229,7 +255,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chetana PilotTrace v0.2 Sponsor Proof Report</title>
+  <title>Chetana PilotTrace v0.3 Sponsor Proof Report</title>
   <meta name="description" content="Sponsor-safe Chetana PilotTrace aggregate proof report for scam-check pilots.">
   <style>
     :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
@@ -271,7 +297,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
     <div class="top">
       <div>
         <div class="label">Chetana by Active Mirror</div>
-        <strong>PilotTrace v0.2</strong>
+        <strong>PilotTrace v0.3</strong>
       </div>
       <p>Generated {html.escape(report.generated_at_utc)} | Last {report.trailing_days} days | Status: <strong>{html.escape(report.status)}</strong></p>
     </div>
@@ -286,6 +312,8 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
     <section class="grid">
       {_metric_tile("Scans completed", totals.scans_completed)}
       {_metric_tile("High-risk pauses", totals.high_risk_pauses)}
+      {_value_tile("Follow-through rate", f"{report.rates.follow_through_rate_from_high_risk_pct:.1f}%")}
+      {_metric_tile("Follow-through actions", totals.follow_through_actions)}
       {_metric_tile("False-safe complaints", totals.false_safe_complaints)}
       {_metric_tile("Feedback reports", totals.feedback_submissions)}
       {_metric_tile("Official rail taps", totals.official_rail_taps)}

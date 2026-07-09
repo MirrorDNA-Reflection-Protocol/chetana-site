@@ -1201,6 +1201,17 @@ export default function ChetanaV0Experience({
     }
   };
 
+  const startRecoveryNow = async () => {
+    if (!result) return;
+    setMoneyMovedAnswer("yes");
+    setCasePacketCopied(false);
+    setDetailsOpen(true);
+    setStatus("Recovery checklist ready. Call 1930 first.");
+    if (casePacketText) {
+      await copyCasePacket();
+    }
+  };
+
   const copyLinkedThreadPacket = async () => {
     if (!result || !threadSignal || !linkedThreadPacketText) return;
     try {
@@ -1734,6 +1745,55 @@ export default function ChetanaV0Experience({
                   <Shield size={14} />
                   <span>Safety loop recorded</span>
                   <small>{(loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
+                </div>
+              )}
+
+              {result.verdict !== "low_signal" && (
+                <div className="v0-followthrough-card">
+                  <div className="v0-followthrough-copy">
+                    <div className="v0-section-label">Follow through</div>
+                    <strong>Send it, report it, or start recovery.</strong>
+                    <p>Most people need one clear next step. Share the warning with someone trusted, use an official rail, or copy a recovery packet if money or access already moved.</p>
+                  </div>
+                  <div className="v0-followthrough-grid">
+                    <button type="button" className="v0-followthrough-main" onClick={shareOnWhatsApp}>
+                      <Phone size={16} />
+                      Send to someone I trust
+                    </button>
+                    <button type="button" onClick={copyShareShield}>
+                      <Copy size={14} />
+                      {shareCopied ? "Copied warning" : "Copy warning"}
+                    </button>
+                    <a
+                      href="tel:1930"
+                      onClick={() => trackReportAction("call_1930", { href: "tel:1930" })}
+                    >
+                      <Phone size={14} />
+                      Call 1930
+                    </a>
+                    <a
+                      href="https://cybercrime.gov.in"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => trackReportAction("cybercrime_portal", { href: "https://cybercrime.gov.in" })}
+                    >
+                      <ExternalLink size={14} />
+                      cybercrime.gov.in
+                    </a>
+                    <a
+                      href={CHAKSHU_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => trackReportAction("chakshu", { href: CHAKSHU_URL })}
+                    >
+                      <ExternalLink size={14} />
+                      Open Chakshu
+                    </a>
+                    <button type="button" className="v0-followthrough-danger" onClick={() => { void startRecoveryNow(); }}>
+                      <AlertTriangle size={14} />
+                      I already lost money
+                    </button>
+                  </div>
                 </div>
               )}
 

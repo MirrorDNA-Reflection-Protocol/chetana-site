@@ -19,6 +19,25 @@ const lazyIntakeCases = [
   },
 ];
 
+const servedSafetyNudgeChecks = [
+  "Money, OTP, or screen access may already be exposed.",
+  "Call 1930 now",
+  "https://cybercrime.gov.in",
+  "Stop screen sharing before you scan.",
+  "Do not approve a collect request to receive money.",
+  "Report on Chakshu",
+];
+
+async function fetchText(pathOrUrl) {
+  const url = pathOrUrl.startsWith("http") ? pathOrUrl : `${baseUrl}${pathOrUrl}`;
+  const response = await fetch(url);
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${url} returned ${response.status}: ${text.slice(0, 240)}`);
+  }
+  return text;
+}
+
 async function postJson(path, body) {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
@@ -32,11 +51,26 @@ async function postJson(path, body) {
   return data;
 }
 
-async function main() {
-  const page = await fetch(`${baseUrl}/`);
-  if (!page.ok) {
-    throw new Error(`/ returned ${page.status}`);
+async function probeServedSafetyNudge() {
+  const pageText = await fetchText("/");
+  const scriptMatches = [...pageText.matchAll(/<script[^>]+src="([^"]+)"[^>]*>/g)].map((match) => match[1]);
+  const appScript = scriptMatches.find((script) => script.includes("/assets/index-"));
+  if (!appScript) {
+    throw new Error("Could not find served Vite app bundle in page HTML");
   }
+  const bundleText = await fetchText(appScript.startsWith("http") ? appScript : appScript);
+  const missing = servedSafetyNudgeChecks.filter((needle) => !bundleText.includes(needle));
+  if (missing.length > 0) {
+    throw new Error(`Served app bundle is missing pre-scan safety nudge text: ${missing.join(", ")}`);
+  }
+  return {
+    asset: appScript,
+    checked_strings: servedSafetyNudgeChecks.length,
+  };
+}
+
+async function main() {
+  const servedSafetyNudge = await probeServedSafetyNudge();
 
   const results = [];
   for (const sample of lazyIntakeCases) {
@@ -68,6 +102,7 @@ async function main() {
   console.log(JSON.stringify({
     status: "pass",
     base_url: baseUrl,
+    served_safety_nudge: servedSafetyNudge,
     checked_cases: results,
   }, null, 2));
 }

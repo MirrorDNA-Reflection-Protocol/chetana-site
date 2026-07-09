@@ -3461,6 +3461,12 @@ export function FamilyPage() {
 /* ── Institutional Partner Page ──────────────────────────────── */
 export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const contactHref = "mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot&body=We%20would%20like%20to%20discuss%20a%20Chetana%20pilot%20or%20sponsorship.";
+  const reasons = [
+    "Reduce preventable loss before a user approves a payment, shares an OTP, installs an APK, or releases goods.",
+    "Turn panic reports into cleaner incident packets: what happened, what was exposed, screenshots, identifiers, and next official rail.",
+    "Give CSR, public-awareness, and merchant networks a simple QR/link surface people can actually use without training.",
+    "Measure outcomes a sponsor can review: scans, high-risk pauses, official handoffs, languages used, and recovery packets copied.",
+  ];
   const pilots = [
     {
       icon: <CreditCard size={18} />,
@@ -3501,9 +3507,9 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
         </div>
         <h1>Help people check a scam before money moves.</h1>
         <p>
-          Chetana is an independent scam checker for India. Banks, CSR teams, public-sector programs,
-          and merchant networks can sponsor access, awareness, and pilot integrations that route users
-          to safer action before they click, pay, scan, install, or share an OTP.
+          Chetana is an independent scam checker for India. It sits before the official recovery rails:
+          screenshot, voice, or tap what happened; get a plain-language risk read; preserve the useful facts;
+          and move to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.
         </p>
         <div className="partner-actions">
           <a className="partner-primary" href={contactHref}>
@@ -3523,13 +3529,22 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
 
       <div className="partner-band">
         <div>
-          <span>Why sponsor</span>
-          <strong>It is cheaper to slow a risky action than recover money after it moves.</strong>
+          <span>Why institutions would use it</span>
+          <strong>It is cheaper to add a fraud pause than recover money after it moves.</strong>
         </div>
         <p>
-          The pilot promise is simple: more people pause, understand the risk, preserve the right evidence,
-          and reach the correct official rail faster.
+          Chetana does not replace a bank, police portal, or government helpline. It makes the moment before
+          escalation simpler, faster, and more measurable for ordinary users.
         </p>
+      </div>
+
+      <div className="partner-thesis">
+        {reasons.map((reason, index) => (
+          <div className="partner-thesis-row" key={reason}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <p>{reason}</p>
+          </div>
+        ))}
       </div>
 
       <div className="partner-grid">
@@ -3547,8 +3562,8 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           <div className="kicker">Pilot proof</div>
           <h2>What a sponsor gets measured</h2>
           <p>
-            Chetana should be bought on outcomes, not vague AI claims. Every institutional pilot needs
-            a small proof packet that a bank, CSR committee, or public team can review.
+            Chetana should be bought on outcomes, not vague AI claims. Every institutional pilot should produce
+            a small proof packet that a bank, CSR committee, public program, or merchant network can review.
           </p>
         </div>
         <div className="partner-metric-grid">

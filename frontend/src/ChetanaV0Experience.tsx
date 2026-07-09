@@ -152,6 +152,17 @@ type CasePacketRow = {
 };
 type VoiceCaptureState = "idle" | "recording" | "recorded";
 type IntakeSource = "chooser" | "clipboard" | "drop";
+type ComposerSafetyNudge = {
+  tone: "danger" | "warning";
+  title: string;
+  body: string;
+  primaryLabel: string;
+  primaryHref: string;
+  eventSurface: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+  secondarySurface?: string;
+};
 
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
@@ -332,6 +343,53 @@ export default function ChetanaV0Experience({
   const actionableScanText = [text.trim(), quickContextText].filter(Boolean).join("\n\n");
   const scanTextForInput = [actionableScanText, actionableScanText || file ? voiceContextText : ""].filter(Boolean).join("\n\n");
   const hasInput = Boolean(actionableScanText.trim() || file);
+  const composerSafetyNudge = useMemo<ComposerSafetyNudge | null>(() => {
+    const selected = new Set(quickContextIds);
+    if (selected.has("money_sent")) {
+      return {
+        tone: "danger",
+        title: "Money, OTP, or screen access may already be exposed.",
+        body: "Do not keep chatting with the caller. Call 1930 now, then contact your bank or wallet support from the official app.",
+        primaryLabel: "Call 1930 now",
+        primaryHref: "tel:1930",
+        eventSurface: "call_1930",
+        secondaryLabel: "Open cybercrime.gov.in",
+        secondaryHref: "https://cybercrime.gov.in",
+        secondarySurface: "cybercrime_portal",
+      };
+    }
+    if (selected.has("screen")) {
+      return {
+        tone: "danger",
+        title: "Stop screen sharing before you scan.",
+        body: "End the call, stop remote access, and do not install an APK or approve accessibility permissions. If money or codes were shared, use 1930.",
+        primaryLabel: "Call 1930",
+        primaryHref: "tel:1930",
+        eventSurface: "call_1930",
+      };
+    }
+    if (selected.has("otp")) {
+      return {
+        tone: "warning",
+        title: "Never read out or type an OTP for them.",
+        body: "Banks, RBI, police, courier staff, and wallet support should not ask for OTP, PIN, CVV, password, or screen sharing.",
+        primaryLabel: "Call 1930 if shared",
+        primaryHref: "tel:1930",
+        eventSurface: "call_1930",
+      };
+    }
+    if (selected.has("upi")) {
+      return {
+        tone: "warning",
+        title: "Do not approve a collect request to receive money.",
+        body: "QR codes and UPI PIN are for sending money, not receiving refunds or prizes. Ask Chetana before approving anything.",
+        primaryLabel: "Report on Chakshu",
+        primaryHref: CHAKSHU_URL,
+        eventSurface: "chakshu",
+      };
+    }
+    return null;
+  }, [quickContextIds]);
   const intakeEvidence = [
     file ? { label: "Screenshot", value: file.name } : null,
     selectedQuickContext.length ? { label: "Context", value: `${selectedQuickContext.length} tap${selectedQuickContext.length === 1 ? "" : "s"}` } : null,
@@ -1262,6 +1320,41 @@ export default function ChetanaV0Experience({
                   );
                 })}
               </div>
+
+              {composerSafetyNudge && (
+                <div className={`v0-safety-nudge ${composerSafetyNudge.tone}`}>
+                  <div>
+                    <div className="v0-section-label">Do not wait</div>
+                    <strong>{composerSafetyNudge.title}</strong>
+                    <p>{composerSafetyNudge.body}</p>
+                  </div>
+                  <div className="v0-safety-actions">
+                    <a
+                      href={composerSafetyNudge.primaryHref}
+                      target={composerSafetyNudge.primaryHref.startsWith("http") ? "_blank" : undefined}
+                      rel="noreferrer"
+                      onClick={() => trackReportAction(composerSafetyNudge.eventSurface, { href: composerSafetyNudge.primaryHref })}
+                    >
+                      {composerSafetyNudge.primaryHref.startsWith("tel:") ? <Phone size={14} /> : <ExternalLink size={14} />}
+                      {composerSafetyNudge.primaryLabel}
+                    </a>
+                    {composerSafetyNudge.secondaryHref && composerSafetyNudge.secondaryLabel && (
+                      <a
+                        href={composerSafetyNudge.secondaryHref}
+                        target={composerSafetyNudge.secondaryHref.startsWith("http") ? "_blank" : undefined}
+                        rel="noreferrer"
+                        onClick={() => trackReportAction(
+                          composerSafetyNudge.secondarySurface || composerSafetyNudge.eventSurface,
+                          { href: composerSafetyNudge.secondaryHref },
+                        )}
+                      >
+                        <ExternalLink size={14} />
+                        {composerSafetyNudge.secondaryLabel}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {dragActive && (

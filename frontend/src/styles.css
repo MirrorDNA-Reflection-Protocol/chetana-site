@@ -1402,6 +1402,52 @@ main {
   white-space: nowrap;
 }
 
+.v0-direct-intent-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 212, 170, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 212, 170, 0.08);
+  color: var(--text);
+}
+
+.v0-direct-intent-note > svg {
+  color: var(--brand);
+}
+
+.v0-direct-intent-note strong {
+  display: block;
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+
+.v0-direct-intent-note p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.v0-direct-intent-note button {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-bright);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 9px 11px;
+  cursor: pointer;
+}
+
+.v0-direct-intent-note button:hover {
+  border-color: rgba(0, 212, 170, 0.45);
+  color: var(--heading);
+}
+
 .v0-quick-row {
   display: flex;
   align-items: center;
@@ -2090,6 +2136,16 @@ main {
     text-align: left;
     justify-items: start;
     max-width: none;
+  }
+
+  .v0-direct-intent-note {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .v0-direct-intent-note button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
   }
 
   .v0-founder-media {

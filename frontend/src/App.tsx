@@ -13,6 +13,8 @@ import ChetanaV0Experience from "./ChetanaV0Experience";
 import OpsAnalyticsPage from "./OpsAnalyticsPage";
 import { I18nProvider } from "./i18n";
 
+type DirectScanIntent = "share" | "shortcut";
+
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 function initialPageFromLocation(): PageId {
   const params = new URLSearchParams(window.location.search);
@@ -32,6 +34,7 @@ export default function App() {
   const [pendingPage, setPendingPage] = useState<PageId>("scan");
   const [sharedContent, setSharedContent] = useState<string | null>(null);
   const [sharedAttachment, setSharedAttachment] = useState<File | null>(null);
+  const [directScanIntent, setDirectScanIntent] = useState<DirectScanIntent | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -57,6 +60,7 @@ export default function App() {
   };
 
   const setPage = (p: PageId) => {
+    setDirectScanIntent(null);
     if (!termsAccepted && p !== "proof" && p !== "home" && p !== "panic" && p !== "ops" && p !== "partners") {
       setPendingPage(p);
       _setPage("proof");
@@ -133,8 +137,9 @@ export default function App() {
       setSharedAttachment(sharedFile);
 
       if (isShare || isAction || isPwa) {
-        setPage("scan");
-        window.history.replaceState({}, "", "/");
+        setDirectScanIntent(isShare ? "share" : "shortcut");
+        _setPage("scan");
+        window.history.replaceState({ page: "scan" }, "", "/");
       }
     };
 
@@ -312,6 +317,7 @@ export default function App() {
                 showHero={false}
                 initialInput={sharedContent}
                 initialFile={sharedAttachment}
+                directScanIntent={directScanIntent}
               />
             </>}
 

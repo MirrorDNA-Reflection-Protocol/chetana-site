@@ -228,12 +228,14 @@ export default function ChetanaV0Experience({
   onNavigate,
   initialInput,
   initialFile,
+  directScanIntent,
   presetMode,
   showHero = true,
 }: {
   onNavigate?: (target: PageId) => void;
   initialInput?: string | null;
   initialFile?: File | null;
+  directScanIntent?: "share" | "shortcut" | null;
   presetMode?: V0Mode;
   showHero?: boolean;
 }) {
@@ -1256,6 +1258,21 @@ export default function ChetanaV0Experience({
               </div>
               <div className="v0-status">{status}</div>
             </div>
+
+            {directScanIntent && (
+              <div className="v0-direct-intent-note" role="note">
+                <Shield size={18} />
+                <div>
+                  <strong>{directScanIntent === "share" ? "Shared screenshot is ready." : "Quick check mode."}</strong>
+                  <p>Chetana gives guidance, not final authority. If money already moved, call 1930 first and verify through your bank or official channel.</p>
+                </div>
+                {onNavigate && (
+                  <button type="button" onClick={() => onNavigate("proof")}>
+                    Full limits
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="v0-quick-row">
               <button className="v0-quick-chip" onClick={loadSample}>Try a sample message</button>

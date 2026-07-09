@@ -45,6 +45,10 @@ FIELD_SOURCE_TAGS: tuple[dict[str, str], ...] = (
     },
 )
 
+ANALYTICS_EVENT_SCHEMA_VERSION = "chetana.v0.analytics.v2"
+FIELD_APP_OPEN_EVENT_NAME = "app_open"
+FIELD_ENTRY_SOURCE = "scam_check_link"
+FIELD_ACTION_PARAM = "scam_check"
 QR_VERSION = 5
 QR_SIZE = 17 + (QR_VERSION * 4)
 QR_DATA_CODEWORDS = 108
@@ -67,6 +71,18 @@ def campaign_url_for_source(public_origin: str, source: str) -> str:
     return _scam_check_link(public_origin, source)
 
 
+def expected_app_open_metadata(source: str) -> dict[str, str]:
+    if source not in source_tag_map():
+        raise KeyError(source)
+    return {
+        "event_name": FIELD_APP_OPEN_EVENT_NAME,
+        "event_version": ANALYTICS_EVENT_SCHEMA_VERSION,
+        "entry_source": FIELD_ENTRY_SOURCE,
+        "source_param": source,
+        "action_param": FIELD_ACTION_PARAM,
+    }
+
+
 def poster_url_for_source(public_origin: str, source: str) -> str:
     if source not in source_tag_map():
         raise KeyError(source)
@@ -81,7 +97,7 @@ def qr_svg_url_for_source(public_origin: str, source: str) -> str:
 
 def _scam_check_link(public_origin: str, source: str) -> str:
     origin = public_origin.rstrip("/")
-    return f"{origin}/?source={source}&action=scam_check"
+    return f"{origin}/?source={source}&action={FIELD_ACTION_PARAM}"
 
 
 def _whatsapp_text(public_origin: str) -> str:
@@ -109,8 +125,9 @@ def build_field_harness(public_origin: str) -> dict[str, Any]:
             "poster_url": poster_url_for_source(public_origin, item["source"]),
             "tracked_params": {
                 "source": item["source"],
-                "action": "scam_check",
+                "action": FIELD_ACTION_PARAM,
             },
+            "expected_app_open_metadata": expected_app_open_metadata(item["source"]),
         }
         for item in FIELD_SOURCE_TAGS
     ]
@@ -167,6 +184,13 @@ def build_field_harness(public_origin: str) -> dict[str, Any]:
             "feedback_submitted with feedback_type only",
             "local_scan_memory_cleared",
         ],
+        "pilottrace_join_contract": {
+            "event_name": FIELD_APP_OPEN_EVENT_NAME,
+            "event_version": ANALYTICS_EVENT_SCHEMA_VERSION,
+            "join_key": "source_param",
+            "expected_entry_source": FIELD_ENTRY_SOURCE,
+            "required_metadata": ["entry_source", "source_param", "action_param"],
+        },
         "pilottrace_metrics": [
             "scans_completed",
             "high_risk_pauses",
@@ -204,6 +228,7 @@ def build_field_launch_receipt(public_origin: str) -> dict[str, Any]:
     assets = []
     for item in harness["campaign_links"]:
         source = item["source"]
+        app_open_metadata = expected_app_open_metadata(source)
         qr_svg = render_qr_svg(item["qr_payload"], title=f"Chetana {item['label']} campaign code")
         poster_html = render_campaign_poster_html(public_origin, source)
         assets.append({
@@ -214,6 +239,7 @@ def build_field_launch_receipt(public_origin: str) -> dict[str, Any]:
             "qr_svg_url": item["qr_svg_url"],
             "poster_url": item["poster_url"],
             "tracked_params": item["tracked_params"],
+            "expected_app_open_metadata": app_open_metadata,
             "qr_payload_sha256": hashlib.sha256(item["qr_payload"].encode("utf-8")).hexdigest(),
             "qr_svg_sha256": hashlib.sha256(qr_svg.encode("utf-8")).hexdigest(),
             "poster_html_sha256": hashlib.sha256(poster_html.encode("utf-8")).hexdigest(),
@@ -223,6 +249,9 @@ def build_field_launch_receipt(public_origin: str) -> dict[str, Any]:
                 "qr_svg_embeds_payload": html.escape(item["qr_payload"]) in qr_svg,
                 "poster_embeds_payload": html.escape(item["qr_payload"]) in poster_html,
                 "qr_and_poster_routes_present": bool(item["qr_svg_url"] and item["poster_url"]),
+                "app_open_metadata_has_source": app_open_metadata["source_param"] == source,
+                "app_open_metadata_has_action": app_open_metadata["action_param"] == FIELD_ACTION_PARAM,
+                "app_open_metadata_has_entry_source": app_open_metadata["entry_source"] == FIELD_ENTRY_SOURCE,
             },
         })
     all_ready = all(all(asset["checks"].values()) for asset in assets)
@@ -235,6 +264,7 @@ def build_field_launch_receipt(public_origin: str) -> dict[str, Any]:
         "campaign_assets": assets,
         "privacy_boundary": harness["privacy_boundary"],
         "event_contract": harness["event_contract"],
+        "pilottrace_join_contract": harness["pilottrace_join_contract"],
         "pilottrace_metrics": harness["pilottrace_metrics"],
         "proof_limits": [
             "This receipt verifies generated campaign URLs, QR SVG payloads, and printable poster payloads.",

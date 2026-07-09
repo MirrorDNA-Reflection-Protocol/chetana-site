@@ -137,6 +137,23 @@ async function main() {
   if (!bankQrCampaign?.poster_url?.includes("/partners/poster/bank_qr")) {
     throw new Error("Field harness JSON is missing bank_qr poster URL.");
   }
+  const expectedBankOpen = bankQrCampaign.expected_app_open_metadata || {};
+  if (
+    expectedBankOpen.event_name !== "app_open" ||
+    expectedBankOpen.event_version !== "chetana.v0.analytics.v2" ||
+    expectedBankOpen.entry_source !== "scam_check_link" ||
+    expectedBankOpen.source_param !== "bank_qr" ||
+    expectedBankOpen.action_param !== "scam_check"
+  ) {
+    throw new Error("Field harness JSON is missing bank_qr app_open attribution metadata.");
+  }
+  if (
+    fieldHarnessJson.pilottrace_join_contract?.event_name !== "app_open" ||
+    fieldHarnessJson.pilottrace_join_contract?.join_key !== "source_param" ||
+    fieldHarnessJson.pilottrace_join_contract?.expected_entry_source !== "scam_check_link"
+  ) {
+    throw new Error("Field harness JSON is missing the PilotTrace source_param join contract.");
+  }
   if (!(fieldHarnessJson.feedback_buckets || []).every((bucket) => bucket.free_text === false)) {
     throw new Error("Field harness feedback buckets must stay free-text disabled.");
   }
@@ -157,6 +174,22 @@ async function main() {
   const receiptBankAsset = (launchReceipt.campaign_assets || []).find((item) => item.source === "bank_qr");
   if (!receiptBankAsset?.checks || !Object.values(receiptBankAsset.checks).every(Boolean)) {
     throw new Error("Field launch receipt bank_qr checks are not all green.");
+  }
+  const receiptBankOpen = receiptBankAsset.expected_app_open_metadata || {};
+  if (
+    receiptBankOpen.event_name !== "app_open" ||
+    receiptBankOpen.event_version !== "chetana.v0.analytics.v2" ||
+    receiptBankOpen.entry_source !== "scam_check_link" ||
+    receiptBankOpen.source_param !== "bank_qr" ||
+    receiptBankOpen.action_param !== "scam_check"
+  ) {
+    throw new Error("Field launch receipt bank_qr attribution metadata is incomplete.");
+  }
+  if (
+    launchReceipt.pilottrace_join_contract?.event_name !== "app_open" ||
+    launchReceipt.pilottrace_join_contract?.join_key !== "source_param"
+  ) {
+    throw new Error("Field launch receipt is missing the PilotTrace source_param join contract.");
   }
 
   const bankQrSvg = await fetchText("/partners/qr/bank_qr.svg");

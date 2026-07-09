@@ -198,6 +198,16 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("whatsapp_forward", sources)
         self.assertIn("merchant_counter", sources)
         self.assertEqual(sources["bank_qr"]["tracked_params"], {"source": "bank_qr", "action": "scam_check"})
+        self.assertEqual(
+            sources["bank_qr"]["expected_app_open_metadata"],
+            {
+                "event_name": "app_open",
+                "event_version": "chetana.v0.analytics.v2",
+                "entry_source": "scam_check_link",
+                "source_param": "bank_qr",
+                "action_param": "scam_check",
+            },
+        )
         self.assertIn("source=bank_qr&action=scam_check", sources["bank_qr"]["url"])
         self.assertIn("/partners/qr/bank_qr.svg", sources["bank_qr"]["qr_svg_url"])
         self.assertIn("/partners/poster/bank_qr", sources["bank_qr"]["poster_url"])
@@ -205,6 +215,9 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("No raw scan text is included in sponsor reporting.", data["privacy_boundary"])
         self.assertIn("source_params", data["pilottrace_metrics"])
         self.assertIn("feedback_submitted with feedback_type only", data["event_contract"])
+        self.assertEqual(data["pilottrace_join_contract"]["event_name"], "app_open")
+        self.assertEqual(data["pilottrace_join_contract"]["join_key"], "source_param")
+        self.assertEqual(data["pilottrace_join_contract"]["expected_entry_source"], "scam_check_link")
         self.assertTrue(all(bucket["free_text"] is False for bucket in data["feedback_buckets"]))
 
         serialized = json.dumps(data)
@@ -226,6 +239,10 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("bank_qr", assets)
         bank_asset = assets["bank_qr"]
         self.assertEqual(bank_asset["tracked_params"], {"source": "bank_qr", "action": "scam_check"})
+        self.assertEqual(bank_asset["expected_app_open_metadata"]["event_name"], "app_open")
+        self.assertEqual(bank_asset["expected_app_open_metadata"]["entry_source"], "scam_check_link")
+        self.assertEqual(bank_asset["expected_app_open_metadata"]["source_param"], "bank_qr")
+        self.assertEqual(bank_asset["expected_app_open_metadata"]["action_param"], "scam_check")
         self.assertIn("source=bank_qr&action=scam_check", bank_asset["campaign_url"])
         self.assertRegex(bank_asset["qr_payload_sha256"], r"^[a-f0-9]{64}$")
         self.assertRegex(bank_asset["qr_svg_sha256"], r"^[a-f0-9]{64}$")

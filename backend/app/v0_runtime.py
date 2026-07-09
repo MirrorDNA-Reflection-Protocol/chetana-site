@@ -81,6 +81,7 @@ EventName = Literal[
     "evidence_saved",
     "first_scan",
     "repeat_scan_7d",
+    "local_scan_memory_cleared",
 ]
 ShareChannel = Literal["whatsapp", "sms", "telegram", "copy_link", "other"]
 ReportTarget = Literal["block_only", "family_only", "manual_report", "other"]

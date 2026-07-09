@@ -240,6 +240,40 @@ class AnalyticsSummaryTests(unittest.TestCase):
         self.assertEqual(summary.breakdowns.recovery_channels, {"web": 1})
         self.assertEqual(summary.breakdowns.official_rails, {"SANCHAR_SAATHI_CHAKSHU": 1})
 
+    def test_summary_counts_local_scan_memory_clear_events(self) -> None:
+        now = datetime.now(UTC).isoformat()
+        events = [
+            {
+                "event_name": "local_scan_memory_cleared",
+                "session_id": "prod-privacy",
+                "timestamp_utc": now,
+                "device_class": "web",
+                "language_hint": "en",
+                "metadata": {
+                    "event_version": "chetana.v0.analytics.v2",
+                    "privacy_action": "clear_scan_memory",
+                    "privacy_surface": "result_card",
+                    "cleared_key_classes": ["thread_hints", "scan_counters", "event_queue"],
+                    "preserved_setup": True,
+                },
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            events_path = Path(temp_dir) / "events.jsonl"
+            with events_path.open("w", encoding="utf-8") as handle:
+                for event in events:
+                    handle.write(json.dumps(event) + "\n")
+
+            summary = build_v0_analytics_summary(events_path=events_path, trailing_days=7)
+
+        self.assertEqual(summary.totals.events, 1)
+        self.assertEqual(summary.totals.unique_sessions, 1)
+        self.assertEqual(summary.totals.local_scan_memory_clears, 1)
+        self.assertEqual(summary.breakdowns.local_privacy_actions, {"clear_scan_memory": 1})
+        self.assertEqual(summary.breakdowns.event_versions, {"chetana.v0.analytics.v2": 1})
+        self.assertEqual(summary.daily[-1].local_scan_memory_clears, 1)
+
     def test_summary_flags_orphan_completions_without_exceeding_hundred_percent(self) -> None:
         now = datetime.now(UTC).isoformat()
         events = [

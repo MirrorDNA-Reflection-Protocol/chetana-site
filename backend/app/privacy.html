@@ -490,6 +490,50 @@
             var button = document.getElementById("clear-local-scan-memory");
             var status = document.getElementById("clear-local-scan-memory-status");
             if (!button || !status) return;
+            function sessionId() {
+                try {
+                    var existing = window.localStorage.getItem("chetana_v0_session_id");
+                    if (existing) return existing;
+                    return "chetana-v0-privacy-" + (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : String(Date.now()));
+                } catch (error) {
+                    return "chetana-v0-privacy";
+                }
+            }
+            function deviceClass() {
+                var ua = navigator.userAgent || "";
+                if (/Android/i.test(ua)) return "android_phone";
+                if (/iPhone|iPad|iPod/i.test(ua)) return "ios_phone";
+                if (window.innerWidth >= 1024) return "desktop";
+                return "web";
+            }
+            function trackClear() {
+                try {
+                    window.fetch("/api/v0/events", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        keepalive: true,
+                        cache: "no-store",
+                        body: JSON.stringify({
+                            event_name: "local_scan_memory_cleared",
+                            session_id: sessionId(),
+                            device_class: deviceClass(),
+                            language_hint: (navigator.language || "en").slice(0, 2),
+                            consent_class: "C0",
+                            payload_class: "derived_state",
+                            persistence_class: "P1",
+                            metadata: {
+                                event_version: "chetana.v0.analytics.v2",
+                                privacy_action: "clear_scan_memory",
+                                privacy_surface: "privacy_page",
+                                page_path: window.location.pathname,
+                                page_variant: "privacy",
+                                cleared_key_classes: ["thread_hints", "scan_counters", "event_queue", "legacy_history", "vigilance_receipts"],
+                                preserved_setup: true
+                            }
+                        })
+                    }).catch(function () {});
+                } catch (error) {}
+            }
             button.addEventListener("click", function () {
                 try {
                     localKeys.forEach(function (key) { window.localStorage.removeItem(key); });
@@ -497,6 +541,7 @@
                 try {
                     sessionKeys.forEach(function (key) { window.sessionStorage.removeItem(key); });
                 } catch (error) {}
+                trackClear();
                 status.textContent = "Local scan memory cleared from this browser.";
             });
         })();

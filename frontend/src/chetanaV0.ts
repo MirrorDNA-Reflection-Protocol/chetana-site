@@ -45,7 +45,8 @@ export type V0EventName =
   | "report_tapped"
   | "evidence_saved"
   | "first_scan"
-  | "repeat_scan_7d";
+  | "repeat_scan_7d"
+  | "local_scan_memory_cleared";
 
 export interface V0Reason {
   code: string;
@@ -350,6 +351,7 @@ type TrackEventOptions = {
   dedupeKey?: string;
   dedupeTtlMs?: number;
   keepalive?: boolean;
+  queueOnFailure?: boolean;
 };
 
 type TrackedEventPayload = Omit<V0EventPayload, "metadata"> & {
@@ -855,7 +857,7 @@ export async function trackV0Event(payload: V0EventPayload, options: TrackEventO
   const trackedPayload = buildTrackedEventPayload(payload);
   await flushQueuedEvents();
   const delivered = await postTrackedEvent(trackedPayload, options.keepalive ?? true);
-  if (!delivered) {
+  if (!delivered && options.queueOnFailure !== false) {
     enqueueTrackedEvent(trackedPayload);
   }
 }

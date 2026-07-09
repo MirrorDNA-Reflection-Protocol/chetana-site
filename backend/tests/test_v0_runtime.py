@@ -246,6 +246,27 @@ class V0TrustRuntimeTests(unittest.TestCase):
         self.assertEqual(len(event.metadata["long"]), 160)
         self.assertNotIn("unsupported", event.metadata)
 
+    def test_local_scan_memory_clear_event_is_supported(self) -> None:
+        event = build_event(
+            V0EventInput(
+                event_name="local_scan_memory_cleared",
+                session_id="prod-privacy",
+                consent_class="C0",
+                payload_class="derived_state",
+                persistence_class="P1",
+                metadata={
+                    "privacy_action": "clear_scan_memory",
+                    "privacy_surface": "result_card",
+                    "cleared_key_classes": ["thread_hints", "scan_counters"],
+                    "preserved_setup": True,
+                },
+            )
+        )
+
+        self.assertEqual(event.event_name, "local_scan_memory_cleared")
+        self.assertEqual(event.metadata["privacy_action"], "clear_scan_memory")
+        self.assertTrue(event.metadata["preserved_setup"])
+
 
 if __name__ == "__main__":
     unittest.main()

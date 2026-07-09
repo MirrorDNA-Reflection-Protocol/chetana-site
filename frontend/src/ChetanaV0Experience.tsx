@@ -1196,6 +1196,27 @@ export default function ChetanaV0Experience({
   };
 
   const clearLocalScanMemory = () => {
+    void trackV0Event({
+      event_name: "local_scan_memory_cleared",
+      session_id: sessionId,
+      device_class: deviceClass(),
+      language_hint: navigator.language.slice(0, 2),
+      metadata: {
+        privacy_action: "clear_scan_memory",
+        privacy_surface: "result_card",
+        cleared_key_classes: [
+          "thread_hints",
+          "scan_counters",
+          "event_queue",
+          "legacy_history",
+          "vigilance_receipts",
+        ],
+        preserved_setup: true,
+      },
+    }, {
+      keepalive: true,
+      queueOnFailure: false,
+    }).catch(() => {});
     clearLocalChetanaScanMemory();
     const message = "Local scan memory cleared from this browser.";
     setThreadSignal(null);

@@ -39,6 +39,10 @@ const servedSafetyNudgeChecks = [
   "Clear local scan memory",
   "Local scan memory cleared from this browser.",
   "Clear repeated-scan hints, local counters, queued scan events",
+  "local_scan_memory_cleared",
+  "Open pilot packet",
+  "Privacy controls used",
+  "View sponsor packet",
 ];
 
 async function fetchText(pathOrUrl) {

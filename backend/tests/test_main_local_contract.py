@@ -31,9 +31,24 @@ class MainLocalContractTests(unittest.TestCase):
         html = resp.text
         self.assertIn("Clear local scan memory", html)
         self.assertIn("Local scan memory cleared from this browser.", html)
+        self.assertIn("local_scan_memory_cleared", html)
+        self.assertIn("privacy_surface", html)
         self.assertIn("chetana_threat_threads_v1", html)
         self.assertIn("chetana_v0_event_queue", html)
         self.assertIn("It keeps language, install, consent, senior mode, and family settings.", html)
+
+    def test_partner_packet_route_and_sitemap_are_public(self) -> None:
+        packet_resp = self.client.get("/partners/packet")
+        self.assertEqual(packet_resp.status_code, 200)
+        packet_html = packet_resp.text
+        self.assertIn("Scam-check pilot packet", packet_html)
+        self.assertIn("Fund a fraud pause before money moves.", packet_html)
+        self.assertIn("No account. No profile database.", packet_html)
+
+        sitemap_resp = self.client.get("/sitemap.xml")
+        self.assertEqual(sitemap_resp.status_code, 200)
+        self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
 
     @patch("app.main._notify_telegram", new_callable=AsyncMock, return_value=False)
     @patch(

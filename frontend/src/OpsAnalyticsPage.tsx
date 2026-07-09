@@ -19,6 +19,7 @@ type AnalyticsSummary = {
     evidence_saves: number;
     report_taps: number;
     share_completes: number;
+    local_scan_memory_clears: number;
   };
   funnel: {
     app_open_sessions: number;
@@ -53,6 +54,7 @@ type AnalyticsSummary = {
     entry_paths: CountMap;
     utm_sources: CountMap;
     event_versions: CountMap;
+    local_privacy_actions: CountMap;
   };
   daily: Array<{
     date: string;
@@ -394,6 +396,11 @@ export default function OpsAnalyticsPage({ onNavigate }: { onNavigate: (page: Pa
               <strong>{formatNumber(summary.funnel.recovery_support_sessions)}</strong>
               <p>{formatPercent(summary.funnel.recovery_support_rate_from_complete_pct)} of complete sessions saved evidence or opened official help.</p>
             </article>
+            <article className="ops-stat-card">
+              <span>Privacy controls</span>
+              <strong>{formatNumber(summary.totals.local_scan_memory_clears)}</strong>
+              <p>Local scan-memory clears counted without scan content or identifiers.</p>
+            </article>
           </div>
 
           <div className="ops-grid">
@@ -500,6 +507,12 @@ export default function OpsAnalyticsPage({ onNavigate }: { onNavigate: (page: Pa
               subtitle="Which official rails are being touched."
               counts={summary.breakdowns.official_rails}
               emptyLabel="No official-rail touches in the current window."
+            />
+            <BreakdownCard
+              title="Privacy controls"
+              subtitle="Aggregate local privacy actions only."
+              counts={summary.breakdowns.local_privacy_actions}
+              emptyLabel="No local privacy-control events in the current window."
             />
             <BreakdownCard
               title="Event versions"

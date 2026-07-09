@@ -29,6 +29,7 @@ class V0AnalyticsTotals(BaseModel):
     report_taps: int = 0
     share_taps: int = 0
     share_completes: int = 0
+    local_scan_memory_clears: int = 0
 
 
 class V0AnalyticsFunnel(BaseModel):
@@ -65,6 +66,7 @@ class V0AnalyticsBreakdowns(BaseModel):
     entry_paths: dict[str, int] = Field(default_factory=dict)
     utm_sources: dict[str, int] = Field(default_factory=dict)
     event_versions: dict[str, int] = Field(default_factory=dict)
+    local_privacy_actions: dict[str, int] = Field(default_factory=dict)
 
 
 class V0AnalyticsDailyBucket(BaseModel):
@@ -78,6 +80,7 @@ class V0AnalyticsDailyBucket(BaseModel):
     risky_verdicts: int = 0
     report_taps: int = 0
     share_completes: int = 0
+    local_scan_memory_clears: int = 0
 
 
 class V0AnalyticsQuality(BaseModel):
@@ -319,6 +322,7 @@ def build_v0_analytics_summary(
     entry_paths: Counter[str] = Counter()
     utm_sources: Counter[str] = Counter()
     event_versions: Counter[str] = Counter()
+    local_privacy_actions: Counter[str] = Counter()
 
     for event in filtered_events:
         event_name = str(event.get("event_name") or "").strip()
@@ -450,6 +454,14 @@ def build_v0_analytics_summary(
             share_channel = str(event.get("share_channel") or "").strip()
             if share_channel:
                 share_channels[share_channel] += 1
+            continue
+
+        if event_name == "local_scan_memory_cleared":
+            totals.local_scan_memory_clears += 1
+            if day_key:
+                daily_counts[day_key]["local_scan_memory_clears"] += 1
+            privacy_action = _metadata_value(event, "privacy_action") or "clear_scan_memory"
+            local_privacy_actions[privacy_action] += 1
 
     totals.unique_sessions = len(unique_sessions)
     completed_after_start = funnel_sessions["scan_started"] & funnel_sessions["scan_completed"]
@@ -490,6 +502,7 @@ def build_v0_analytics_summary(
         entry_paths=_sorted_counts(entry_paths),
         utm_sources=_sorted_counts(utm_sources),
         event_versions=_sorted_counts(event_versions),
+        local_privacy_actions=_sorted_counts(local_privacy_actions),
     )
 
     daily: list[V0AnalyticsDailyBucket] = []
@@ -509,6 +522,7 @@ def build_v0_analytics_summary(
                 risky_verdicts=counts.get("risky_verdicts", 0),
                 report_taps=counts.get("report_taps", 0),
                 share_completes=counts.get("share_completes", 0),
+                local_scan_memory_clears=counts.get("local_scan_memory_clears", 0),
             )
         )
 

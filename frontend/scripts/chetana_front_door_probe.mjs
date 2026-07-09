@@ -15,10 +15,32 @@ async function postJson(path, body) {
   return data;
 }
 
+async function fetchText(path) {
+  const response = await fetch(`${baseUrl}${path}`);
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${path} returned ${response.status}: ${text.slice(0, 240)}`);
+  }
+  return text;
+}
+
 async function main() {
-  const page = await fetch(`${baseUrl}/`);
-  if (!page.ok) {
-    throw new Error(`/ returned ${page.status}`);
+  await fetchText("/");
+  const packet = await fetchText("/partners/packet");
+  const packetNeedles = [
+    "Scam-check pilot packet",
+    "Fund a fraud pause before money moves.",
+    "No account. No profile database.",
+    "Sample case packet",
+  ];
+  const missingPacketNeedles = packetNeedles.filter((needle) => !packet.includes(needle));
+  if (missingPacketNeedles.length > 0) {
+    throw new Error(`Partner packet missing strings: ${missingPacketNeedles.join(", ")}`);
+  }
+
+  const sitemap = await fetchText("/sitemap.xml");
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/packet")) {
+    throw new Error("Sitemap does not include /partners/packet");
   }
 
   const verdict = await postJson("/api/v0/scan", {

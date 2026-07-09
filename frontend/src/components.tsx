@@ -3462,10 +3462,10 @@ export function FamilyPage() {
 export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const contactHref = "mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot&body=We%20would%20like%20to%20discuss%20a%20Chetana%20pilot%20or%20sponsorship.";
   const reasons = [
-    "Reduce preventable loss before a user approves a payment, shares an OTP, installs an APK, or releases goods.",
-    "Turn panic reports into cleaner incident packets: what happened, what was exposed, screenshots, identifiers, and next official rail.",
-    "Give CSR, public-awareness, and merchant networks a simple QR/link surface people can actually use without training.",
-    "Measure outcomes a sponsor can review: scans, high-risk pauses, official handoffs, languages used, and recovery packets copied.",
+    "Put a fraud pause before payment, OTP sharing, APK install, screen sharing, or goods release.",
+    "Turn panic into a cleaner incident packet: what happened, what was exposed, screenshots, identifiers, and the next official rail.",
+    "Give branches, WhatsApp groups, merchant networks, and public campaigns one QR/link surface people can use without training.",
+    "Measure sponsor-safe outcomes: scans, high-risk pauses, official handoffs, languages used, packet copies, and privacy-control usage.",
   ];
   const pilots = [
     {
@@ -3495,6 +3495,7 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
     "1930 / cybercrime handoffs",
     "Languages used",
     "Recovery packets copied",
+    "Privacy controls used",
     "False-safe complaints",
   ];
   const sourceLadder = [
@@ -3523,24 +3524,59 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
       text: "Sources like The420 help track patterns and briefs, but they are not automated verdict ground truth.",
     },
   ];
+  const proofTiles = [
+    {
+      title: "No account burden",
+      text: "A user can scan from a link, QR, PWA shortcut, or shared screenshot without creating a profile.",
+    },
+    {
+      title: "Scan-and-forget posture",
+      text: "Chetana returns the advisory result and does not keep raw scan submissions as a user database.",
+    },
+    {
+      title: "Official rails stay visible",
+      text: "1930, cybercrime.gov.in, Chakshu, bank support, NPCI, RBI CMS, and suspect-search rails remain one action away.",
+    },
+    {
+      title: "Outcome report",
+      text: "A sponsor can review aggregate counts and sample packets without receiving user scan content.",
+    },
+  ];
+  const casePacketRows = [
+    ["Trigger", "Suspicious KYC/UPI pressure message"],
+    ["Verdict", "High risk: stop before paying or sharing codes"],
+    ["Identifiers", "UPI ID, phone number, link domain, amount if visible"],
+    ["Next action", "Call 1930 if money or access moved; otherwise use Chakshu or verify in the official app"],
+    ["Privacy boundary", "Raw scan content is not included in aggregate sponsor metrics"],
+  ];
+  const pilotPlan = [
+    ["Week 1", "Launch", "Launch one sponsor link/QR and branch or campaign copy."],
+    ["Weeks 2-4", "Measure", "Track scans, high-risk pauses, official-rail taps, languages, and packet copies."],
+    ["Weeks 5-8", "Tune", "Tune regional scam examples, merchant scripts, and recovery handoff wording."],
+    ["Weeks 9-12", "Decide", "Deliver the pilot proof packet and decide sponsor, CSR, or procurement route."],
+  ];
 
   return (
     <section className="partner-page">
       <div className="partner-hero">
         <div className="kicker kicker-glow">
           <ShieldCheck size={14} />
-          Institutional pilots
+          Banks, government programs, telecom, fintech, CSR
         </div>
-        <h1>Help people check a scam before money moves.</h1>
+        <h1>Put Chetana in front of fraud loss.</h1>
         <p>
-          Chetana is an independent scam checker for India. It sits before the official recovery rails:
-          screenshot, voice, or tap what happened; get a plain-language risk read; preserve the useful facts;
-          and move to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.
+          Chetana is an independent scam checker for India. A user screenshots a message, taps what happened,
+          or adds a short note. Chetana gives a plain-language risk read, preserves the useful facts,
+          and routes them to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.
         </p>
         <div className="partner-actions">
           <a className="partner-primary" href={contactHref}>
             <MessageCircle size={17} />
             Start a pilot
+          </a>
+          <a className="partner-secondary" href="/partners/packet" target="_blank" rel="noreferrer">
+            <FileText size={17} />
+            Open pilot packet
           </a>
           <button className="partner-secondary" onClick={() => onNavigate("nexus")}>
             <FileText size={17} />
@@ -3555,13 +3591,22 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
 
       <div className="partner-band">
         <div>
-          <span>Why institutions would use it</span>
-          <strong>It is cheaper to add a fraud pause than recover money after it moves.</strong>
+          <span>The sponsor case</span>
+          <strong>It is cheaper to fund a fraud pause than recover money after it moves.</strong>
         </div>
         <p>
           Chetana does not replace a bank, police portal, or government helpline. It makes the moment before
-          escalation simpler, faster, and more measurable for ordinary users.
+          escalation simpler, faster, and measurable without collecting a user-profile database.
         </p>
+      </div>
+
+      <div className="partner-proof-grid">
+        {proofTiles.map((tile) => (
+          <div className="partner-proof-tile" key={tile.title}>
+            <strong>{tile.title}</strong>
+            <p>{tile.text}</p>
+          </div>
+        ))}
       </div>
 
       <div className="partner-thesis">
@@ -3571,6 +3616,40 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <p>{reason}</p>
           </div>
         ))}
+      </div>
+
+      <div className="partner-packet-panel">
+        <div className="partner-packet-copy">
+          <div className="kicker">Pilot packet</div>
+          <h2>One page a sponsor can forward internally.</h2>
+          <p>
+            The packet gives a pilot offer, privacy boundary, sample case packet, measurement plan,
+            and next step. It is built for a bank innovation team, state cyber program, telecom anti-fraud
+            team, CSR committee, or merchant association.
+          </p>
+          <div className="partner-actions">
+            <a className="partner-primary" href="/partners/packet" target="_blank" rel="noreferrer">
+              <FileText size={17} />
+              View sponsor packet
+            </a>
+            <a className="partner-secondary" href={contactHref}>
+              <MessageCircle size={17} />
+              Email pilot request
+            </a>
+          </div>
+        </div>
+        <div className="partner-case-packet" aria-label="Sample Chetana case packet">
+          <div className="partner-case-head">
+            <span>Sample packet</span>
+            <strong>Chetana linked scam summary</strong>
+          </div>
+          {casePacketRows.map(([label, value]) => (
+            <div className="partner-case-row" key={label}>
+              <span>{label}</span>
+              <p>{value}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="partner-grid">
@@ -3623,24 +3702,19 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <span key={metric}>{metric}</span>
           ))}
         </div>
+        <div className="partner-metrics-note">
+          No raw scan text, UPI ID, phone number, screenshot, or user profile is needed for sponsor metrics.
+        </div>
       </div>
 
       <div className="partner-steps">
-        <div className="partner-step">
-          <span>01</span>
-          <strong>Public sponsor page</strong>
-          <p>Make the opportunity easy to find from Chetana without distracting consumers from scanning.</p>
-        </div>
-        <div className="partner-step">
-          <span>02</span>
-          <strong>90-day pilot</strong>
-          <p>Run one region, one language cluster, or one merchant/bank workflow with weekly proof reports.</p>
-        </div>
-        <div className="partner-step">
-          <span>03</span>
-          <strong>Procurement or CSR route</strong>
-          <p>Move through GeM, a bank innovation team, CSR sponsorship, or a public-sector awareness program.</p>
-        </div>
+        {pilotPlan.map(([label, title, text]) => (
+          <div className="partner-step" key={label}>
+            <span>{label}</span>
+            <strong>{title}</strong>
+            <p>{text}</p>
+          </div>
+        ))}
       </div>
     </section>
   );

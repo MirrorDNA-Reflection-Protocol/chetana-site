@@ -2145,6 +2145,8 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/#weather</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
   <url><loc>https://chetana.activemirror.ai/#atlas</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/#trust</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
 </urlset>"""
     return PlainTextResponse(xml, media_type="application/xml")
 
@@ -2157,6 +2159,116 @@ async def security_txt():
         "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
         media_type="text/plain"
     )
+
+
+@app.get("/partners/packet", include_in_schema=False)
+async def partners_packet():
+    from fastapi.responses import HTMLResponse as _HTML
+    html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chetana Pilot Packet for Banks and Public Programs</title>
+  <meta name="description" content="One-page Chetana pilot packet for banks, public programs, telecom anti-fraud teams, CSR sponsors, fintechs, and merchant networks.">
+  <style>
+    :root { color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#ffffff; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }
+    main { max-width:980px; margin:0 auto; padding:34px 22px 44px; }
+    a { color:var(--accent); font-weight:700; }
+    .top { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; padding-bottom:18px; border-bottom:2px solid var(--ink); }
+    .brand { display:grid; gap:3px; }
+    .brand span { color:var(--accent); font-size:.78rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+    h1 { max-width:760px; margin:18px 0 10px; font-size:clamp(2rem, 5vw, 4rem); line-height:.98; letter-spacing:0; }
+    h2 { margin:0 0 8px; font-size:1.15rem; }
+    p { margin:0; color:var(--muted); }
+    .cta { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+    .cta a { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 14px; border-radius:8px; text-decoration:none; }
+    .primary { background:var(--accent); color:#fff; }
+    .secondary { border:1px solid var(--line); color:var(--ink); }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:22px 0; }
+    .tile, .box, .row, .step { border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .tile { padding:14px; min-height:130px; }
+    .tile strong, .step strong { display:block; margin-bottom:6px; }
+    .tile p, .step p, .row p { font-size:.92rem; }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0; }
+    .box { padding:16px; background:var(--soft); }
+    .rows { display:grid; overflow:hidden; border:1px solid var(--line); border-radius:8px; }
+    .row { display:grid; grid-template-columns:150px 1fr; gap:10px; padding:11px 12px; border:0; border-bottom:1px solid var(--line); border-radius:0; }
+    .row:last-child { border-bottom:0; }
+    .row span, .step span, .label { color:var(--gold); font-size:.72rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; }
+    .steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .step { padding:14px; background:#fff; }
+    .foot { margin-top:22px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem; }
+    @media print { main { padding:18px; } .cta { display:none; } a { color:var(--ink); } }
+    @media (max-width:760px) { .top, .split { grid-template-columns:1fr; display:grid; } .grid, .steps { grid-template-columns:1fr; } .row { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div class="brand">
+        <span>Chetana by Active Mirror</span>
+        <strong>Scam-check pilot packet</strong>
+      </div>
+      <p>Public URL: <a href="https://chetana.activemirror.ai/partners/packet">chetana.activemirror.ai/partners/packet</a></p>
+    </div>
+
+    <h1>Fund a fraud pause before money moves.</h1>
+    <p>Chetana is an independent scam checker for India. A user screenshots a suspicious message, taps what happened, or adds a short note. Chetana gives a plain-language risk read, preserves useful facts, and routes the user to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.</p>
+    <div class="cta">
+      <a class="primary" href="mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot">Start a pilot</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners">Open partner page</a>
+      <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
+    </div>
+
+    <section class="grid">
+      <div class="tile"><strong>Who should sponsor</strong><p>Banks, PSPs, fintechs, telecom anti-fraud teams, state cyber programs, CSR committees, and merchant networks.</p></div>
+      <div class="tile"><strong>What users get</strong><p>Screenshot or tap context, verdict, safest next action, official help rails, and a copyable case packet.</p></div>
+      <div class="tile"><strong>What sponsors get</strong><p>Aggregate scans, high-risk pauses, official handoffs, language mix, packet copies, and privacy-control usage.</p></div>
+      <div class="tile"><strong>Privacy boundary</strong><p>No account. No profile database. Raw scan text, screenshots, UPI IDs, and phone numbers are not sponsor metrics.</p></div>
+    </section>
+
+    <section class="split">
+      <div class="box">
+        <div class="label">Pilot offer</div>
+        <h2>90 days, one focused audience.</h2>
+        <p>Run one region, language cluster, branch campaign, merchant association, or public-awareness link. Weekly proof reports show what people checked and which official next step they used, without exposing raw scan content.</p>
+      </div>
+      <div class="box">
+        <div class="label">Why now</div>
+        <h2>Recovery starts too late.</h2>
+        <p>Chetana is positioned before loss: before UPI approval, OTP sharing, APK install, screen sharing, fake payment proof acceptance, or rushed reply.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">Sample case packet</div>
+      <h2>What Chetana helps the user preserve</h2>
+      <div class="rows">
+        <div class="row"><span>Trigger</span><p>Suspicious KYC/UPI pressure message with amount, phone number, UPI ID, or link.</p></div>
+        <div class="row"><span>Verdict</span><p>High risk: stop before paying, approving a collect request, sharing codes, installing an app, or giving screen access.</p></div>
+        <div class="row"><span>Identifiers</span><p>Current scan identifiers visible to the user: UPI ID, phone number, link domain, merchant name, amount, transaction reference if present.</p></div>
+        <div class="row"><span>Next action</span><p>Call 1930 if money, OTP, account access, or screen access moved. Otherwise use Chakshu, bank support, cybercrime.gov.in, or the official app.</p></div>
+        <div class="row"><span>Boundary</span><p>The packet is for the user to copy or share. Aggregate sponsor metrics do not include raw scan content.</p></div>
+      </div>
+    </section>
+
+    <section class="steps">
+      <div class="step"><span>Week 1</span><strong>Launch</strong><p>Publish sponsor QR/link and branch, merchant, or awareness copy.</p></div>
+      <div class="step"><span>Weeks 2-4</span><strong>Measure</strong><p>Track aggregate scans, high-risk pauses, official-rail taps, languages, and packet copies.</p></div>
+      <div class="step"><span>Weeks 5-8</span><strong>Tune</strong><p>Improve regional examples, merchant scripts, and recovery handoff wording.</p></div>
+      <div class="step"><span>Weeks 9-12</span><strong>Decide</strong><p>Deliver proof packet and choose sponsorship, CSR, procurement, or integration route.</p></div>
+    </section>
+
+    <div class="foot">
+      Chetana is independent and is not a government, RBI, NPCI, I4C, CERT-In, police, or bank service. It is an advisory scam-check tool that keeps official recovery rails visible.
+    </div>
+  </main>
+</body>
+</html>"""
+    return _HTML(content=html)
 
 
 @app.get("/privacy", include_in_schema=False)
@@ -2248,6 +2360,50 @@ async def privacy_policy():
       var button = document.getElementById("clear-local-scan-memory");
       var status = document.getElementById("clear-local-scan-memory-status");
       if (!button || !status) return;
+      function sessionId() {
+        try {
+          var existing = window.localStorage.getItem("chetana_v0_session_id");
+          if (existing) return existing;
+          return "chetana-v0-privacy-" + (window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : String(Date.now()));
+        } catch (error) {
+          return "chetana-v0-privacy";
+        }
+      }
+      function deviceClass() {
+        var ua = navigator.userAgent || "";
+        if (/Android/i.test(ua)) return "android_phone";
+        if (/iPhone|iPad|iPod/i.test(ua)) return "ios_phone";
+        if (window.innerWidth >= 1024) return "desktop";
+        return "web";
+      }
+      function trackClear() {
+        try {
+          window.fetch("/api/v0/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            cache: "no-store",
+            body: JSON.stringify({
+              event_name: "local_scan_memory_cleared",
+              session_id: sessionId(),
+              device_class: deviceClass(),
+              language_hint: (navigator.language || "en").slice(0, 2),
+              consent_class: "C0",
+              payload_class: "derived_state",
+              persistence_class: "P1",
+              metadata: {
+                event_version: "chetana.v0.analytics.v2",
+                privacy_action: "clear_scan_memory",
+                privacy_surface: "privacy_page",
+                page_path: window.location.pathname,
+                page_variant: "privacy",
+                cleared_key_classes: ["thread_hints", "scan_counters", "event_queue", "legacy_history", "vigilance_receipts"],
+                preserved_setup: true
+              }
+            })
+          }).catch(function () {});
+        } catch (error) {}
+      }
       button.addEventListener("click", function () {
         try {
           localKeys.forEach(function (key) { window.localStorage.removeItem(key); });
@@ -2255,6 +2411,7 @@ async def privacy_policy():
         try {
           sessionKeys.forEach(function (key) { window.sessionStorage.removeItem(key); });
         } catch (error) {}
+        trackClear();
         status.textContent = "Local scan memory cleared from this browser.";
       });
     })();

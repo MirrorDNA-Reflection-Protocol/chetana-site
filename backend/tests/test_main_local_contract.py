@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.analytics import build_v0_analytics_summary
 from app.api_keys import require_api_key
+import app.main as main_module
 from app.main import app
 
 
@@ -38,17 +39,65 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("It keeps language, install, consent, senior mode, and family settings.", html)
 
     def test_partner_packet_route_and_sitemap_are_public(self) -> None:
+        partners_resp = self.client.get("/partners")
+        self.assertEqual(partners_resp.status_code, 200)
+        partners_html = partners_resp.text
+        self.assertIn("Chetana Partner Pilots for Banks, Government, and CSR", partners_html)
+        self.assertIn('<meta property="og:title" content="Chetana Partner Pilots for Banks, Government, and CSR" />', partners_html)
+        self.assertIn('<link rel="canonical" href="https://chetana.activemirror.ai/partners" />', partners_html)
+
         packet_resp = self.client.get("/partners/packet")
         self.assertEqual(packet_resp.status_code, 200)
         packet_html = packet_resp.text
         self.assertIn("Scam-check pilot packet", packet_html)
         self.assertIn("Fund a fraud pause before money moves.", packet_html)
         self.assertIn("No account. No profile database.", packet_html)
+        self.assertIn("Open outreach kit", packet_html)
+
+        outreach_resp = self.client.get("/partners/outreach-kit")
+        self.assertEqual(outreach_resp.status_code, 200)
+        outreach_html = outreach_resp.text
+        self.assertIn("Chetana Outreach Kit for Sponsor Pilots", outreach_html)
+        self.assertIn("Bank / PSP email", outreach_html)
+        self.assertIn("Weekly pilot proof report", outreach_html)
 
         sitemap_resp = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap_resp.status_code, 200)
         self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/outreach-kit", sitemap_resp.text)
+
+    def test_partner_inquiry_endpoint_records_local_lead(self) -> None:
+        original_log = main_module.PARTNER_INQUIRIES_LOG
+        with tempfile.TemporaryDirectory() as tmpdir:
+            main_module.PARTNER_INQUIRIES_LOG = Path(tmpdir) / "partners" / "inquiries.jsonl"
+            try:
+                resp = self.client.post(
+                    "/api/v1/partners/inquiries",
+                    json={
+                        "name": "Pilot Owner",
+                        "organization": "Example Bank",
+                        "role": "Fraud Risk",
+                        "email": "pilot.owner@example.com",
+                        "pilot_type": "bank_psp",
+                        "message": "Run a branch-cluster pilot.",
+                        "source_path": "/partners",
+                    },
+                )
+                self.assertEqual(resp.status_code, 200)
+                data = resp.json()
+                self.assertTrue(data["ok"])
+                self.assertTrue(data["inquiry_id"].startswith("chetana-partner-"))
+
+                lines = main_module.PARTNER_INQUIRIES_LOG.read_text(encoding="utf-8").splitlines()
+                self.assertEqual(len(lines), 1)
+                payload = json.loads(lines[0])
+                self.assertEqual(payload["organization"], "Example Bank")
+                self.assertEqual(payload["email"], "pilot.owner@example.com")
+                self.assertEqual(payload["storage_boundary"], "local_jsonl_no_external_crm")
+                self.assertEqual(payload["status"], "new")
+            finally:
+                main_module.PARTNER_INQUIRIES_LOG = original_log
 
     @patch("app.main._notify_telegram", new_callable=AsyncMock, return_value=False)
     @patch(

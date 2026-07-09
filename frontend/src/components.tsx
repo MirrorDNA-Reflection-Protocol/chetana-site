@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import cytoscape from "cytoscape";
 import { useI18n } from "./i18n";
@@ -21,6 +21,15 @@ import { localScreenshotScan, localPatternScan } from "./localScanner";
 // i18n handled by Google Translate widget (index.html)
 
 const API = import.meta.env.DEV ? "http://localhost:8093" : "";
+const DEFAULT_PARTNER_INQUIRY = {
+  name: "",
+  organization: "",
+  role: "",
+  email: "",
+  pilot_type: "bank_psp",
+  message: "",
+  website: "",
+};
 const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
 const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d } });
 const PASTE_LANGUAGE_PROMPTS = [
@@ -3461,6 +3470,38 @@ export function FamilyPage() {
 /* ── Institutional Partner Page ──────────────────────────────── */
 export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const contactHref = "mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot&body=We%20would%20like%20to%20discuss%20a%20Chetana%20pilot%20or%20sponsorship.";
+  const [inquiry, setInquiry] = useState(DEFAULT_PARTNER_INQUIRY);
+  const [inquiryState, setInquiryState] = useState<"idle" | "submitting" | "sent" | "error">("idle");
+  const [inquiryStatus, setInquiryStatus] = useState("");
+  const updateInquiry = (key: keyof typeof DEFAULT_PARTNER_INQUIRY, value: string) => {
+    setInquiry((current) => ({ ...current, [key]: value }));
+    if (inquiryState !== "idle") {
+      setInquiryState("idle");
+      setInquiryStatus("");
+    }
+  };
+  const submitPartnerInquiry = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setInquiryState("submitting");
+    setInquiryStatus("Sending pilot request...");
+    try {
+      const response = await fetch(`${API}/api/v1/partners/inquiries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...inquiry, source_path: "/partners" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok !== true) {
+        throw new Error(data?.detail || "Could not record the request.");
+      }
+      setInquiryState("sent");
+      setInquiryStatus("Pilot request received. We will follow up from Active Mirror.");
+      setInquiry(DEFAULT_PARTNER_INQUIRY);
+    } catch (error) {
+      setInquiryState("error");
+      setInquiryStatus(error instanceof Error ? error.message : "Could not record the request. Email is still available.");
+    }
+  };
   const reasons = [
     "Put a fraud pause before payment, OTP sharing, APK install, screen sharing, or goods release.",
     "Turn panic into a cleaner incident packet: what happened, what was exposed, screenshots, identifiers, and the next official rail.",
@@ -3570,13 +3611,17 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           and routes them to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.
         </p>
         <div className="partner-actions">
-          <a className="partner-primary" href={contactHref}>
+          <a className="partner-primary" href="#pilot-inquiry">
             <MessageCircle size={17} />
-            Start a pilot
+            Request pilot contact
           </a>
           <a className="partner-secondary" href="/partners/packet" target="_blank" rel="noreferrer">
             <FileText size={17} />
             Open pilot packet
+          </a>
+          <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
+            <Share2 size={17} />
+            Outreach kit
           </a>
           <button className="partner-secondary" onClick={() => onNavigate("nexus")}>
             <FileText size={17} />
@@ -3598,6 +3643,109 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           Chetana does not replace a bank, police portal, or government helpline. It makes the moment before
           escalation simpler, faster, and measurable without collecting a user-profile database.
         </p>
+      </div>
+
+      <div className="partner-inquiry-panel" id="pilot-inquiry">
+        <div className="partner-inquiry-copy">
+          <div className="kicker">Sponsor intake</div>
+          <h2>Tell us who should sponsor the pilot.</h2>
+          <p>
+            Use this for a bank, public program, telecom team, CSR committee, fintech, or merchant network.
+            Chetana stores the inquiry locally and does not add an external CRM.
+          </p>
+          <div className="partner-inquiry-privacy">
+            No raw scam scan text, screenshots, UPI IDs, phone numbers, or user profiles are sent through this form.
+          </div>
+        </div>
+        <form className="partner-inquiry-form" onSubmit={submitPartnerInquiry}>
+          <div className="partner-form-grid">
+            <label className="partner-field">
+              <span>Your name</span>
+              <input
+                value={inquiry.name}
+                onChange={(event) => updateInquiry("name", event.target.value)}
+                minLength={2}
+                maxLength={120}
+                required
+                autoComplete="name"
+              />
+            </label>
+            <label className="partner-field">
+              <span>Organization</span>
+              <input
+                value={inquiry.organization}
+                onChange={(event) => updateInquiry("organization", event.target.value)}
+                minLength={2}
+                maxLength={160}
+                required
+                autoComplete="organization"
+              />
+            </label>
+            <label className="partner-field">
+              <span>Role</span>
+              <input
+                value={inquiry.role}
+                onChange={(event) => updateInquiry("role", event.target.value)}
+                maxLength={120}
+                autoComplete="organization-title"
+              />
+            </label>
+            <label className="partner-field">
+              <span>Email</span>
+              <input
+                value={inquiry.email}
+                onChange={(event) => updateInquiry("email", event.target.value)}
+                type="email"
+                maxLength={180}
+                required
+                autoComplete="email"
+              />
+            </label>
+          </div>
+          <label className="partner-field">
+            <span>Pilot lane</span>
+            <select value={inquiry.pilot_type} onChange={(event) => updateInquiry("pilot_type", event.target.value)}>
+              <option value="bank_psp">Bank / PSP fraud-risk pilot</option>
+              <option value="government_public_program">Government or public digital-safety program</option>
+              <option value="csr_digital_safety">CSR digital-safety sponsorship</option>
+              <option value="telecom_fraud">Telecom anti-fraud campaign</option>
+              <option value="merchant_network">Merchant association or retail network</option>
+              <option value="other">Other institutional pilot</option>
+            </select>
+          </label>
+          <label className="partner-field">
+            <span>What should we know?</span>
+            <textarea
+              value={inquiry.message}
+              onChange={(event) => updateInquiry("message", event.target.value)}
+              maxLength={2000}
+              rows={4}
+              placeholder="Region, audience, fraud problem, or person we should contact."
+            />
+          </label>
+          <label className="partner-field partner-honeypot" aria-hidden="true">
+            <span>Website</span>
+            <input
+              value={inquiry.website}
+              onChange={(event) => updateInquiry("website", event.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </label>
+          <div className="partner-form-actions">
+            <button className="partner-primary" type="submit" disabled={inquiryState === "submitting"}>
+              <Send size={17} />
+              {inquiryState === "submitting" ? "Sending..." : "Request pilot contact"}
+            </button>
+            <a className="partner-secondary" href={contactHref}>
+              <MessageCircle size={17} />
+              Email instead
+            </a>
+          </div>
+          <div className={`partner-form-status ${inquiryState}`} aria-live="polite">
+            {inquiryStatus}
+          </div>
+        </form>
       </div>
 
       <div className="partner-proof-grid">
@@ -3635,6 +3783,10 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <a className="partner-secondary" href={contactHref}>
               <MessageCircle size={17} />
               Email pilot request
+            </a>
+            <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
+              <Share2 size={17} />
+              Open outreach kit
             </a>
           </div>
         </div>

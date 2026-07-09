@@ -8,6 +8,7 @@ Kavach remains available for thin identifier checks and feeds.
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import html as html_lib
 import httpx
 import json
 import logging
@@ -19,7 +20,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
@@ -201,6 +202,92 @@ _client: httpx.AsyncClient | None = None
 _CHAT_WINDOW_S = int(os.getenv("CHETANA_CHAT_WINDOW_S", "60"))
 _CHAT_MAX_REQUESTS = int(os.getenv("CHETANA_CHAT_MAX_REQUESTS", "12"))
 _CHAT_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
+PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
+_PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class PartnerInquiryRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=120)
+    organization: str = Field(..., min_length=2, max_length=160)
+    role: str = Field(default="", max_length=120)
+    email: str = Field(..., min_length=5, max_length=180)
+    pilot_type: Literal[
+        "bank_psp",
+        "government_public_program",
+        "csr_digital_safety",
+        "telecom_fraud",
+        "merchant_network",
+        "other",
+    ] = "bank_psp"
+    message: str = Field(default="", max_length=2000)
+    source_path: str = Field(default="/partners", max_length=160)
+    website: str = Field(default="", max_length=160)
+
+
+def _partner_now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _compact_partner_text(value: str | None, max_len: int) -> str:
+    compact = re.sub(r"\s+", " ", (value or "").strip())
+    return compact[:max_len]
+
+
+def _append_partner_inquiry(payload: dict[str, Any]) -> None:
+    PARTNER_INQUIRIES_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with PARTNER_INQUIRIES_LOG.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def _render_spa_route(title: str, description: str, canonical_path: str) -> str:
+    index_path = frontend_dist / "index.html"
+    if index_path.exists():
+        page = index_path.read_text(encoding="utf-8")
+    else:
+        page = (
+            "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "</head><body><div id=\"root\"></div></body></html>"
+        )
+
+    origin = "https://chetana.activemirror.ai"
+    canonical = f"{origin}{canonical_path}"
+    image = f"{origin}/og-image.png"
+    safe_title = html_lib.escape(title, quote=True)
+    safe_description = html_lib.escape(description, quote=True)
+    safe_canonical = html_lib.escape(canonical, quote=True)
+    safe_image = html_lib.escape(image, quote=True)
+
+    page = re.sub(r"<title>.*?</title>", f"<title>{safe_title}</title>", page, count=1, flags=re.S)
+    page = re.sub(r"\n?\s*<meta name=\"description\" content=\"[^\"]*\"\s*/?>", "", page)
+    page = re.sub(r"\n?\s*<link rel=\"canonical\" href=\"[^\"]*\"\s*/?>", "", page)
+    page = re.sub(
+        r"\n?\s*<meta (?:property|name)=\"(?:og:[^\"]+|twitter:[^\"]+)\" content=\"[^\"]*\"\s*/?>",
+        "",
+        page,
+    )
+
+    meta_block = f"""    <meta name="description" content="{safe_description}" />
+    <link rel="canonical" href="{safe_canonical}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{safe_canonical}" />
+    <meta property="og:title" content="{safe_title}" />
+    <meta property="og:description" content="{safe_description}" />
+    <meta property="og:image" content="{safe_image}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Chetana by Active Mirror" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@ActiveMirror_" />
+    <meta name="twitter:creator" content="@ActiveMirror_" />
+    <meta name="twitter:title" content="{safe_title}" />
+    <meta name="twitter:description" content="{safe_description}" />
+    <meta name="twitter:image" content="{safe_image}" />"""
+
+    marker = "    <!-- Design System Fonts -->"
+    if marker in page:
+        return page.replace(marker, f"{meta_block}\n\n{marker}", 1)
+    return page.replace("</head>", f"{meta_block}\n</head>", 1)
 
 
 async def get_client() -> httpx.AsyncClient:
@@ -2125,6 +2212,41 @@ async def v0_trust_bundle(req: V0TrustRuntimeRequest):
     bundle = build_trust_bundle(req)
     return {"trust_bundle": bundle.model_dump()}
 
+
+@app.post("/api/v1/partners/inquiries")
+async def partner_inquiry(req: PartnerInquiryRequest):
+    """Record a local institutional pilot inquiry without adding an external CRM dependency."""
+    received_at = _partner_now_utc()
+    if _compact_partner_text(req.website, 160):
+        return {"ok": True, "inquiry_id": None, "received_at_utc": received_at}
+
+    email = _compact_partner_text(req.email, 180).lower()
+    if not _PARTNER_EMAIL_RE.fullmatch(email):
+        raise HTTPException(status_code=422, detail="Enter a valid email address.")
+
+    name = _compact_partner_text(req.name, 120)
+    organization = _compact_partner_text(req.organization, 160)
+    if len(name) < 2 or len(organization) < 2:
+        raise HTTPException(status_code=422, detail="Name and organization are required.")
+
+    inquiry_id = f"chetana-partner-{uuid4().hex[:12]}"
+    payload = {
+        "inquiry_id": inquiry_id,
+        "received_at_utc": received_at,
+        "name": name,
+        "organization": organization,
+        "role": _compact_partner_text(req.role, 120),
+        "email": email,
+        "pilot_type": req.pilot_type,
+        "message": _compact_partner_text(req.message, 2000),
+        "source_path": _compact_partner_text(req.source_path, 160) or "/partners",
+        "storage_boundary": "local_jsonl_no_external_crm",
+        "status": "new",
+    }
+    _append_partner_inquiry(payload)
+    return {"ok": True, "inquiry_id": inquiry_id, "received_at_utc": received_at}
+
+
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
 
@@ -2147,6 +2269,7 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/#trust</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
 </urlset>"""
     return PlainTextResponse(xml, media_type="application/xml")
 
@@ -2159,6 +2282,20 @@ async def security_txt():
         "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
         media_type="text/plain"
     )
+
+
+@app.get("/partners", include_in_schema=False)
+@app.get("/partners/", include_in_schema=False)
+async def partners_page():
+    html = _render_spa_route(
+        title="Chetana Partner Pilots for Banks, Government, and CSR",
+        description=(
+            "Sponsor a 90-day Chetana scam-check pilot for banks, public programs, telecom anti-fraud teams, "
+            "CSR committees, fintechs, or merchant networks in India."
+        ),
+        canonical_path="/partners",
+    )
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/partners/packet", include_in_schema=False)
@@ -2220,6 +2357,7 @@ async def partners_packet():
     <div class="cta">
       <a class="primary" href="mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot">Start a pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Open partner page</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/outreach-kit">Open outreach kit</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
     </div>
 
@@ -2269,6 +2407,144 @@ async def partners_packet():
 </body>
 </html>"""
     return _HTML(content=html)
+
+
+@app.get("/partners/outreach-kit", include_in_schema=False)
+async def partners_outreach_kit():
+    return HTMLResponse(
+        content="""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chetana Outreach Kit for Sponsor Pilots</title>
+  <meta name="description" content="Forwardable Chetana outreach templates for bank, government, CSR, telecom, fintech, and merchant sponsor pilots.">
+  <style>
+    :root { color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#fff; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }
+    main { max-width:980px; margin:0 auto; padding:34px 22px 44px; }
+    a { color:var(--accent); font-weight:700; }
+    h1 { max-width:790px; margin:10px 0 12px; font-size:clamp(2rem, 5vw, 4rem); line-height:1; letter-spacing:0; }
+    h2 { margin:0 0 10px; font-size:1.22rem; }
+    p { margin:0; color:var(--muted); }
+    .top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; padding-bottom:18px; border-bottom:2px solid var(--ink); }
+    .label { color:var(--gold); font-size:.74rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+    .cta { display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 24px; }
+    .cta a { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 14px; border-radius:8px; text-decoration:none; }
+    .primary { background:var(--accent); color:#fff; }
+    .secondary { border:1px solid var(--line); color:var(--ink); }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+    .card, .template, .report { border:1px solid var(--line); border-radius:8px; background:#fff; padding:16px; }
+    .card { min-height:160px; background:var(--soft); }
+    .card strong { display:block; margin-bottom:8px; }
+    .templates { display:grid; gap:14px; margin-top:18px; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:10px 0 0; padding:14px; border-radius:8px; background:#0f172a; color:#e5e7eb; font-size:.92rem; line-height:1.55; }
+    .report { margin-top:18px; background:var(--soft); }
+    .foot { margin-top:22px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem; }
+    @media (max-width:760px) { .top { display:grid; } .grid { grid-template-columns:1fr; } }
+    @media print { .cta { display:none; } main { padding:18px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <div class="label">Chetana by Active Mirror</div>
+        <strong>Sponsor outreach kit</strong>
+      </div>
+      <p>Use with <a href="https://chetana.activemirror.ai/partners/packet">the pilot packet</a>.</p>
+    </div>
+    <h1>Forwardable copy for getting Chetana sponsored.</h1>
+    <p>These templates are written for Indian banks, public digital-safety programs, telecom anti-fraud teams, CSR committees, fintechs, and merchant associations. Keep the ask simple: sponsor one focused 90-day pilot and measure high-risk pauses plus official handoffs.</p>
+    <div class="cta">
+      <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request pilot contact</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
+      <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
+    </div>
+
+    <section class="grid">
+      <div class="card"><strong>Best first audience</strong><p>A bank fraud-risk, innovation, CSR, public policy, or customer education owner who already cares about UPI fraud, digital arrest, APK, KYC, or merchant fake-payment losses.</p></div>
+      <div class="card"><strong>Simple ask</strong><p>Fund one QR/link campaign for one region, branch cluster, language group, merchant association, or public-awareness drive.</p></div>
+      <div class="card"><strong>Proof to promise</strong><p>Weekly aggregate report: scans, high-risk pauses, official-rail taps, languages, packet copies, and privacy-control usage. No raw scan content.</p></div>
+    </section>
+
+    <section class="templates">
+      <div class="template">
+        <div class="label">Bank / PSP email</div>
+        <h2>Subject: 90-day Chetana pilot to create a fraud pause before UPI loss</h2>
+        <pre>Hello [Name],
+
+Chetana is an independent scam checker for India. A user screenshots a suspicious message, QR request, fake payment proof, APK link, or UPI pressure flow and gets a plain-language risk read before they act.
+
+We are looking for one bank/PSP partner to sponsor a focused 90-day pilot for [region / branch cluster / customer education campaign]. The pilot measures aggregate scans, high-risk pauses, 1930/cybercrime handoffs, language usage, packet copies, and privacy-control usage. It does not share raw scan text, screenshots, UPI IDs, phone numbers, or user profiles with the sponsor.
+
+Pilot packet: https://chetana.activemirror.ai/partners/packet
+Contact: https://chetana.activemirror.ai/partners#pilot-inquiry
+
+Would you be open to a short pilot scoping call?</pre>
+      </div>
+      <div class="template">
+        <div class="label">Government / public program email</div>
+        <h2>Subject: Chetana public-awareness pilot for scam checks before escalation</h2>
+        <pre>Hello [Name],
+
+Chetana can give citizens a simple first stop before panic, payment, OTP sharing, APK install, screen sharing, or complaint filing. It keeps official rails visible: 1930, cybercrime.gov.in, Chakshu, bank support, and relevant recovery steps.
+
+We propose a 90-day public-awareness pilot for [district / state / language group / campaign]. The goal is not to replace official portals. The goal is to reduce confusion before loss and make evidence preservation easier after loss.
+
+Pilot packet: https://chetana.activemirror.ai/partners/packet
+Outreach kit: https://chetana.activemirror.ai/partners/outreach-kit
+
+Can we share a one-page pilot outline with the right digital-safety or cyber-awareness owner?</pre>
+      </div>
+      <div class="template">
+        <div class="label">CSR / merchant network email</div>
+        <h2>Subject: Sponsor a simple scam checker for families and small merchants</h2>
+        <pre>Hello [Name],
+
+Most people do not need a complex app when they are scared. They need one easy action: screenshot anything and ask Chetana.
+
+Chetana helps families, seniors, students, and small merchants check suspicious messages, QR requests, payment proofs, and fake support pressure before they lose money or release goods. A sponsor can fund a focused 90-day pilot and receive aggregate proof of use without getting raw user scan content.
+
+Pilot packet: https://chetana.activemirror.ai/partners/packet
+Try Chetana: https://chetana.activemirror.ai
+
+Could we discuss a CSR or merchant-awareness pilot?</pre>
+      </div>
+    </section>
+
+    <section class="report">
+      <div class="label">Weekly pilot proof report</div>
+      <h2>Use this report shape with sponsors</h2>
+      <pre>Week: [date range]
+Sponsor lane: [bank / public program / CSR / merchant]
+Audience: [region, branch cluster, language, campaign]
+
+Aggregate outcomes:
+- Scans completed:
+- High-risk pauses:
+- 1930 / cybercrime handoffs:
+- Chakshu / bank / official-app handoffs:
+- Recovery packets copied:
+- Languages used:
+- Privacy controls used:
+
+Top patterns seen:
+- [Pattern 1]
+- [Pattern 2]
+- [Pattern 3]
+
+Sponsor-safe boundary:
+No raw scan text, screenshots, UPI IDs, phone numbers, or user profiles are included in this report.</pre>
+    </section>
+
+    <div class="foot">Chetana is independent and is not a government, RBI, NPCI, I4C, CERT-In, police, or bank service. It is an advisory scam-check tool that keeps official recovery rails visible.</div>
+  </main>
+</body>
+</html>""",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/privacy", include_in_schema=False)

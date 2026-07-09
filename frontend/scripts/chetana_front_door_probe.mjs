@@ -26,21 +26,48 @@ async function fetchText(path) {
 
 async function main() {
   await fetchText("/");
+  const partners = await fetchText("/partners");
+  const partnerNeedles = [
+    "Chetana Partner Pilots for Banks, Government, and CSR",
+    "https://chetana.activemirror.ai/partners",
+    "og:title",
+  ];
+  const missingPartnerNeedles = partnerNeedles.filter((needle) => !partners.includes(needle));
+  if (missingPartnerNeedles.length > 0) {
+    throw new Error(`Partner page metadata missing strings: ${missingPartnerNeedles.join(", ")}`);
+  }
+
   const packet = await fetchText("/partners/packet");
   const packetNeedles = [
     "Scam-check pilot packet",
     "Fund a fraud pause before money moves.",
     "No account. No profile database.",
     "Sample case packet",
+    "Open outreach kit",
   ];
   const missingPacketNeedles = packetNeedles.filter((needle) => !packet.includes(needle));
   if (missingPacketNeedles.length > 0) {
     throw new Error(`Partner packet missing strings: ${missingPacketNeedles.join(", ")}`);
   }
 
+  const outreachKit = await fetchText("/partners/outreach-kit");
+  const outreachNeedles = [
+    "Chetana Outreach Kit for Sponsor Pilots",
+    "Bank / PSP email",
+    "Government / public program email",
+    "Weekly pilot proof report",
+  ];
+  const missingOutreachNeedles = outreachNeedles.filter((needle) => !outreachKit.includes(needle));
+  if (missingOutreachNeedles.length > 0) {
+    throw new Error(`Partner outreach kit missing strings: ${missingOutreachNeedles.join(", ")}`);
+  }
+
   const sitemap = await fetchText("/sitemap.xml");
   if (!sitemap.includes("https://chetana.activemirror.ai/partners/packet")) {
     throw new Error("Sitemap does not include /partners/packet");
+  }
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/outreach-kit")) {
+    throw new Error("Sitemap does not include /partners/outreach-kit");
   }
 
   const verdict = await postJson("/api/v0/scan", {

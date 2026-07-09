@@ -299,6 +299,7 @@ export default function ChetanaV0Experience({
   const [showFullBreakdown, setShowFullBreakdown] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [casePacketCopied, setCasePacketCopied] = useState(false);
+  const [linkedPacketCopied, setLinkedPacketCopied] = useState(false);
   const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
 
   useEffect(() => {
@@ -504,6 +505,46 @@ export default function ChetanaV0Experience({
       "- Preserve screenshots, UTR/transaction ID, phone numbers, UPI IDs, links, and chat history.",
     ].join("\n");
   }, [casePacketRows, result]);
+  const linkedThreadPacketText = useMemo(() => {
+    if (!result || !threadSignal) return "";
+    const entities = result.entities;
+    const upiIds = entities?.upi_ids || [];
+    const phoneNumbers = entities?.phone_numbers || [];
+    const urls = entities?.urls || [];
+    const identifierLines = [
+      upiIds.length > 0 ? `- UPI IDs in current scan: ${upiIds.join(", ")}` : null,
+      phoneNumbers.length > 0 ? `- Phone numbers in current scan: ${phoneNumbers.join(", ")}` : null,
+      urls.length > 0 ? `- Links in current scan: ${urls.join(", ")}` : null,
+    ].filter((line): line is string => Boolean(line));
+
+    return [
+      "Chetana linked scam summary",
+      `Scan: ${result.scan_id}`,
+      `Verdict: ${verdictLabel(result.verdict)} - ${scamTypeLabel(result.scam_type)}`,
+      `Safe next step: ${result.safe_next_step || result.guidance?.do_now?.[0] || "Verify before you act."}`,
+      `Repeated signal: ${threadSignal.label}`,
+      `Linked scans on this device: ${threadSignal.event_count}`,
+      "",
+      "Current scan identifiers:",
+      ...(identifierLines.length ? identifierLines : ["- No visible phone, UPI, or link in the current scan."]),
+      "",
+      "Local thread note:",
+      "- Chetana matched private hashes saved in this browser.",
+      "- This thread history was not sent to Chetana's server.",
+      "- This is a warning signal, not an official fraud determination.",
+      "",
+      "What to preserve:",
+      "- Screenshots of the message, sender profile, payment request, and payment app screen.",
+      "- UTR / transaction ID, amount, date, and time if any money moved.",
+      "- Phone numbers, UPI IDs, links, caller name, and app names involved.",
+      "",
+      "Use this with:",
+      "- Your bank or payment app support.",
+      "- 1930 if money, OTP, account access, or screen access was exposed.",
+      "- cybercrime.gov.in if you need to file or continue a report.",
+      "- A trusted family member before paying or replying.",
+    ].join("\n");
+  }, [result, threadSignal]);
 
   const resetScanState = (nextStatus = "Ready when you are.") => {
     setResult(null);
@@ -521,6 +562,7 @@ export default function ChetanaV0Experience({
     setShowFullBreakdown(false);
     setShareCopied(false);
     setCasePacketCopied(false);
+    setLinkedPacketCopied(false);
     setMoneyMovedAnswer(null);
     setStatus(nextStatus);
   };
@@ -1117,6 +1159,36 @@ export default function ChetanaV0Experience({
     }
   };
 
+  const copyLinkedThreadPacket = async () => {
+    if (!result || !threadSignal || !linkedThreadPacketText) return;
+    try {
+      await navigator.clipboard.writeText(linkedThreadPacketText);
+      setLinkedPacketCopied(true);
+      window.setTimeout(() => setLinkedPacketCopied(false), 1800);
+      void trackV0Event({
+        event_name: "evidence_saved",
+        session_id: sessionId,
+        scan_id: result.scan_id,
+        input_type: result.input_type,
+        verdict: result.verdict,
+        device_class: deviceClass(),
+        language_hint: result.language_hint || navigator.language.slice(0, 2),
+        metadata: {
+          recovery_step: "linked_thread_case_packet_copy",
+          recovery_channel: "clipboard",
+          artifact_kind: "linked_text_case_packet",
+          local_thread_event_count: threadSignal.event_count,
+          local_thread_matched_kinds: threadSignal.matched_kinds,
+        },
+      }, {
+        dedupeTtlMs: EXPORT_EVENT_TTL_MS,
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      setStatus("Could not copy. Select the linked case text manually.");
+    }
+  };
+
   const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
     if (!result) return;
     const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
@@ -1520,8 +1592,14 @@ export default function ChetanaV0Experience({
               {threadSignal && (
                 <div className="v0-thread-strip">
                   <Shield size={15} />
-                  <span>{threadSignal.message}</span>
-                  <small>{threadSignal.privacy_note}</small>
+                  <div className="v0-thread-copy">
+                    <span>{threadSignal.message}</span>
+                    <small>{threadSignal.privacy_note}</small>
+                  </div>
+                  <button className="v0-thread-copy-button" onClick={copyLinkedThreadPacket}>
+                    <Copy size={13} />
+                    {linkedPacketCopied ? "Copied case packet" : "Copy case packet"}
+                  </button>
                 </div>
               )}
 

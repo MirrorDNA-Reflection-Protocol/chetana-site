@@ -2029,15 +2029,43 @@ main {
   font-weight: 760;
 }
 
-.v0-thread-strip svg {
+.v0-thread-strip > svg {
   grid-row: 1 / span 2;
   flex: 0 0 auto;
 }
 
-.v0-thread-strip small {
+.v0-thread-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.v0-thread-copy small {
   color: rgba(204,251,241,0.76);
   font-size: 0.76rem;
   font-weight: 680;
+}
+
+.v0-thread-copy-button {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 5px;
+  min-height: 34px;
+  border: 1px solid rgba(204,251,241,0.24);
+  background: rgba(204,251,241,0.1);
+  color: #ecfeff;
+  border-radius: 999px;
+  padding: 7px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  line-height: 1;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.v0-thread-copy-button:hover {
+  background: rgba(204,251,241,0.16);
 }
 
 .v0-reason-list,

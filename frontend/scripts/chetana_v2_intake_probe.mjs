@@ -33,6 +33,9 @@ const servedSafetyNudgeChecks = [
   "No known match found. Still verify before paying.",
   "appeared in another scan on this device",
   "Threading stays in this browser as private hashes.",
+  "Copy case packet",
+  "Chetana linked scam summary",
+  "This is a warning signal, not an official fraud determination.",
 ];
 
 async function fetchText(pathOrUrl) {

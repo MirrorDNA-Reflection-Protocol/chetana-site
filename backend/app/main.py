@@ -65,6 +65,7 @@ from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary 
 from app.field_harness import (  # noqa: E402
     FIELD_SOURCE_TAGS,
     campaign_url_for_source,
+    build_field_launch_receipt,
     build_field_harness,
     render_campaign_poster_html,
     render_field_harness_html,
@@ -1952,6 +1953,12 @@ async def partner_pilottrace(days: int = Query(default=14, ge=1, le=90)):
 async def partner_field_harness():
     """Return the source-tagged field deployment contract for Chetana pilots."""
     return build_field_harness(CHETANA_PUBLIC_ORIGIN)
+
+
+@app.get("/api/v1/partners/field-harness/launch-receipt")
+async def partner_field_harness_launch_receipt():
+    """Return a machine-verifiable receipt for campaign QR/poster assets."""
+    return build_field_launch_receipt(CHETANA_PUBLIC_ORIGIN)
 
 
 @app.get("/api/v1/rails", response_model=list[GamechangerOfficialRail])

@@ -113,6 +113,7 @@ async function main() {
     "source=merchant_counter&amp;action=scam_check",
     "Aggregate by default",
     "Open JSON contract",
+    "Open launch receipt",
   ];
   const missingFieldHarnessNeedles = fieldHarnessNeedles.filter((needle) => !fieldHarness.includes(needle));
   if (missingFieldHarnessNeedles.length > 0) {
@@ -138,6 +139,24 @@ async function main() {
   }
   if (!(fieldHarnessJson.feedback_buckets || []).every((bucket) => bucket.free_text === false)) {
     throw new Error("Field harness feedback buckets must stay free-text disabled.");
+  }
+
+  const launchReceipt = await fetchJson("/api/v1/partners/field-harness/launch-receipt");
+  if (launchReceipt.schema_version !== "chetana.field_launch_receipt.v0.1") {
+    throw new Error("Field launch receipt has wrong schema version.");
+  }
+  if (launchReceipt.status !== "ready_for_distribution" || launchReceipt.sponsor_safe !== true) {
+    throw new Error("Field launch receipt is not marked sponsor-safe and distribution-ready.");
+  }
+  if (launchReceipt.phone_camera_scan_proof?.status !== "unchecked") {
+    throw new Error("Field launch receipt must not claim physical phone camera scan proof.");
+  }
+  if (!(launchReceipt.proof_limits || []).includes("This receipt does not prove a physical phone camera scanned the QR.")) {
+    throw new Error("Field launch receipt is missing physical-scan proof limit.");
+  }
+  const receiptBankAsset = (launchReceipt.campaign_assets || []).find((item) => item.source === "bank_qr");
+  if (!receiptBankAsset?.checks || !Object.values(receiptBankAsset.checks).every(Boolean)) {
+    throw new Error("Field launch receipt bank_qr checks are not all green.");
   }
 
   const bankQrSvg = await fetchText("/partners/qr/bank_qr.svg");

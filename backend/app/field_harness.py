@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 from urllib.parse import quote
 from typing import Any
 
@@ -195,6 +196,56 @@ def build_field_harness(public_origin: str) -> dict[str, Any]:
             {"day": "8-21", "step": "Review PilotTrace aggregates and tune copy, not user privacy boundaries."},
             {"day": "22-30", "step": "Deliver sponsor-safe proof and decide sponsorship, CSR, or integration path."},
         ],
+    }
+
+
+def build_field_launch_receipt(public_origin: str) -> dict[str, Any]:
+    harness = build_field_harness(public_origin)
+    assets = []
+    for item in harness["campaign_links"]:
+        source = item["source"]
+        qr_svg = render_qr_svg(item["qr_payload"], title=f"Chetana {item['label']} campaign code")
+        poster_html = render_campaign_poster_html(public_origin, source)
+        assets.append({
+            "source": source,
+            "label": item["label"],
+            "campaign_url": item["url"],
+            "qr_payload": item["qr_payload"],
+            "qr_svg_url": item["qr_svg_url"],
+            "poster_url": item["poster_url"],
+            "tracked_params": item["tracked_params"],
+            "qr_payload_sha256": hashlib.sha256(item["qr_payload"].encode("utf-8")).hexdigest(),
+            "qr_svg_sha256": hashlib.sha256(qr_svg.encode("utf-8")).hexdigest(),
+            "poster_html_sha256": hashlib.sha256(poster_html.encode("utf-8")).hexdigest(),
+            "checks": {
+                "campaign_url_has_source": f"source={source}" in item["url"],
+                "campaign_url_has_action": "action=scam_check" in item["url"],
+                "qr_svg_embeds_payload": html.escape(item["qr_payload"]) in qr_svg,
+                "poster_embeds_payload": html.escape(item["qr_payload"]) in poster_html,
+                "qr_and_poster_routes_present": bool(item["qr_svg_url"] and item["poster_url"]),
+            },
+        })
+    all_ready = all(all(asset["checks"].values()) for asset in assets)
+    return {
+        "schema_version": "chetana.field_launch_receipt.v0.1",
+        "status": "ready_for_distribution" if all_ready else "needs_review",
+        "sponsor_safe": True,
+        "public_origin": public_origin.rstrip("/"),
+        "asset_count": len(assets),
+        "campaign_assets": assets,
+        "privacy_boundary": harness["privacy_boundary"],
+        "event_contract": harness["event_contract"],
+        "pilottrace_metrics": harness["pilottrace_metrics"],
+        "proof_limits": [
+            "This receipt verifies generated campaign URLs, QR SVG payloads, and printable poster payloads.",
+            "This receipt does not prove a physical phone camera scanned the QR.",
+            "This receipt does not prove campaign distribution or user traffic.",
+            "PilotTrace must be used after launch to verify real scans, pauses, and follow-through.",
+        ],
+        "phone_camera_scan_proof": {
+            "status": "unchecked",
+            "reason": "Requires a reachable physical phone or external camera scan receipt.",
+        },
     }
 
 
@@ -624,6 +675,7 @@ def render_field_harness_html(harness: dict[str, Any]) -> str:
       <a class="primary" href="{html.escape(harness["campaign_links"][0]["url"], quote=True)}">Open bank QR link</a>
       <a class="primary" href="{html.escape(harness["whatsapp"]["url"], quote=True)}">Forward WhatsApp copy</a>
       <a class="secondary" href="{html.escape(harness["public_origin"], quote=True)}/api/v1/partners/field-harness">Open JSON contract</a>
+      <a class="secondary" href="{html.escape(harness["public_origin"], quote=True)}/api/v1/partners/field-harness/launch-receipt">Open launch receipt</a>
       <a class="secondary" href="{html.escape(harness["public_origin"], quote=True)}/partners/pilottrace">View PilotTrace</a>
       <a class="secondary" href="{html.escape(harness["public_origin"], quote=True)}/partners/30-day-pilot">Open 30-day pilot</a>
     </div>

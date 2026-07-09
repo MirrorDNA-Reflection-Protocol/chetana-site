@@ -106,6 +106,7 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("Aggregate by default", harness_html)
         self.assertIn("Open QR SVG", harness_html)
         self.assertIn("Open printable poster", harness_html)
+        self.assertIn("Open launch receipt", harness_html)
 
         sitemap_resp = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap_resp.status_code, 200)
@@ -209,6 +210,27 @@ class MainLocalContractTests(unittest.TestCase):
         serialized = json.dumps(data)
         self.assertNotIn("raw_scan_text\":", serialized)
         self.assertNotIn("screenshot_bytes", serialized)
+
+    def test_partner_field_launch_receipt_is_explicit_about_proof_limits(self) -> None:
+        resp = self.client.get("/api/v1/partners/field-harness/launch-receipt")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["schema_version"], "chetana.field_launch_receipt.v0.1")
+        self.assertEqual(data["status"], "ready_for_distribution")
+        self.assertTrue(data["sponsor_safe"])
+        self.assertEqual(data["asset_count"], 6)
+        self.assertEqual(data["phone_camera_scan_proof"]["status"], "unchecked")
+        self.assertIn("This receipt does not prove a physical phone camera scanned the QR.", data["proof_limits"])
+
+        assets = {item["source"]: item for item in data["campaign_assets"]}
+        self.assertIn("bank_qr", assets)
+        bank_asset = assets["bank_qr"]
+        self.assertEqual(bank_asset["tracked_params"], {"source": "bank_qr", "action": "scam_check"})
+        self.assertIn("source=bank_qr&action=scam_check", bank_asset["campaign_url"])
+        self.assertRegex(bank_asset["qr_payload_sha256"], r"^[a-f0-9]{64}$")
+        self.assertRegex(bank_asset["qr_svg_sha256"], r"^[a-f0-9]{64}$")
+        self.assertRegex(bank_asset["poster_html_sha256"], r"^[a-f0-9]{64}$")
+        self.assertTrue(all(bank_asset["checks"].values()))
 
     def test_partner_field_harness_qr_and_poster_assets_are_local(self) -> None:
         qr_resp = self.client.get("/partners/qr/bank_qr.svg")

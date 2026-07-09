@@ -3497,6 +3497,32 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
     "Recovery packets copied",
     "False-safe complaints",
   ];
+  const sourceLadder = [
+    {
+      icon: <ShieldCheck size={18} />,
+      status: "Live now",
+      title: "Local scam rules",
+      text: "Tap-only and screenshot-first triage for OTP, UPI, APK, remote access, KYC, courier, job, and merchant scams.",
+    },
+    {
+      icon: <Search size={18} />,
+      status: "API candidates",
+      title: "URL and file reputation",
+      text: "Google Safe Browsing, URLhaus, PhishTank, OpenPhish, VirusTotal, and urlscan can enrich suspicious links with consent and keys.",
+    },
+    {
+      icon: <Globe size={18} />,
+      status: "Official manual rails",
+      title: "India reporting paths",
+      text: "1930, cybercrime.gov.in, NCRP suspect search, Chakshu, RBI CMS, and bank support stay visible as official next steps.",
+    },
+    {
+      icon: <BookOpen size={18} />,
+      status: "Research only",
+      title: "News and OSINT signals",
+      text: "Sources like The420 help track patterns and briefs, but they are not automated verdict ground truth.",
+    },
+  ];
 
   return (
     <section className="partner-page">
@@ -3555,6 +3581,32 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <p>{pilot.text}</p>
           </div>
         ))}
+      </div>
+
+      <div className="partner-source-ladder">
+        <div className="partner-source-head">
+          <div>
+            <div className="kicker">Data / API ladder</div>
+            <h2>Built to add signal without overclaiming.</h2>
+          </div>
+          <p>
+            Chetana starts with local rules and official routing. External APIs can enrich suspicious links,
+            but a no-match never means safe.
+          </p>
+        </div>
+        <div className="partner-source-grid">
+          {sourceLadder.map((source) => (
+            <div className="partner-source-card" key={source.title}>
+              <div className="partner-card-icon">{source.icon}</div>
+              <span>{source.status}</span>
+              <h3>{source.title}</h3>
+              <p>{source.text}</p>
+            </div>
+          ))}
+        </div>
+        <div className="partner-source-note">
+          Machine-readable source registry: <code>/api/v1/intelligence-sources</code>
+        </div>
       </div>
 
       <div className="partner-proof">

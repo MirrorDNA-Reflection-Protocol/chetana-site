@@ -82,6 +82,30 @@ export interface V0ScanExtraction {
   image_metadata?: Record<string, string | number | boolean | null>;
 }
 
+export interface V0KavachIndicator {
+  kind: "upi" | "phone" | "merchant_payment_proof";
+  value: string;
+  normalized: string;
+  risk_level: "high" | "medium" | "low" | "invalid";
+  score: number;
+  matched: boolean;
+  match_type?: string | null;
+  signals: string[];
+  advice: string[];
+  provider?: Record<string, string | boolean> | null;
+  reports: number;
+}
+
+export interface V0KavachEnrichment {
+  source: "chetana_local_kavach_seed";
+  checked_at_utc: string;
+  risk_level: "high" | "medium" | "low" | "invalid";
+  max_score: number;
+  indicators: V0KavachIndicator[];
+  summary: string;
+  no_match_is_safe: false;
+}
+
 export interface V0Verdict {
   scan_id: string;
   timestamp_utc: string;
@@ -109,6 +133,7 @@ export interface V0Verdict {
   ocr_attempted?: boolean;
   ocr_latency_ms?: number | null;
   fallback_reason?: string | null;
+  kavach_enrichment?: V0KavachEnrichment | null;
 }
 
 export interface V0ExtractedInput {

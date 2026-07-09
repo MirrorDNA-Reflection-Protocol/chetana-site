@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "version": 1,
+    "updated": "2026-07-09",
+    "source": "ported_from_local_kavach_seed",
+    "note": "Small deterministic seed pack for local Chetana enrichment. No-match is never a safety guarantee."
+  },
+  "upi": {
+    "patterns": [
+      {"contains": "paytmqr", "note": "Often seen in fake QR or payment-handle abuse"},
+      {"contains": "luckywin", "note": "Lottery or gambling scam handle pattern"},
+      {"contains": "cashprize", "note": "Fake prize or reward handle pattern"},
+      {"contains": "kycupdate", "note": "KYC fraud handle pattern"},
+      {"contains": "refund.", "note": "Fake refund handle pattern"},
+      {"contains": "helpdesk", "note": "Fake helpdesk handle pattern"},
+      {"contains": "loanapproved", "note": "Fake loan approval handle pattern"},
+      {"contains": "invest.profit", "note": "Investment scam handle pattern"},
+      {"contains": "job.offer", "note": "Fake job offer fee handle pattern"},
+      {"contains": "free.iphone", "note": "Fake giveaway handle pattern"},
+      {"contains": "army.canteen", "note": "Army canteen impersonation pattern"},
+      {"contains": "electricity.bill", "note": "Fake utility disconnection handle pattern"}
+    ],
+    "suspicious_keywords": [
+      "refund",
+      "kyc",
+      "winner",
+      "lottery",
+      "prize",
+      "customs",
+      "clearance",
+      "verification",
+      "update",
+      "offer",
+      "free",
+      "lucky",
+      "army",
+      "canteen",
+      "job.offer",
+      "hr.dept",
+      "electricity",
+      "bill.pay",
+      "rbi",
+      "sbi",
+      "income.tax"
+    ],
+    "flagged": {
+      "fraud.refund@ybl": {"type": "refund_scam", "reports": 47, "first_seen": "2025-11-01"},
+      "kyc.update.sbi@oksbi": {"type": "kyc_fraud", "reports": 112, "first_seen": "2025-09-15"},
+      "lucky.winner2025@paytm": {"type": "lottery_scam", "reports": 83, "first_seen": "2025-10-22"},
+      "customs.clearance@ybl": {"type": "customs_scam", "reports": 29, "first_seen": "2025-12-05"},
+      "rbi.verification@axl": {"type": "bank_impersonation", "reports": 64, "first_seen": "2025-08-18"},
+      "olx.buyer.payment@ybl": {"type": "marketplace_scam", "reports": 156, "first_seen": "2025-07-10"},
+      "army.canteen.deal@paytm": {"type": "impersonation_scam", "reports": 38, "first_seen": "2025-11-20"},
+      "free.iphone.offer@ybl": {"type": "lottery_scam", "reports": 91, "first_seen": "2025-10-01"},
+      "electricity.bill.pay@oksbi": {"type": "utility_scam", "reports": 77, "first_seen": "2025-09-28"},
+      "job.offer.hr@ibl": {"type": "job_scam", "reports": 203, "first_seen": "2025-06-14"}
+    }
+  },
+  "phones": {
+    "patterns": [
+      {"prefix": "140", "type": "telemarketing", "note": "Common DND-violating telemarketing prefix"},
+      {"prefix": "1409", "type": "spam_call", "note": "Frequently used for robocalls"},
+      {"prefix": "1800", "type": "legitimate_or_scam", "note": "Toll-free number. Verify independently."}
+    ],
+    "flagged": {
+      "9876543210": {"type": "lottery_scam", "reports": 47, "first_seen": "2025-03-12"},
+      "8888000111": {"type": "fake_customer_care", "reports": 189, "first_seen": "2025-07-15"},
+      "7000123456": {"type": "marketplace_scam", "reports": 67, "first_seen": "2025-10-10"},
+      "6000999888": {"type": "utility_scam", "reports": 145, "first_seen": "2025-09-20"},
+      "9111222333": {"type": "authority_impersonation", "reports": 312, "first_seen": "2025-06-01"},
+      "8500100200": {"type": "job_scam", "reports": 98, "first_seen": "2025-11-05"},
+      "7777888999": {"type": "investment_scam", "reports": 421, "first_seen": "2025-05-12"},
+      "9090909090": {"type": "kyc_fraud", "reports": 176, "first_seen": "2025-08-22"}
+    }
+  }
+}

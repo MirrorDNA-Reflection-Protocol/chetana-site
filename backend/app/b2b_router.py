@@ -66,6 +66,7 @@ class PartnerScanResponse(BaseModel):
     recommended_actions: List[str] = Field(default_factory=list)
     safe_next_step: Optional[str] = None
     guidance: dict[str, Any] = Field(default_factory=dict)
+    kavach_enrichment: Optional[dict[str, Any]] = None
     disclaimer: str = (
         "Automated trust assessment only. Use official institutional review and recovery processes for final action."
     )
@@ -124,6 +125,7 @@ async def _run_partner_scan(req: ScanRequest):
         recommended_actions=verdict.recommended_actions,
         safe_next_step=verdict.safe_next_step,
         guidance=verdict.guidance.model_dump(),
+        kavach_enrichment=verdict.kavach_enrichment.model_dump() if verdict.kavach_enrichment else None,
     )
     return verdict, response
 

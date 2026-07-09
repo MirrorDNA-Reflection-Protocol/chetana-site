@@ -71,6 +71,57 @@ class V0TrustRuntimeTests(unittest.TestCase):
         self.assertEqual(scan.runtime_source, "local")
         self.assertEqual(scan.extraction_quality, "strong")
         self.assertFalse(scan.can_improve_scan)
+        self.assertIsNone(scan.kavach_enrichment)
+
+    def test_known_kavach_upi_match_upgrades_scan_to_high_risk(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="Pay kyc.update.sbi@oksbi now to unblock your account.",
+                language_hint="en",
+                session_id="test-session",
+            )
+        )
+
+        self.assertEqual(scan.verdict, "high_risk")
+        self.assertEqual(scan.risk_level, "high")
+        self.assertIsNotNone(scan.kavach_enrichment)
+        assert scan.kavach_enrichment is not None
+        self.assertEqual(scan.kavach_enrichment.risk_level, "high")
+        self.assertFalse(scan.kavach_enrichment.no_match_is_safe)
+        self.assertIn("report_and_block", scan.recommended_actions)
+        self.assertTrue(any("Local identifier checks" in reason.explanation for reason in scan.reasons))
+
+    def test_known_kavach_phone_match_upgrades_scan_to_high_risk(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="Call 7777888999 for guaranteed trading profits today.",
+                language_hint="en",
+                session_id="test-session",
+            )
+        )
+
+        self.assertEqual(scan.verdict, "high_risk")
+        self.assertIsNotNone(scan.kavach_enrichment)
+        assert scan.kavach_enrichment is not None
+        self.assertTrue(any(indicator.kind == "phone" for indicator in scan.kavach_enrichment.indicators))
+
+    def test_clean_upi_enrichment_does_not_clear_the_scan(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="The shop UPI ID is shop.local@ybl.",
+                language_hint="en",
+                session_id="test-session",
+            )
+        )
+
+        self.assertIn(scan.verdict, {"needs_review", "low_signal"})
+        self.assertIsNotNone(scan.kavach_enrichment)
+        assert scan.kavach_enrichment is not None
+        self.assertEqual(scan.kavach_enrichment.risk_level, "low")
+        self.assertFalse(scan.kavach_enrichment.no_match_is_safe)
 
     def test_weak_screenshot_extraction_can_be_improved(self) -> None:
         scan = analyze_scan(

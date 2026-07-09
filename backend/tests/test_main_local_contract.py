@@ -99,6 +99,7 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn(data["verdict"], {"high_risk", "caution", "needs_review", "low_signal"})
         self.assertIn("guidance", data)
         self.assertIn("reason_codes", data)
+        self.assertIn("kavach_enrichment", data)
         self.assertTrue(data["scan_id"].startswith("chetana-scan-"))
 
     def test_analytics_summary_endpoint_exposes_canonical_totals(self) -> None:

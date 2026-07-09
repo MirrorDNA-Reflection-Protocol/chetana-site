@@ -13,6 +13,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.kavach_enrichment import V0KavachEnrichment, build_kavach_enrichment
+
 InputType = Literal["screenshot", "text", "qr_image", "payment_screenshot", "mixed"]
 VerdictValue = Literal["high_risk", "caution", "needs_review", "low_signal"]
 ScamType = Literal[
@@ -180,6 +182,7 @@ class V0Verdict(StrictModel):
     ocr_attempted: bool = False
     ocr_latency_ms: int | None = Field(default=None, ge=0)
     fallback_reason: str | None = None
+    kavach_enrichment: V0KavachEnrichment | None = None
 
 
 class V0ScanInput(StrictModel):
@@ -621,6 +624,42 @@ def _add_reason(
     scorebox[0] += int(meta["weight"])
 
 
+def _apply_kavach_enrichment(
+    reasons: dict[ReasonCode, V0Reason],
+    scorebox: list[int],
+    enrichment: V0KavachEnrichment | None,
+) -> None:
+    if not enrichment or enrichment.risk_level not in {"high", "medium"}:
+        return
+
+    strongest = max(enrichment.indicators, key=lambda indicator: indicator.score, default=None)
+    if strongest is None:
+        return
+
+    if enrichment.risk_level == "high":
+        scorebox[0] = max(scorebox[0], 70)
+    else:
+        scorebox[0] = max(scorebox[0], 42)
+
+    if strongest.kind == "upi":
+        target = "UPI ID"
+    elif strongest.kind == "phone":
+        target = "phone number"
+    else:
+        target = "payment proof"
+
+    signal = strongest.signals[0] if strongest.signals else enrichment.summary
+    meta = REASON_META["unverifiable_contact"]
+    reasons["unverifiable_contact"] = V0Reason(
+        code="unverifiable_contact",
+        label=str(meta["label"]),
+        explanation=(
+            f"Local identifier checks flagged this {target}: {signal} "
+            "A missing match is never a safety guarantee."
+        ),
+    )
+
+
 def _detect_scam_type(text: str, input_type: InputType) -> ScamType:
     scores: dict[ScamType, int] = defaultdict(int)
     if INVESTMENT_RE.search(text) or RETURN_RE.search(text):
@@ -837,6 +876,12 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
     reasons: dict[ReasonCode, V0Reason] = {}
     scorebox = [0]
     entities = extract_entities(text)
+    kavach_enrichment = build_kavach_enrichment(
+        text=text,
+        upi_ids=entities.upi_ids,
+        phone_numbers=entities.phone_numbers,
+        input_type=payload.input_type,
+    )
 
     if not text:
         _add_reason(
@@ -877,6 +922,7 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
                 share_shield_eligible=True,
                 evidence_pack_eligible=True,
                 notes="Need more context before a stronger verdict.",
+                kavach_enrichment=kavach_enrichment,
             ),
             payload,
             text,
@@ -957,6 +1003,8 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
             "The request depends on a UPI handle that you should verify independently.",
         )
 
+    _apply_kavach_enrichment(reasons, scorebox, kavach_enrichment)
+
     if suspicious_host_found and ("impersonates_authority" in reasons or "asks_for_money" in reasons):
         scorebox[0] += 10
     if payload.input_type == "payment_screenshot" and "asks_for_money" in reasons:
@@ -996,7 +1044,12 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         actions.extend(["do_not_pay", "verify_with_official_source"])
         if payload.input_type != "text":
             actions.append("save_evidence")
-        if "asks_for_money" in reasons or "impersonates_authority" in reasons or payload.input_type == "payment_screenshot":
+        if (
+            "asks_for_money" in reasons
+            or "impersonates_authority" in reasons
+            or payload.input_type == "payment_screenshot"
+            or (kavach_enrichment is not None and kavach_enrichment.risk_level == "high")
+        ):
             actions.append("report_and_block")
         elif "move_off_platform" in reasons:
             actions.append("share_with_family")
@@ -1071,6 +1124,7 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
             share_shield_eligible=verdict in {"high_risk", "caution", "needs_review"},
             evidence_pack_eligible=verdict in {"high_risk", "caution", "needs_review"},
             notes=notes,
+            kavach_enrichment=kavach_enrichment,
         ),
         payload,
         text,
@@ -1356,6 +1410,12 @@ def build_v0_loop_receipt(payload: V0LoopReceiptRequest) -> V0LoopReceipt:
                 "confidence_band": verdict.confidence_band,
                 "scam_type": verdict.scam_type,
                 "decision_owner": "chetana_deterministic_runtime",
+                "kavach_enrichment": {
+                    "risk_level": verdict.kavach_enrichment.risk_level,
+                    "max_score": verdict.kavach_enrichment.max_score,
+                    "indicator_count": len(verdict.kavach_enrichment.indicators),
+                    "no_match_is_safe": verdict.kavach_enrichment.no_match_is_safe,
+                } if verdict.kavach_enrichment else None,
             },
         ),
         _loop_phase(

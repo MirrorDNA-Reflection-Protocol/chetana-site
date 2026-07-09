@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, DragEvent } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   Copy,
@@ -136,6 +137,30 @@ const RECOVERY_SURFACE_DEFAULTS: Record<string, {
     reportTarget: "manual_report",
   },
 };
+
+function kavachSignalForResult(result: V0Verdict | null): { tone: "high" | "medium" | "low"; text: string } | null {
+  const enrichment = result?.kavach_enrichment;
+  if (!enrichment || enrichment.indicators.length === 0) return null;
+
+  const flagged = enrichment.indicators.find((indicator) => indicator.risk_level === "high" || indicator.risk_level === "medium");
+  if (flagged) {
+    const label =
+      flagged.kind === "upi"
+        ? "UPI ID"
+        : flagged.kind === "phone"
+          ? "phone number"
+          : "payment proof";
+    return {
+      tone: flagged.risk_level === "high" ? "high" : "medium",
+      text: `Extra check found risk in this ${label}. Do not pay or reply yet.`,
+    };
+  }
+
+  return {
+    tone: "low",
+    text: "No known match found. Still verify before paying.",
+  };
+}
 
 type RecoveryActionOptions = {
   reportTarget?: "manual_report" | "other";
@@ -1195,6 +1220,8 @@ export default function ChetanaV0Experience({
     window.requestAnimationFrame(scrollToComposer);
   };
 
+  const kavachSignal = kavachSignalForResult(result);
+
   return (
     <section className="v0-shell v0-shell-simple">
       {showHero && (
@@ -1477,6 +1504,13 @@ export default function ChetanaV0Experience({
                 <Check size={14} />
                 <span>{runtimeSourceLabel(result)}</span>
               </div>
+
+              {kavachSignal && (
+                <div className={`v0-kavach-strip ${kavachSignal.tone}`}>
+                  <AlertTriangle size={15} />
+                  <span>{kavachSignal.text}</span>
+                </div>
+              )}
 
               {loopReceipt && (
                 <div className={`v0-loop-receipt ${loopReceipt.status}`}>

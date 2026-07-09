@@ -26,6 +26,11 @@ const servedSafetyNudgeChecks = [
   "Stop screen sharing before you scan.",
   "Do not approve a collect request to receive money.",
   "Report on Chakshu",
+  "Install once. Share screenshots straight to Chetana.",
+  "Add to Home screen",
+  "Extra check found risk in this",
+  "Do not pay or reply yet.",
+  "No known match found. Still verify before paying.",
 ];
 
 async function fetchText(pathOrUrl) {
@@ -71,6 +76,22 @@ async function probeServedSafetyNudge() {
 
 async function main() {
   const servedSafetyNudge = await probeServedSafetyNudge();
+  const kavachProbe = await postJson("/api/v0/scan", {
+    input_type: "text",
+    text: "Pay kyc.update.sbi@oksbi now to unblock your account.",
+    language_hint: "en",
+    source_name: null,
+    session_id: "v2-intake-probe-kavach",
+  });
+  if (kavachProbe.verdict !== "high_risk") {
+    throw new Error(`Kavach probe did not return high_risk: ${kavachProbe.verdict}`);
+  }
+  if (kavachProbe.kavach_enrichment?.risk_level !== "high") {
+    throw new Error("Kavach probe did not expose high-risk enrichment");
+  }
+  if (kavachProbe.kavach_enrichment?.no_match_is_safe !== false) {
+    throw new Error("Kavach enrichment must preserve no_match_is_safe=false");
+  }
 
   const results = [];
   for (const sample of lazyIntakeCases) {
@@ -103,6 +124,12 @@ async function main() {
     status: "pass",
     base_url: baseUrl,
     served_safety_nudge: servedSafetyNudge,
+    kavach_probe: {
+      verdict: kavachProbe.verdict,
+      risk_level: kavachProbe.kavach_enrichment.risk_level,
+      max_score: kavachProbe.kavach_enrichment.max_score,
+      no_match_is_safe: kavachProbe.kavach_enrichment.no_match_is_safe,
+    },
     checked_cases: results,
   }, null, 2));
 }

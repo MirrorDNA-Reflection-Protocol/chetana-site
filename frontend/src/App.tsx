@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Download, X } from "lucide-react";
 import { PageId } from "./types";
 import {
   BackgroundMesh, Nav, SafetyRadar, Atlas, TrustPage, PanicPage,
@@ -14,8 +15,40 @@ import OpsAnalyticsPage from "./OpsAnalyticsPage";
 import { I18nProvider } from "./i18n";
 
 type DirectScanIntent = "share" | "shortcut";
+type BeforeInstallPromptEvent = Event & {
+  platforms?: string[];
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+const INSTALL_DISMISSED_KEY = "chetana_install_prompt_dismissed_at";
+const INSTALL_DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
+
+function isInstallSurfacePage(page: PageId): boolean {
+  return page === "home" || page === "scan" || page === "consumer";
+}
+
+function isInstalledDisplayMode(): boolean {
+  const navWithStandalone = navigator as Navigator & { standalone?: boolean };
+  return Boolean(
+    navWithStandalone.standalone ||
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches,
+  );
+}
+
+function isLikelyMobileBrowser(): boolean {
+  return window.innerWidth <= 820 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+function installPromptDismissedRecently(): boolean {
+  const dismissedAt = Number(localStorage.getItem(INSTALL_DISMISSED_KEY) || 0);
+  return dismissedAt > 0 && Date.now() - dismissedAt < INSTALL_DISMISS_TTL_MS;
+}
+
 function initialPageFromLocation(): PageId {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("page");
@@ -37,6 +70,11 @@ export default function App() {
   const [directScanIntent, setDirectScanIntent] = useState<DirectScanIntent | null>(null);
   const [updateReady, setUpdateReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installBannerVisible, setInstallBannerVisible] = useState(false);
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [appInstalled, setAppInstalled] = useState(() => isInstalledDisplayMode());
 
   const syncPageUrl = (nextPage: PageId, replace = false) => {
     const params = new URLSearchParams(window.location.search);
@@ -165,6 +203,39 @@ export default function App() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
   useEffect(() => {
+    if (appInstalled || directScanIntent || !isInstallSurfacePage(page) || installPromptDismissedRecently()) return;
+    if (installPrompt || isLikelyMobileBrowser()) {
+      setInstallBannerVisible(true);
+    }
+  }, [appInstalled, directScanIntent, installPrompt, page]);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      if (!installPromptDismissedRecently()) {
+        setInstallBannerVisible(true);
+      }
+    };
+
+    const onAppInstalled = () => {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+      setInstallBannerVisible(false);
+      setInstallHelpOpen(false);
+      localStorage.setItem("chetana_installed_at", String(Date.now()));
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
     let disposed = false;
@@ -244,6 +315,40 @@ export default function App() {
     }
   };
 
+  const dismissInstallBanner = () => {
+    localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+    setInstallBannerVisible(false);
+    setInstallHelpOpen(false);
+  };
+
+  const installChetana = async () => {
+    if (!installPrompt) {
+      setInstallHelpOpen(true);
+      return;
+    }
+
+    setInstalling(true);
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice.catch(() => null);
+      if (choice?.outcome === "accepted") {
+        setInstallBannerVisible(false);
+      } else {
+        dismissInstallBanner();
+      }
+      setInstallPrompt(null);
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const showInstallBanner = (
+    installBannerVisible &&
+    isInstallSurfacePage(page) &&
+    !directScanIntent &&
+    !appInstalled
+  );
+
   return (
     <I18nProvider>
     <div className="app-shell">
@@ -258,6 +363,33 @@ export default function App() {
           <button onClick={refreshToLatest} disabled={refreshing}>
             {refreshing ? "Refreshing..." : "Refresh now"}
           </button>
+        </div>
+      )}
+      {showInstallBanner && (
+        <div className={installHelpOpen ? "app-install-banner expanded" : "app-install-banner"}>
+          <div className="app-install-copy">
+            <strong>Install once. Share screenshots straight to Chetana.</strong>
+            <span>
+              {installPrompt
+                ? "Tap Install now. After that, use Share from WhatsApp, Messages, or Gallery and choose Chetana."
+                : "On Android Chrome: open the browser menu, choose Add to Home screen, then Share screenshots to Chetana."}
+            </span>
+            {installHelpOpen && (
+              <span className="app-install-steps">
+                After install: take a screenshot, tap Share, choose Chetana, and the scanner opens with evidence attached.
+              </span>
+            )}
+          </div>
+          <div className="app-install-actions">
+            <button className="app-install-primary" onClick={installChetana} disabled={installing}>
+              <Download size={16} />
+              {installPrompt ? (installing ? "Opening..." : "Install") : "Show steps"}
+            </button>
+            <button className="app-install-dismiss" onClick={dismissInstallBanner}>
+              <X size={16} />
+              Later
+            </button>
+          </div>
         </div>
       )}
       <main>

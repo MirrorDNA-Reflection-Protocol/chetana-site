@@ -306,15 +306,90 @@ main {
   opacity: 0.7;
   cursor: wait;
 }
+.app-install-banner {
+  max-width: 1200px;
+  margin: 12px auto 0;
+  padding: 13px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 212, 170, 0.24);
+  background: rgba(0, 212, 170, 0.08);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.app-install-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.app-install-copy strong {
+  color: var(--heading);
+  font-size: 15px;
+}
+.app-install-copy span {
+  color: rgba(255,255,255,0.72);
+  line-height: 1.45;
+  font-size: 13px;
+}
+.app-install-copy .app-install-steps {
+  color: var(--text);
+}
+.app-install-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.app-install-actions button {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.app-install-primary {
+  border: 1px solid rgba(0, 212, 170, 0.45);
+  background: linear-gradient(135deg, #22e3bb, #0ea582);
+  color: #021310;
+  box-shadow: 0 10px 22px rgba(0, 212, 170, 0.18);
+}
+.app-install-primary:hover {
+  background: linear-gradient(135deg, #35f0ca, #14bd96);
+  color: #021310;
+}
+.app-install-dismiss {
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.07);
+  color: var(--text-bright);
+}
+.app-install-actions button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+.app-install-primary:disabled {
+  color: #05231d;
+}
 @media (max-width: 768px) {
-  .app-update-banner {
+  .app-update-banner,
+  .app-install-banner {
     margin: 12px 16px 0;
     padding: 14px;
     flex-direction: column;
     align-items: stretch;
   }
-  .app-update-banner button {
+  .app-update-banner button,
+  .app-install-actions,
+  .app-install-actions button {
     width: 100%;
+  }
+  .app-install-actions {
+    flex-direction: column;
   }
 }
 
@@ -1901,6 +1976,41 @@ main {
   justify-items: end;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.v0-kavach-strip {
+  margin-top: 12px;
+  padding: 13px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 760;
+}
+
+.v0-kavach-strip svg {
+  flex: 0 0 auto;
+}
+
+.v0-kavach-strip.high {
+  border: 1px solid rgba(248,113,113,0.35);
+  background: rgba(127,29,29,0.24);
+  color: #fecaca;
+}
+
+.v0-kavach-strip.medium {
+  border: 1px solid rgba(251,146,60,0.35);
+  background: rgba(124,45,18,0.22);
+  color: #fed7aa;
+}
+
+.v0-kavach-strip.low {
+  border: 1px solid rgba(148,163,184,0.24);
+  background: rgba(148,163,184,0.08);
+  color: rgba(237,233,224,0.82);
+  font-weight: 700;
 }
 
 .v0-reason-list,

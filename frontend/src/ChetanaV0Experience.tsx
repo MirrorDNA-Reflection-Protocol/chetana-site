@@ -1200,16 +1200,32 @@ export default function ChetanaV0Experience({
           <div className="v0-simple-copy">
             <div className="v0-app-mark" aria-label="Chetana scam checker">
               <span className="v0-app-glyph">
-                <Shield size={26} />
+                <Shield size={22} />
               </span>
               <strong>Chetana</strong>
             </div>
             <h1>Ask Chetana</h1>
-            <p>Upload a screenshot, record a quick voice note, or tap what happened. Chetana checks the risk signals and gives one safest next step.</p>
+            <p>Screenshot, voice, or one tap. Know what to do before you pay.</p>
             <div className="v0-app-privacy">
               Private by default. No login required.
             </div>
           </div>
+          <div className="v0-hero-proof-list" aria-label="Chetana trust points">
+            <span><Check size={14} /> Screenshot-first scam check</span>
+            <span><Phone size={14} /> 1930 stays visible when money moved</span>
+            <span><Shield size={14} /> Advisory only, not a government service</span>
+          </div>
+          {onNavigate && (
+            <div className="v0-institution-note">
+              <div className="v0-section-label">For sponsors</div>
+              <strong>Banks and public programs care when Chetana creates cleaner pre-report packets.</strong>
+              <p>Users pause before paying, preserve evidence, and move to the correct official rail faster.</p>
+              <button onClick={() => onNavigate("partners")}>
+                <FileText size={14} />
+                Partner pilots
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1861,6 +1877,23 @@ export default function ChetanaV0Experience({
             </div>
           )}
         </div>
+
+        {showHero && (
+          <div className="v0-proof-strip" aria-label="Chetana proof points">
+            <span>
+              <strong>Private by default</strong>
+              Voice stays local unless a future runtime explicitly changes that.
+            </span>
+            <span>
+              <strong>Official rails visible</strong>
+              1930, cybercrime.gov.in, and Chakshu stay one tap away.
+            </span>
+            <span>
+              <strong>Partner-ready</strong>
+              Pilots can measure pauses, handoffs, languages, and recovery packets.
+            </span>
+          </div>
+        )}
 
         <div className="v0-recovery-strip">
           <span>If money already moved, stop chatting and use official help.</span>

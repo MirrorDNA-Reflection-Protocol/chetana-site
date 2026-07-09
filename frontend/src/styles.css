@@ -350,40 +350,44 @@ main {
 }
 
 .v0-shell-simple {
-  max-width: 720px;
-  margin: 48px auto 24px;
+  max-width: 1120px;
+  margin: 28px auto 24px;
   gap: 18px;
-  padding: 44px 48px 34px;
+  padding: 26px;
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 30px;
+  border-radius: 8px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(139,92,246,0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02)),
-    rgba(6,6,8,0.94);
+    radial-gradient(700px 260px at 12% 0%, rgba(201,163,94,0.11), transparent 64%),
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018)),
+    rgba(5,6,8,0.95);
   box-shadow: 0 30px 90px rgba(0,0,0,0.34);
   font-family: var(--sans);
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+  align-items: start;
 }
 
 .v0-simple-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  text-align: center;
-  gap: 14px;
+  justify-items: start;
+  text-align: left;
+  gap: 16px;
+  position: sticky;
+  top: 110px;
 }
 
 .v0-simple-copy {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   gap: 12px;
   width: 100%;
   max-width: 620px;
 }
 
 .v0-app-mark {
-  display: grid;
-  justify-items: center;
-  gap: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   color: var(--heading);
   font-size: 0.84rem;
   line-height: 1;
@@ -394,10 +398,10 @@ main {
 .v0-app-glyph {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
+  width: 42px;
+  height: 42px;
   border: 1px solid rgba(255,255,255,0.13);
-  border-radius: 18px;
+  border-radius: 8px;
   color: #f8fafc;
   background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
   box-shadow: 0 18px 44px rgba(0,0,0,0.25);
@@ -408,18 +412,19 @@ main {
   margin: 0;
   color: var(--heading);
   font-family: var(--sans);
-  font-size: clamp(2.5rem, 5.1vw, 3.85rem);
+  font-size: clamp(2.65rem, 3.5vw, 3.45rem);
   font-style: normal;
   font-weight: 850;
-  line-height: 0.94;
+  line-height: 0.92;
   letter-spacing: 0;
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .v0-simple-copy p {
-  max-width: 46ch;
+  max-width: 32ch;
   color: var(--text);
-  font-size: clamp(1.02rem, 1.8vw, 1.18rem);
+  font-size: clamp(1.03rem, 1.4vw, 1.15rem);
   line-height: 1.5;
 }
 
@@ -427,6 +432,64 @@ main {
   color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.v0-hero-proof-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.v0-hero-proof-list span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.028);
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.v0-institution-note {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(201,163,94,0.18);
+  border-radius: 8px;
+  background: rgba(201,163,94,0.055);
+}
+
+.v0-institution-note strong {
+  color: var(--heading);
+  font-size: 1rem;
+  line-height: 1.28;
+}
+
+.v0-institution-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.v0-institution-note button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: fit-content;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.055);
+  color: var(--text-bright);
+  font-size: 0.86rem;
+  font-weight: 820;
+  cursor: pointer;
 }
 
 .v0-simple-actions {
@@ -484,20 +547,29 @@ main {
 }
 
 .v0-shell-simple .v0-grid {
+  grid-column: 2;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .v0-shell-simple .v0-main {
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .v0-shell-simple .v0-composer {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  min-width: 0;
+  max-width: 100%;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.052), rgba(255,255,255,0.022)),
+    rgba(8,9,12,0.82);
+  box-shadow: 0 22px 62px rgba(0,0,0,0.24);
 }
 
 .v0-shell-simple .v0-submit {
@@ -513,6 +585,7 @@ main {
 .v0-shell-simple .v0-upload-large .v0-upload-inner {
   min-height: 104px;
   border-color: rgba(168,85,247,0.42);
+  border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(168,85,247,0.13), rgba(255,255,255,0.035)),
     rgba(255,255,255,0.02);
@@ -524,7 +597,7 @@ main {
   gap: 8px;
   padding: 5px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(255,255,255,0.03);
 }
 
@@ -535,7 +608,7 @@ main {
   gap: 8px;
   min-height: 44px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 6px;
   color: var(--text);
   background: transparent;
   font-weight: 700;
@@ -555,9 +628,10 @@ main {
 .v0-lazy-panel {
   display: grid;
   gap: 14px;
+  min-width: 0;
   padding: 16px;
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 18px;
+  border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.052), rgba(255,255,255,0.022)),
     rgba(255,255,255,0.018);
@@ -586,6 +660,7 @@ main {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .v0-voice-button {
@@ -656,12 +731,14 @@ main {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
 }
 
 .v0-context-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid rgba(255,255,255,0.1);
@@ -673,6 +750,7 @@ main {
   line-height: 1.1;
   cursor: pointer;
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .v0-context-chip.active {
@@ -752,7 +830,7 @@ main {
   gap: 8px;
   padding: 11px 13px;
   border: 1px dashed rgba(201,163,94,0.54);
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(201,163,94,0.1);
   color: var(--heading);
   font-size: 0.9rem;
@@ -801,6 +879,31 @@ main {
   color: var(--heading);
   font-size: 1.04rem;
   font-weight: 800;
+}
+
+.v0-proof-strip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.v0-proof-strip span {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.024);
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+
+.v0-proof-strip strong {
+  color: var(--text-bright);
+  font-size: 0.92rem;
 }
 
 .v0-visual-demo {
@@ -1368,6 +1471,7 @@ main {
 }
 
 .v0-recovery-strip {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1914,6 +2018,23 @@ main {
 }
 
 @media (max-width: 960px) {
+  .v0-shell-simple {
+    grid-template-columns: 1fr;
+    max-width: 720px;
+  }
+
+  .v0-simple-hero {
+    position: static;
+  }
+
+  .v0-shell-simple .v0-grid {
+    grid-column: 1;
+  }
+
+  .v0-proof-strip {
+    grid-template-columns: 1fr;
+  }
+
   .v0-hero-shell,
   .v0-grid,
   .v0-simple-hero,
@@ -1986,14 +2107,36 @@ main {
   }
 
   .v0-shell-simple {
-    margin: 14px 12px 18px;
-    padding: 26px 18px 18px;
-    border-radius: 24px;
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    margin: 14px auto 18px;
+    padding: 18px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .v0-shell-simple .v0-composer {
+    padding: 14px;
   }
 
   .v0-simple-copy h1 {
     max-width: 100%;
-    font-size: clamp(2.35rem, 10vw, 2.85rem);
+    font-size: clamp(2.55rem, 12vw, 3.2rem);
+  }
+
+  .v0-hero-proof-list,
+  .v0-institution-note,
+  .v0-proof-strip,
+  .v0-recovery-strip,
+  .v0-simple-tabs,
+  .v0-upload-large .v0-upload-inner,
+  .v0-textarea,
+  .v0-submit {
+    max-width: 100%;
+  }
+
+  .v0-composer h2 {
+    overflow-wrap: anywhere;
   }
 
   .v0-simple-actions,
@@ -2018,6 +2161,8 @@ main {
   .v0-upload-inner,
   .v0-voice-button {
     width: 100%;
+    min-width: 0;
+    white-space: normal;
   }
 
   .v0-voice-row,
@@ -2035,6 +2180,22 @@ main {
     justify-content: center;
     text-align: center;
     white-space: normal;
+  }
+
+  .v0-context-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v0-context-chip {
+    width: 100%;
+    min-height: 38px;
+    font-size: 0.82rem;
+  }
+
+  .v0-safety-actions a {
+    width: 100%;
+    white-space: normal;
+    text-align: center;
   }
 
   .v0-recovery-strip {

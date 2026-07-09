@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 # Load shared Chetana soul, gates, prompt from canonical location
@@ -205,6 +206,14 @@ _CHAT_MAX_REQUESTS = int(os.getenv("CHETANA_CHAT_MAX_REQUESTS", "12"))
 _CHAT_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
+CHETANA_SOURCE_TAGS = {
+    "whatsapp_forward": "WhatsApp forward",
+    "branch_poster": "Branch poster",
+    "bank_qr": "Bank QR",
+    "gov_qr": "Government QR",
+    "csr_qr": "CSR QR",
+}
 
 
 class PartnerInquiryRequest(BaseModel):
@@ -238,6 +247,16 @@ def _append_partner_inquiry(payload: dict[str, Any]) -> None:
     PARTNER_INQUIRIES_LOG.parent.mkdir(parents=True, exist_ok=True)
     with PARTNER_INQUIRIES_LOG.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+
+def _scam_check_link(source: str) -> str:
+    clean = source if source in CHETANA_SOURCE_TAGS else "partner_qr"
+    return f"{CHETANA_PUBLIC_ORIGIN}/?source={clean}&action=scam_check"
+
+
+def _whatsapp_forward_link() -> str:
+    message = f"Fake hai kya? Screenshot bhejo. Chetana bata degi: {_scam_check_link('whatsapp_forward')}"
+    return f"https://wa.me/?text={quote(message)}"
 
 
 def _render_spa_route(title: str, description: str, canonical_path: str) -> str:
@@ -2277,6 +2296,8 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/#atlas</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/#trust</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/india-kit</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/30-day-pilot</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
@@ -2300,12 +2321,246 @@ async def partners_page():
     html = _render_spa_route(
         title="Chetana Partner Pilots for Banks, Government, and CSR",
         description=(
-            "Sponsor a 90-day Chetana scam-check pilot for banks, public programs, telecom anti-fraud teams, "
+            "Sponsor a 30-day Chetana scam-check pilot for banks, public programs, telecom anti-fraud teams, "
             "CSR committees, fintechs, or merchant networks in India."
         ),
         canonical_path="/partners",
     )
     return HTMLResponse(content=html, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/partners/india-kit", include_in_schema=False)
+async def partners_india_kit():
+    source_rows = "\n".join(
+        f"""<div class="row">
+          <span>{html_lib.escape(label)}</span>
+          <a href="{html_lib.escape(_scam_check_link(source), quote=True)}">{html_lib.escape(_scam_check_link(source))}</a>
+        </div>"""
+        for source, label in CHETANA_SOURCE_TAGS.items()
+    )
+    return HTMLResponse(
+        content=f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chetana India QR and WhatsApp Kit</title>
+  <meta name="description" content="QR-ready and WhatsApp-forward copy for Chetana scam-check campaigns in India.">
+  <style>
+    :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
+    * {{ box-sizing:border-box; }}
+    html, body {{ overflow-x:hidden; }}
+    body {{ margin:0; background:#fff; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }}
+    main {{ width:100%; max-width:1040px; margin:0 auto; padding:34px 22px 44px; }}
+    a {{ color:var(--accent); font-weight:800; overflow-wrap:anywhere; }}
+    h1 {{ max-width:820px; margin:10px 0 12px; font-size:clamp(2.4rem, 7vw, 5rem); line-height:.95; letter-spacing:0; }}
+    h2 {{ margin:0 0 10px; font-size:1.18rem; }}
+    p {{ margin:0; color:var(--muted); }}
+    .top {{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; padding-bottom:18px; border-bottom:2px solid var(--ink); }}
+    .label {{ color:var(--gold); font-size:.74rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }}
+    .hero-copy {{ max-width:760px; font-size:1.12rem; }}
+    .cta {{ display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 24px; }}
+    .cta a {{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 14px; border-radius:8px; text-decoration:none; }}
+    .primary {{ background:var(--accent); color:#fff; }}
+    .secondary {{ border:1px solid var(--line); color:var(--ink); }}
+    .grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }}
+    .card, .box, .poster {{ border:1px solid var(--line); border-radius:8px; background:#fff; padding:16px; }}
+    .card {{ min-height:160px; background:var(--soft); }}
+    .card strong {{ display:block; margin-bottom:8px; color:var(--ink); }}
+    .split {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }}
+    .poster {{ min-height:300px; display:grid; align-content:center; gap:14px; text-align:center; background:linear-gradient(180deg, #ffffff, #f8fafc); }}
+    .poster strong {{ font-size:clamp(2rem, 5vw, 4rem); line-height:.98; }}
+    .poster p {{ max-width:460px; margin:0 auto; font-size:1.08rem; }}
+    .rows {{ display:grid; gap:0; overflow:hidden; border:1px solid var(--line); border-radius:8px; }}
+    .row {{ display:grid; grid-template-columns:170px minmax(0,1fr); gap:12px; padding:11px 12px; border-bottom:1px solid var(--line); }}
+    .row:last-child {{ border-bottom:0; }}
+    .row span {{ color:var(--gold); font-size:.72rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }}
+    pre {{ white-space:pre-wrap; overflow-wrap:anywhere; margin:10px 0 0; padding:14px; border-radius:8px; background:#0f172a; color:#e5e7eb; font-size:.94rem; line-height:1.55; }}
+    .foot {{ margin-top:22px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem; }}
+    @media (max-width:760px) {{ .top, .split {{ display:grid; grid-template-columns:1fr; }} .grid {{ grid-template-columns:1fr; }} .row {{ grid-template-columns:1fr; }} }}
+    @media print {{ .cta {{ display:none; }} main {{ padding:18px; }} a {{ color:var(--ink); }} }}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <div class="label">Chetana by Active Mirror</div>
+        <strong>India QR and WhatsApp kit</strong>
+      </div>
+      <p>Public URL: <a href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">chetana.activemirror.ai/partners/india-kit</a></p>
+    </div>
+
+    <h1>Fake hai kya?</h1>
+    <p class="hero-copy">Screenshot bhejo. Chetana bata degi. Use this kit for bank branches, government awareness drives, CSR campaigns, college posters, merchant counters, and WhatsApp groups.</p>
+    <div class="cta">
+      <a class="primary" href="{html_lib.escape(_scam_check_link('branch_poster'), quote=True)}">Open scam checker</a>
+      <a class="primary" href="{html_lib.escape(_whatsapp_forward_link(), quote=True)}">Forward on WhatsApp</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/30-day-pilot">Open 30-day pilot</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/pilottrace">View PilotTrace</a>
+    </div>
+
+    <section class="grid">
+      <div class="card"><strong>For the user</strong><p>No login. No complaint filed automatically. Screenshot, paste, or tap what happened.</p></div>
+      <div class="card"><strong>For a sponsor</strong><p>Source-tagged QR links show which campaign brought people in, without giving the sponsor raw scam content.</p></div>
+      <div class="card"><strong>For research</strong><p>Use aggregate source tags, verdicts, feedback buckets, official-rail taps, and follow-through counts. Ask consent before using examples.</p></div>
+    </section>
+
+    <section class="split">
+      <div class="poster" aria-label="Printable poster copy">
+        <div class="label">Poster copy</div>
+        <strong>Fake hai kya?</strong>
+        <p>Screenshot bhejo. Chetana bata degi.</p>
+        <p>No login. No complaint filed. Official next steps only.</p>
+        <p><a href="{html_lib.escape(_scam_check_link('branch_poster'), quote=True)}">chetana.activemirror.ai</a></p>
+      </div>
+      <div class="box">
+        <div class="label">WhatsApp forward</div>
+        <h2>Copy this into family, college, branch, or merchant groups.</h2>
+        <pre>Fake hai kya? Screenshot bhejo. Chetana bata degi.
+
+Use this before you pay, share OTP, install an app, approve UPI, or trust a payment screenshot:
+{html_lib.escape(_scam_check_link('whatsapp_forward'))}
+
+If money already moved, call 1930 and contact your bank.</pre>
+      </div>
+    </section>
+
+    <section class="box">
+      <div class="label">Source-tag links</div>
+      <h2>Use one link per campaign</h2>
+      <p>Turn these URLs into QR codes with your existing design tool. Chetana counts the source tag and action, not the user's private scam text.</p>
+      <div class="rows">{source_rows}</div>
+    </section>
+
+    <section class="split">
+      <div class="box">
+        <div class="label">Simple user promise</div>
+        <h2>What people should understand in five seconds</h2>
+        <pre>Screenshot anything suspicious.
+Ask Chetana.
+Stop before paying.
+If money moved, call 1930.</pre>
+      </div>
+      <div class="box">
+        <div class="label">Consent boundary</div>
+        <h2>Research without breaking trust</h2>
+        <p>Use aggregate campaign counts by default. Collect raw examples only when a user explicitly agrees to share a case for research, training, or sponsor review.</p>
+      </div>
+    </section>
+
+    <div class="foot">
+      Chetana is independent and is not a government, RBI, NPCI, I4C, CERT-In, police, or bank service. It routes users toward official help rails when needed.
+    </div>
+  </main>
+</body>
+</html>""",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/partners/30-day-pilot", include_in_schema=False)
+async def partners_30_day_pilot():
+    return HTMLResponse(
+        content=f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chetana 30-Day Fraud Pause Pilot</title>
+  <meta name="description" content="30-day Chetana pilot for banks, government programs, CSR sponsors, telecom anti-fraud teams, fintechs, and merchant networks.">
+  <style>
+    :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
+    * {{ box-sizing:border-box; }}
+    body {{ margin:0; background:#fff; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }}
+    main {{ width:100%; max-width:1040px; margin:0 auto; padding:34px 22px 44px; }}
+    a {{ color:var(--accent); font-weight:800; overflow-wrap:anywhere; }}
+    h1 {{ max-width:860px; margin:10px 0 12px; font-size:clamp(2.25rem, 6vw, 4.8rem); line-height:.96; letter-spacing:0; }}
+    h2 {{ margin:0 0 10px; font-size:1.18rem; }}
+    p {{ margin:0; color:var(--muted); }}
+    .top {{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; padding-bottom:18px; border-bottom:2px solid var(--ink); }}
+    .label {{ color:var(--gold); font-size:.74rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }}
+    .lead {{ max-width:760px; font-size:1.1rem; }}
+    .cta {{ display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 24px; }}
+    .cta a {{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 14px; border-radius:8px; text-decoration:none; }}
+    .primary {{ background:var(--accent); color:#fff; }}
+    .secondary {{ border:1px solid var(--line); color:var(--ink); }}
+    .grid {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:20px 0; }}
+    .card, .box, .step {{ border:1px solid var(--line); border-radius:8px; background:#fff; padding:16px; }}
+    .card {{ min-height:150px; background:var(--soft); }}
+    .card strong, .step strong {{ display:block; margin-bottom:8px; color:var(--ink); }}
+    .split {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }}
+    .steps {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }}
+    .step span {{ display:block; margin-bottom:8px; color:var(--gold); font-size:.72rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }}
+    ul {{ margin:.25rem 0 0; padding-left:1.1rem; color:var(--muted); }}
+    .foot {{ margin-top:22px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem; }}
+    @media (max-width:820px) {{ .top, .split {{ display:grid; grid-template-columns:1fr; }} .grid, .steps {{ grid-template-columns:1fr; }} }}
+    @media print {{ .cta {{ display:none; }} main {{ padding:18px; }} a {{ color:var(--ink); }} }}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <div>
+        <div class="label">Chetana by Active Mirror</div>
+        <strong>30-day fraud pause pilot</strong>
+      </div>
+      <p>Use with <a href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">the India kit</a>.</p>
+    </div>
+
+    <h1>Make one audience stop before fraud loss.</h1>
+    <p class="lead">A 30-day pilot gives a bank, public program, CSR sponsor, telecom anti-fraud team, fintech, or merchant network a measurable Chetana campaign without asking users to create accounts or share private scam content with the sponsor.</p>
+    <div class="cta">
+      <a class="primary" href="{CHETANA_PUBLIC_ORIGIN}/partners#pilot-inquiry">Request pilot contact</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">Open India kit</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/pilottrace">View PilotTrace</a>
+      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/packet">Open packet</a>
+    </div>
+
+    <section class="grid">
+      <div class="card"><strong>User action</strong><p>Screenshot, paste, voice note, or one tap. Ask Chetana before paying, approving UPI, sharing OTP, installing APK, or releasing goods.</p></div>
+      <div class="card"><strong>Distribution</strong><p>Use source-tagged QR links for bank branches, WhatsApp groups, CSR posters, colleges, ward offices, and merchant counters.</p></div>
+      <div class="card"><strong>Research signal</strong><p>Measure source tag, verdict, input type, feedback bucket, official-rail tap, share, packet copy, and privacy-control use.</p></div>
+      <div class="card"><strong>Privacy boundary</strong><p>No sponsor raw scan text, screenshots, phone numbers, UPI IDs, URLs, or user-profile database.</p></div>
+    </section>
+
+    <section class="split">
+      <div class="box">
+        <div class="label">Harness loop</div>
+        <h2>Users and data, without trust damage</h2>
+        <ul>
+          <li>Source-tagged link brings a user to the scam checker.</li>
+          <li>User receives verdict, safest next action, and official rails.</li>
+          <li>User can give one-tap feedback if Chetana missed or over-warned.</li>
+          <li>PilotTrace reports aggregate outcomes to sponsors.</li>
+          <li>Research examples require explicit consent.</li>
+        </ul>
+      </div>
+      <div class="box">
+        <div class="label">Why a sponsor cares</div>
+        <h2>It gives them proof before procurement</h2>
+        <p>Instead of buying an abstract AI product, the sponsor sees whether real users scanned, paused, followed official rails, shared warnings, copied case packets, and complained when Chetana was wrong.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">30-day plan</div>
+      <div class="steps">
+        <div class="step"><span>Week 1</span><strong>Launch</strong><p>Choose one audience, publish QR/WhatsApp links, and freeze source tags.</p></div>
+        <div class="step"><span>Week 2</span><strong>Observe</strong><p>Review scans, high-risk pauses, feedback buckets, and official rail taps.</p></div>
+        <div class="step"><span>Week 3</span><strong>Tune</strong><p>Improve campaign copy, local language examples, and recovery handoff wording.</p></div>
+        <div class="step"><span>Week 4</span><strong>Decide</strong><p>Deliver sponsor-safe PilotTrace proof and choose sponsorship, CSR, or integration path.</p></div>
+      </div>
+    </section>
+
+    <div class="foot">
+      Chetana is independent and is not a government, RBI, NPCI, I4C, CERT-In, police, or bank service. It is an advisory scam-check tool that keeps official recovery rails visible.
+    </div>
+  </main>
+</body>
+</html>""",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/partners/packet", include_in_schema=False)
@@ -2367,7 +2622,9 @@ async def partners_packet():
     <div class="cta">
       <a class="primary" href="mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot">Start a pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Open partner page</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/india-kit">Open India kit</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/outreach-kit">Open outreach kit</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/30-day-pilot">Open 30-day pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
     </div>
@@ -2382,7 +2639,7 @@ async def partners_packet():
     <section class="split">
       <div class="box">
         <div class="label">Pilot offer</div>
-        <h2>90 days, one focused audience.</h2>
+        <h2>30 days, one focused audience.</h2>
         <p>Run one region, language cluster, branch campaign, merchant association, or public-awareness link. Weekly proof reports show what people checked and which official next step they used, without exposing raw scan content.</p>
       </div>
       <div class="box">
@@ -2407,8 +2664,8 @@ async def partners_packet():
     <section class="steps">
       <div class="step"><span>Week 1</span><strong>Launch</strong><p>Publish sponsor QR/link and branch, merchant, or awareness copy.</p></div>
       <div class="step"><span>Weeks 2-4</span><strong>Measure</strong><p>Track aggregate scans, high-risk pauses, official-rail taps, languages, and packet copies.</p></div>
-      <div class="step"><span>Weeks 5-8</span><strong>Tune</strong><p>Improve regional examples, merchant scripts, and recovery handoff wording.</p></div>
-      <div class="step"><span>Weeks 9-12</span><strong>Decide</strong><p>Deliver proof packet and choose sponsorship, CSR, procurement, or integration route.</p></div>
+      <div class="step"><span>Week 3</span><strong>Tune</strong><p>Improve regional examples, merchant scripts, and recovery handoff wording.</p></div>
+      <div class="step"><span>Week 4</span><strong>Decide</strong><p>Deliver proof packet and choose sponsorship, CSR, procurement, or integration route.</p></div>
     </section>
 
     <div class="foot">
@@ -2467,9 +2724,11 @@ async def partners_outreach_kit():
       <p>Use with <a href="https://chetana.activemirror.ai/partners/packet">the pilot packet</a>.</p>
     </div>
     <h1>Forwardable copy for getting Chetana sponsored.</h1>
-    <p>These templates are written for Indian banks, public digital-safety programs, telecom anti-fraud teams, CSR committees, fintechs, and merchant associations. Keep the ask simple: sponsor one focused 90-day pilot and measure high-risk pauses plus official handoffs.</p>
+    <p>These templates are written for Indian banks, public digital-safety programs, telecom anti-fraud teams, CSR committees, fintechs, and merchant associations. Keep the ask simple: sponsor one focused 30-day pilot and measure high-risk pauses plus official handoffs.</p>
     <div class="cta">
       <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request pilot contact</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/india-kit">Open India kit</a>
+      <a class="secondary" href="https://chetana.activemirror.ai/partners/30-day-pilot">Open 30-day pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/pilottrace">View PilotTrace report</a>
       <a class="secondary" href="https://chetana.activemirror.ai">Try Chetana</a>
@@ -2484,12 +2743,12 @@ async def partners_outreach_kit():
     <section class="templates">
       <div class="template">
         <div class="label">Bank / PSP email</div>
-        <h2>Subject: 90-day Chetana pilot to create a fraud pause before UPI loss</h2>
+        <h2>Subject: 30-day Chetana pilot to create a fraud pause before UPI loss</h2>
         <pre>Hello [Name],
 
 Chetana is an independent scam checker for India. A user screenshots a suspicious message, QR request, fake payment proof, APK link, or UPI pressure flow and gets a plain-language risk read before they act.
 
-We are looking for one bank/PSP partner to sponsor a focused 90-day pilot for [region / branch cluster / customer education campaign]. The pilot measures aggregate scans, high-risk pauses, 1930/cybercrime handoffs, language usage, packet copies, and privacy-control usage. It does not share raw scan text, screenshots, UPI IDs, phone numbers, or user profiles with the sponsor.
+We are looking for one bank/PSP partner to sponsor a focused 30-day pilot for [region / branch cluster / customer education campaign]. The pilot measures aggregate scans, high-risk pauses, 1930/cybercrime handoffs, language usage, packet copies, and privacy-control usage. It does not share raw scan text, screenshots, UPI IDs, phone numbers, or user profiles with the sponsor.
 
 Pilot packet: https://chetana.activemirror.ai/partners/packet
 Contact: https://chetana.activemirror.ai/partners#pilot-inquiry
@@ -2503,7 +2762,7 @@ Would you be open to a short pilot scoping call?</pre>
 
 Chetana can give citizens a simple first stop before panic, payment, OTP sharing, APK install, screen sharing, or complaint filing. It keeps official rails visible: 1930, cybercrime.gov.in, Chakshu, bank support, and relevant recovery steps.
 
-We propose a 90-day public-awareness pilot for [district / state / language group / campaign]. The goal is not to replace official portals. The goal is to reduce confusion before loss and make evidence preservation easier after loss.
+We propose a 30-day public-awareness pilot for [district / state / language group / campaign]. The goal is not to replace official portals. The goal is to reduce confusion before loss and make evidence preservation easier after loss.
 
 Pilot packet: https://chetana.activemirror.ai/partners/packet
 Outreach kit: https://chetana.activemirror.ai/partners/outreach-kit
@@ -2517,7 +2776,7 @@ Can we share a one-page pilot outline with the right digital-safety or cyber-awa
 
 Most people do not need a complex app when they are scared. They need one easy action: screenshot anything and ask Chetana.
 
-Chetana helps families, seniors, students, and small merchants check suspicious messages, QR requests, payment proofs, and fake support pressure before they lose money or release goods. A sponsor can fund a focused 90-day pilot and receive aggregate proof of use without getting raw user scan content.
+Chetana helps families, seniors, students, and small merchants check suspicious messages, QR requests, payment proofs, and fake support pressure before they lose money or release goods. A sponsor can fund a focused 30-day pilot and receive aggregate proof of use without getting raw user scan content.
 
 Pilot packet: https://chetana.activemirror.ai/partners/packet
 Try Chetana: https://chetana.activemirror.ai

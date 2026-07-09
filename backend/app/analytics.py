@@ -71,6 +71,8 @@ class V0AnalyticsBreakdowns(BaseModel):
     official_rails: dict[str, int] = Field(default_factory=dict)
     entry_sources: dict[str, int] = Field(default_factory=dict)
     entry_paths: dict[str, int] = Field(default_factory=dict)
+    source_params: dict[str, int] = Field(default_factory=dict)
+    action_params: dict[str, int] = Field(default_factory=dict)
     utm_sources: dict[str, int] = Field(default_factory=dict)
     event_versions: dict[str, int] = Field(default_factory=dict)
     local_privacy_actions: dict[str, int] = Field(default_factory=dict)
@@ -331,6 +333,8 @@ def build_v0_analytics_summary(
     official_rails: Counter[str] = Counter()
     entry_sources: Counter[str] = Counter()
     entry_paths: Counter[str] = Counter()
+    source_params: Counter[str] = Counter()
+    action_params: Counter[str] = Counter()
     utm_sources: Counter[str] = Counter()
     event_versions: Counter[str] = Counter()
     local_privacy_actions: Counter[str] = Counter()
@@ -368,6 +372,12 @@ def build_v0_analytics_summary(
             page_path = _metadata_value(event, "page_variant") or _metadata_value(event, "page_path")
             if page_path:
                 entry_paths[page_path] += 1
+            source_param = _metadata_value(event, "source_param")
+            if source_param:
+                source_params[source_param] += 1
+            action_param = _metadata_value(event, "action_param")
+            if action_param:
+                action_params[action_param] += 1
             utm_source = _metadata_value(event, "utm_source")
             if utm_source:
                 utm_sources[utm_source] += 1
@@ -538,6 +548,8 @@ def build_v0_analytics_summary(
         official_rails=_sorted_counts(official_rails),
         entry_sources=_sorted_counts(entry_sources),
         entry_paths=_sorted_counts(entry_paths),
+        source_params=_sorted_counts(source_params),
+        action_params=_sorted_counts(action_params),
         utm_sources=_sorted_counts(utm_sources),
         event_versions=_sorted_counts(event_versions),
         local_privacy_actions=_sorted_counts(local_privacy_actions),

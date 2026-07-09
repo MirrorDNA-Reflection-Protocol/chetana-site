@@ -1434,28 +1434,18 @@ export default function ChetanaV0Experience({
               </span>
               <strong>Chetana</strong>
             </div>
-            <h1>Ask Chetana</h1>
-            <p>Screenshot, voice, or one tap. Know what to do before you pay.</p>
+            <h1>Fake hai kya?</h1>
+            <p>Screenshot bhejo. Chetana bata degi.</p>
             <div className="v0-app-privacy">
-              Private by default. No login required.
+              No login. No complaint filed. Official next steps only.
             </div>
           </div>
           <div className="v0-hero-proof-list" aria-label="Chetana trust points">
-            <span><Check size={14} /> Screenshot-first scam check</span>
-            <span><Phone size={14} /> 1930 stays visible when money moved</span>
+            <span><Check size={14} /> Screenshot, paste, or tap what happened</span>
+            <span><Mic size={14} /> Voice note can stay local</span>
+            <span><Phone size={14} /> 1930 and cybercrime.gov.in when money moved</span>
             <span><Shield size={14} /> Advisory only, not a government service</span>
           </div>
-          {onNavigate && (
-            <div className="v0-institution-note">
-              <div className="v0-section-label">For sponsors</div>
-              <strong>Banks and public programs care when Chetana creates cleaner pre-report packets.</strong>
-              <p>Users pause before paying, preserve evidence, and move to the correct official rail faster.</p>
-              <button onClick={() => onNavigate("partners")}>
-                <FileText size={14} />
-                Partner pilots
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1477,11 +1467,11 @@ export default function ChetanaV0Experience({
             <div className="v0-composer-head">
               <div>
                 <div className="v0-section-label">Ask Chetana</div>
-                <h2>{mode === "text" ? "Paste or tap context" : "Screenshot or quick context"}</h2>
+                <h2>{mode === "text" ? "Paste or tap" : "Screenshot or tap"}</h2>
                 <p className="v0-composer-copy">
                   {mode === "text"
                     ? "Paste the suspicious message, tap what happened, or record a local voice note."
-                    : "Use a screenshot from WhatsApp, SMS, email, QR, payment proof, or tap what happened if you are in a hurry."}
+                    : "Use a screenshot from WhatsApp, SMS, email, QR, or payment proof. Tap context if you are in a hurry."}
                 </p>
               </div>
               <div className="v0-status">{status}</div>
@@ -1521,7 +1511,7 @@ export default function ChetanaV0Experience({
               <div className="v0-lazy-copy">
                 <div className="v0-section-label">Fast path</div>
                 <strong>No perfect prompt needed.</strong>
-                <p>Tap what happened. Add a screenshot if you have one. Voice stays on this page and is not transcribed yet.</p>
+                <p>Tap one thing. Add a screenshot if you have one. Voice stays on this page and is not transcribed yet.</p>
               </div>
 
               <div className="v0-voice-row">

@@ -3533,6 +3533,7 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
   const metrics = [
     "Scans completed",
     "High-risk actions routed",
+    "Source tags",
     "1930 / cybercrime handoffs",
     "Languages used",
     "Recovery packets copied",
@@ -3561,9 +3562,9 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
     },
     {
       icon: <BookOpen size={18} />,
-      status: "Research only",
-      title: "News and OSINT signals",
-      text: "Sources like The420 help track patterns and briefs, but they are not automated verdict ground truth.",
+      status: "Harness layer",
+      title: "Consented research loop",
+      text: "Source tags, feedback buckets, and follow-through counts are collected by default. Raw examples require explicit consent.",
     },
   ];
   const proofTiles = [
@@ -3593,9 +3594,9 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
   ];
   const pilotPlan = [
     ["Week 1", "Launch", "Launch one sponsor link/QR and branch or campaign copy."],
-    ["Weeks 2-4", "Measure", "Track scans, high-risk pauses, official-rail taps, languages, and packet copies."],
-    ["Weeks 5-8", "Tune", "Tune regional scam examples, merchant scripts, and recovery handoff wording."],
-    ["Weeks 9-12", "Decide", "Deliver the pilot proof packet and decide sponsor, CSR, or procurement route."],
+    ["Week 2", "Measure", "Track scans, high-risk pauses, source tags, official-rail taps, languages, and packet copies."],
+    ["Week 3", "Tune", "Tune regional scam examples, merchant scripts, and recovery handoff wording."],
+    ["Week 4", "Decide", "Deliver the pilot proof packet and decide sponsor, CSR, or procurement route."],
   ];
 
   return (
@@ -3619,6 +3620,14 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           <a className="partner-secondary" href="/partners/packet" target="_blank" rel="noreferrer">
             <FileText size={17} />
             Open pilot packet
+          </a>
+          <a className="partner-secondary" href="/partners/india-kit" target="_blank" rel="noreferrer">
+            <QrCode size={17} />
+            India kit
+          </a>
+          <a className="partner-secondary" href="/partners/30-day-pilot" target="_blank" rel="noreferrer">
+            <BarChart3 size={17} />
+            30-day pilot
           </a>
           <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
             <Share2 size={17} />
@@ -3780,6 +3789,14 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <a className="partner-primary" href="/partners/packet" target="_blank" rel="noreferrer">
               <FileText size={17} />
               View sponsor packet
+            </a>
+            <a className="partner-secondary" href="/partners/india-kit" target="_blank" rel="noreferrer">
+              <QrCode size={17} />
+              India kit
+            </a>
+            <a className="partner-secondary" href="/partners/30-day-pilot" target="_blank" rel="noreferrer">
+              <BarChart3 size={17} />
+              30-day pilot
             </a>
             <a className="partner-secondary" href={contactHref}>
               <MessageCircle size={17} />

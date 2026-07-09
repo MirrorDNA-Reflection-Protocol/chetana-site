@@ -46,7 +46,7 @@ class PilotTraceRates(BaseModel):
 
 
 class PilotTraceReport(BaseModel):
-    schema_version: str = "chetana.pilottrace.v0.3"
+    schema_version: str = "chetana.pilottrace.v0.4"
     generated_at_utc: str
     trailing_days: int
     source: str = "v0_event_ledger_and_partner_inquiry_log"
@@ -183,6 +183,10 @@ def build_pilottrace_report(
             "privacy_actions": summary.breakdowns.local_privacy_actions,
             "feedback_types": summary.breakdowns.feedback_types,
             "feedback_surfaces": summary.breakdowns.feedback_surfaces,
+            "entry_sources": summary.breakdowns.entry_sources,
+            "source_params": summary.breakdowns.source_params,
+            "action_params": summary.breakdowns.action_params,
+            "utm_sources": summary.breakdowns.utm_sources,
             "partner_inquiry_types": _sorted_counts(inquiry_types),
         },
         daily=daily,
@@ -202,6 +206,7 @@ def build_pilottrace_report(
             "Partner inquiries are counted by pilot lane only; names, emails, roles, and messages are excluded.",
             "Feedback is counted by reason bucket only; no free-text complaint body is collected for PilotTrace.",
             "Synthetic, QA, test, and duplicate event rows are excluded from the sponsor report.",
+            "Source tags such as bank_qr, gov_qr, branch_poster, csr_qr, and whatsapp_forward are counted as campaign labels only.",
         ],
         excluded_fields=[
             "raw_scan_text",
@@ -215,6 +220,7 @@ def build_pilottrace_report(
             "feedback_text",
             "ip_address",
             "device_identifier",
+            "raw_referrer_url",
         ],
         missing_metrics=[],
         proof_notes=[
@@ -255,7 +261,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chetana PilotTrace v0.3 Sponsor Proof Report</title>
+  <title>Chetana PilotTrace v0.4 Sponsor Proof Report</title>
   <meta name="description" content="Sponsor-safe Chetana PilotTrace aggregate proof report for scam-check pilots.">
   <style>
     :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
@@ -297,7 +303,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
     <div class="top">
       <div>
         <div class="label">Chetana by Active Mirror</div>
-        <strong>PilotTrace v0.3</strong>
+        <strong>PilotTrace v0.4</strong>
       </div>
       <p>Generated {html.escape(report.generated_at_utc)} | Last {report.trailing_days} days | Status: <strong>{html.escape(report.status)}</strong></p>
     </div>
@@ -329,6 +335,8 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
       {_count_rows("Input types", report.breakdowns.get("input_types", {}))}
       {_count_rows("Feedback types", report.breakdowns.get("feedback_types", {}))}
       {_count_rows("Partner inquiry lanes", report.breakdowns.get("partner_inquiry_types", {}))}
+      {_count_rows("Source tags", report.breakdowns.get("source_params", {}))}
+      {_count_rows("Entry sources", report.breakdowns.get("entry_sources", {}))}
     </div>
     <div class="split">
       <section class="box"><h2>Privacy boundary</h2><ul>{privacy_items}</ul></section>

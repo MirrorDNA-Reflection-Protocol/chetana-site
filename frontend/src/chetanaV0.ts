@@ -394,7 +394,7 @@ function readLaunchContext(): LaunchContext | null {
 
 function hasAttributionTokens(params: URLSearchParams): boolean {
   if (params.has("share")) return true;
-  if (params.get("action") === "scan") return true;
+  if (isScamCheckAction(params.get("action"))) return true;
   if (params.get("source")) return true;
   return ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].some((key) => params.has(key));
 }
@@ -411,11 +411,15 @@ function attributionParams(): URLSearchParams {
 function pageVariant(params: URLSearchParams): string {
   const queryPage = params.get("page");
   if (queryPage) return queryPage;
-  if (params.has("share") || params.get("action") === "scan" || params.get("source") === "pwa") {
+  if (params.has("share") || isScamCheckAction(params.get("action")) || params.get("source") === "pwa") {
     return "scan";
   }
   const path = window.location.pathname.replace(/^\/+/, "");
   return path || "home";
+}
+
+function isScamCheckAction(action: string | null): boolean {
+  return action === "scan" || action === "scam_check";
 }
 
 snapshotLaunchContext();
@@ -601,7 +605,9 @@ function referrerHost(): string | null {
 function entrySource(params: URLSearchParams): string {
   if (params.has("share")) return "share_intent";
   if (params.get("action") === "scan") return "pwa_scan_shortcut";
+  if (params.get("action") === "scam_check") return "scam_check_link";
   if (params.get("source") === "pwa") return "pwa_launch";
+  if (params.get("source")) return "source_tag";
   if (params.get("utm_source")) return "campaign";
   if (document.referrer) return "referral";
   if (currentDisplayMode() !== "browser") return "installed_app";

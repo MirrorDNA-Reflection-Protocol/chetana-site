@@ -55,6 +55,10 @@ const servedSafetyNudgeChecks = [
   "Send to someone I trust",
   "I already lost money",
   "Follow through",
+  "Fake hai kya?",
+  "Screenshot bhejo. Chetana bata degi.",
+  "No login. No complaint filed. Official next steps only.",
+  "Tap one thing. Add a screenshot if you have one.",
 ];
 
 async function fetchText(pathOrUrl) {

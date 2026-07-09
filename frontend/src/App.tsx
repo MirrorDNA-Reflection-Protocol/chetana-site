@@ -61,6 +61,10 @@ function initialPageFromLocation(): PageId {
   return "home";
 }
 
+function isScamCheckAction(action: string | null): boolean {
+  return action === "scan" || action === "scam_check";
+}
+
 export default function App() {
   const [page, _setPage] = useState<PageId>(() => initialPageFromLocation());
   const [termsAccepted, setTermsAccepted] = useState(() => !!localStorage.getItem("chetana_terms_accepted"));
@@ -116,7 +120,7 @@ export default function App() {
     const bootFromIntent = async () => {
       const params = new URLSearchParams(window.location.search);
       const isShare = params.has("share");
-      const isAction = params.get("action") === "scan";
+      const isAction = isScamCheckAction(params.get("action"));
       const isPwa = params.get("source") === "pwa";
       let sharedText = params.get("shared_text");
       let sharedFile: File | null = null;

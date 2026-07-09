@@ -52,7 +52,9 @@ async function main() {
     "Fund a fraud pause before money moves.",
     "No account. No profile database.",
     "Sample case packet",
+    "Open India kit",
     "Open outreach kit",
+    "Open 30-day pilot",
     "View PilotTrace report",
   ];
   const missingPacketNeedles = packetNeedles.filter((needle) => !packet.includes(needle));
@@ -66,6 +68,8 @@ async function main() {
     "Bank / PSP email",
     "Government / public program email",
     "Weekly pilot proof report",
+    "Open India kit",
+    "Open 30-day pilot",
     "View PilotTrace report",
   ];
   const missingOutreachNeedles = outreachNeedles.filter((needle) => !outreachKit.includes(needle));
@@ -73,9 +77,36 @@ async function main() {
     throw new Error(`Partner outreach kit missing strings: ${missingOutreachNeedles.join(", ")}`);
   }
 
+  const indiaKit = await fetchText("/partners/india-kit");
+  const indiaKitNeedles = [
+    "Chetana India QR and WhatsApp Kit",
+    "Fake hai kya?",
+    "Screenshot bhejo. Chetana bata degi.",
+    "source=bank_qr&amp;action=scam_check",
+    "source=gov_qr&amp;action=scam_check",
+    "source=whatsapp_forward&amp;action=scam_check",
+    "No login. No complaint filed. Official next steps only.",
+  ];
+  const missingIndiaKitNeedles = indiaKitNeedles.filter((needle) => !indiaKit.includes(needle));
+  if (missingIndiaKitNeedles.length > 0) {
+    throw new Error(`India kit missing strings: ${missingIndiaKitNeedles.join(", ")}`);
+  }
+
+  const pilotPage = await fetchText("/partners/30-day-pilot");
+  const pilotPageNeedles = [
+    "Chetana 30-Day Fraud Pause Pilot",
+    "Harness loop",
+    "Source-tagged link brings a user to the scam checker.",
+    "View PilotTrace",
+  ];
+  const missingPilotPageNeedles = pilotPageNeedles.filter((needle) => !pilotPage.includes(needle));
+  if (missingPilotPageNeedles.length > 0) {
+    throw new Error(`30-day pilot page missing strings: ${missingPilotPageNeedles.join(", ")}`);
+  }
+
   const pilotTrace = await fetchText("/partners/pilottrace");
   const pilotTraceNeedles = [
-    "Chetana PilotTrace v0.3 Sponsor Proof Report",
+    "Chetana PilotTrace v0.4 Sponsor Proof Report",
     "Sponsor-safe proof report.",
     "No raw scan text is included.",
     "Follow-through rate",
@@ -89,7 +120,7 @@ async function main() {
   }
 
   const pilotTraceJson = await fetchJson("/api/v1/partners/pilottrace");
-  if (pilotTraceJson.schema_version !== "chetana.pilottrace.v0.3" || pilotTraceJson.sponsor_safe !== true) {
+  if (pilotTraceJson.schema_version !== "chetana.pilottrace.v0.4" || pilotTraceJson.sponsor_safe !== true) {
     throw new Error("PilotTrace JSON contract is missing sponsor-safe schema markers.");
   }
   if (!Object.prototype.hasOwnProperty.call(pilotTraceJson.totals || {}, "false_safe_complaints")) {
@@ -100,6 +131,12 @@ async function main() {
   }
 
   const sitemap = await fetchText("/sitemap.xml");
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/india-kit")) {
+    throw new Error("Sitemap does not include /partners/india-kit");
+  }
+  if (!sitemap.includes("https://chetana.activemirror.ai/partners/30-day-pilot")) {
+    throw new Error("Sitemap does not include /partners/30-day-pilot");
+  }
   if (!sitemap.includes("https://chetana.activemirror.ai/partners/packet")) {
     throw new Error("Sitemap does not include /partners/packet");
   }

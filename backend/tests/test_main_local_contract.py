@@ -53,6 +53,8 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("Fund a fraud pause before money moves.", packet_html)
         self.assertIn("No account. No profile database.", packet_html)
         self.assertIn("Open outreach kit", packet_html)
+        self.assertIn("Open India kit", packet_html)
+        self.assertIn("Open 30-day pilot", packet_html)
 
         outreach_resp = self.client.get("/partners/outreach-kit")
         self.assertEqual(outreach_resp.status_code, 200)
@@ -60,10 +62,32 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("Chetana Outreach Kit for Sponsor Pilots", outreach_html)
         self.assertIn("Bank / PSP email", outreach_html)
         self.assertIn("Weekly pilot proof report", outreach_html)
+        self.assertIn("Open India kit", outreach_html)
+        self.assertIn("Open 30-day pilot", outreach_html)
+
+        india_kit_resp = self.client.get("/partners/india-kit")
+        self.assertEqual(india_kit_resp.status_code, 200)
+        india_kit_html = india_kit_resp.text
+        self.assertIn("Chetana India QR and WhatsApp Kit", india_kit_html)
+        self.assertIn("Fake hai kya?", india_kit_html)
+        self.assertIn("Screenshot bhejo. Chetana bata degi.", india_kit_html)
+        self.assertIn("source=bank_qr&amp;action=scam_check", india_kit_html)
+        self.assertIn("source=gov_qr&amp;action=scam_check", india_kit_html)
+        self.assertIn("source=whatsapp_forward&amp;action=scam_check", india_kit_html)
+        self.assertIn("No login. No complaint filed. Official next steps only.", india_kit_html)
+
+        pilot_resp = self.client.get("/partners/30-day-pilot")
+        self.assertEqual(pilot_resp.status_code, 200)
+        pilot_html = pilot_resp.text
+        self.assertIn("Chetana 30-Day Fraud Pause Pilot", pilot_html)
+        self.assertIn("Harness loop", pilot_html)
+        self.assertIn("Source-tagged link brings a user to the scam checker.", pilot_html)
 
         sitemap_resp = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap_resp.status_code, 200)
         self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/india-kit", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/30-day-pilot", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/outreach-kit", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/pilottrace", sitemap_resp.text)
@@ -145,6 +169,17 @@ class MainLocalContractTests(unittest.TestCase):
             old = now - timedelta(days=40)
             with events_path.open("w", encoding="utf-8") as handle:
                 for payload in [
+                    {
+                        "event_name": "app_open",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "metadata": {
+                            "event_version": "chetana.v0.analytics.v2",
+                            "entry_source": "scam_check_link",
+                            "source_param": "branch_poster",
+                            "action_param": "scam_check",
+                        },
+                    },
                     {
                         "event_name": "scan_completed",
                         "session_id": "session-a",
@@ -260,7 +295,7 @@ class MainLocalContractTests(unittest.TestCase):
 
         self.assertEqual(json_resp.status_code, 200)
         data = json_resp.json()
-        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.3")
+        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.4")
         self.assertTrue(data["sponsor_safe"])
         self.assertEqual(data["totals"]["scans_completed"], 1)
         self.assertEqual(data["totals"]["high_risk_pauses"], 1)
@@ -276,6 +311,8 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertEqual(data["totals"]["partner_inquiries"], 1)
         self.assertEqual(data["breakdowns"]["feedback_types"], {"missed_scam": 1})
         self.assertEqual(data["breakdowns"]["partner_inquiry_types"], {"bank_psp": 1})
+        self.assertEqual(data["breakdowns"]["source_params"], {"branch_poster": 1})
+        self.assertEqual(data["breakdowns"]["action_params"], {"scam_check": 1})
         self.assertEqual(data["quality"]["invalid_inquiry_rows"], 1)
         self.assertEqual(data["quality"]["out_of_window_inquiry_rows"], 1)
         serialized = json.dumps(data)
@@ -284,7 +321,7 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertNotIn("Do not expose this correction note.", serialized)
 
         self.assertEqual(html_resp.status_code, 200)
-        self.assertIn("Chetana PilotTrace v0.3 Sponsor Proof Report", html_resp.text)
+        self.assertIn("Chetana PilotTrace v0.4 Sponsor Proof Report", html_resp.text)
         self.assertIn("Follow-through rate", html_resp.text)
         self.assertIn("No raw scan text is included.", html_resp.text)
         self.assertIn("False-safe complaints", html_resp.text)
@@ -376,7 +413,13 @@ class MainLocalContractTests(unittest.TestCase):
                     "event_name": "app_open",
                     "session_id": "session-a",
                     "timestamp_utc": now,
-                    "metadata": {"event_version": "chetana.v0.analytics.v2", "entry_source": "campaign", "utm_source": "the420"},
+                    "metadata": {
+                        "event_version": "chetana.v0.analytics.v2",
+                        "entry_source": "scam_check_link",
+                        "source_param": "bank_qr",
+                        "action_param": "scam_check",
+                        "utm_source": "the420",
+                    },
                 }) + "\n")
                 handle.write(json.dumps({
                     "event_name": "scan_started",
@@ -410,7 +453,9 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertEqual(data["trailing_days"], 3)
         self.assertEqual(data["totals"]["scan_completes"], 1)
         self.assertEqual(data["totals"]["risky_verdicts"], 1)
-        self.assertEqual(data["breakdowns"]["entry_sources"], {"campaign": 1})
+        self.assertEqual(data["breakdowns"]["entry_sources"], {"scam_check_link": 1})
+        self.assertEqual(data["breakdowns"]["source_params"], {"bank_qr": 1})
+        self.assertEqual(data["breakdowns"]["action_params"], {"scam_check": 1})
         self.assertEqual(data["breakdowns"]["utm_sources"], {"the420": 1})
 
     def test_legacy_analytics_event_is_mirrored_into_v0_contract(self) -> None:

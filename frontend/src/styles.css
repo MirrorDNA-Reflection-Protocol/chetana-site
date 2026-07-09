@@ -2068,6 +2068,74 @@ main {
   background: rgba(204,251,241,0.16);
 }
 
+.v0-local-memory-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.035);
+}
+
+.v0-local-memory-strip > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.v0-local-memory-strip strong {
+  color: var(--heading);
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.v0-local-memory-strip p,
+.v0-local-memory-strip small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.v0-local-memory-strip small {
+  color: #ccfbf1;
+  font-weight: 760;
+}
+
+.v0-local-memory-strip button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  color: var(--text-bright);
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 820;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.v0-local-memory-strip button:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+@media (max-width: 640px) {
+  .v0-local-memory-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .v0-local-memory-strip button {
+    width: 100%;
+  }
+}
+
 .v0-reason-list,
 .v0-step-list,
 .v0-secondary-grid,

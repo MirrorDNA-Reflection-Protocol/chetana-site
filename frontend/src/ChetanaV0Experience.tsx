@@ -48,7 +48,11 @@ import {
   verdictSummary,
   V0ExtractedInput,
 } from "./chetanaV0";
-import { recordLocalThreatThread, type V0ThreatThreadSignal } from "./chetanaThreatThreading";
+import {
+  clearLocalChetanaScanMemory,
+  recordLocalThreatThread,
+  type V0ThreatThreadSignal,
+} from "./chetanaThreatThreading";
 import ChetanaResultScreen, { riskFromVerdict } from "./ChetanaResultScreen";
 
 const DEFAULT_PROMPTS: Record<V0Mode, string> = {
@@ -300,6 +304,7 @@ export default function ChetanaV0Experience({
   const [shareCopied, setShareCopied] = useState(false);
   const [casePacketCopied, setCasePacketCopied] = useState(false);
   const [linkedPacketCopied, setLinkedPacketCopied] = useState(false);
+  const [localMemoryClearStatus, setLocalMemoryClearStatus] = useState<string | null>(null);
   const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
 
   useEffect(() => {
@@ -563,6 +568,7 @@ export default function ChetanaV0Experience({
     setShareCopied(false);
     setCasePacketCopied(false);
     setLinkedPacketCopied(false);
+    setLocalMemoryClearStatus(null);
     setMoneyMovedAnswer(null);
     setStatus(nextStatus);
   };
@@ -1189,6 +1195,15 @@ export default function ChetanaV0Experience({
     }
   };
 
+  const clearLocalScanMemory = () => {
+    clearLocalChetanaScanMemory();
+    const message = "Local scan memory cleared from this browser.";
+    setThreadSignal(null);
+    setLocalMemoryClearStatus(message);
+    setStatus(message);
+    window.setTimeout(() => setLocalMemoryClearStatus(null), 2800);
+  };
+
   const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
     if (!result) return;
     const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
@@ -1602,6 +1617,19 @@ export default function ChetanaV0Experience({
                   </button>
                 </div>
               )}
+
+              <div className="v0-local-memory-strip">
+                <div>
+                  <div className="v0-section-label">Local privacy</div>
+                  <strong>Scan memory stays on this browser.</strong>
+                  <p>Clear repeated-scan hints, local counters, queued scan events, and old scan history without changing language, install, consent, senior mode, or family settings.</p>
+                  {localMemoryClearStatus && <small aria-live="polite">{localMemoryClearStatus}</small>}
+                </div>
+                <button type="button" onClick={clearLocalScanMemory}>
+                  <X size={14} />
+                  Clear local scan memory
+                </button>
+              </div>
 
               {loopReceipt && (
                 <div className={`v0-loop-receipt ${loopReceipt.status}`}>

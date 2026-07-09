@@ -49,7 +49,22 @@ type StoredThreatThreadState = {
   index: Record<string, string[]>;
 };
 
-const STORAGE_KEY = "chetana_threat_threads_v1";
+export const CHETANA_THREAT_THREADS_STORAGE_KEY = "chetana_threat_threads_v1";
+export const CLEARABLE_CHETANA_LOCAL_SCAN_KEYS = [
+  CHETANA_THREAT_THREADS_STORAGE_KEY,
+  "chetana_v0_scan_count",
+  "chetana_v0_last_scan_at",
+  "chetana_v0_event_queue",
+  "chetana_history",
+  "chetana_scan_count",
+  "chetana_vigilance",
+  "chetana_vigilance_proof",
+] as const;
+export const CLEARABLE_CHETANA_SESSION_SCAN_KEYS = [
+  "chetana_v0_event_dedupe",
+] as const;
+
+const STORAGE_KEY = CHETANA_THREAT_THREADS_STORAGE_KEY;
 const THREAD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CORRELATION_WINDOW_MS = 72 * 60 * 60 * 1000;
 const MAX_THREADS = 25;
@@ -194,6 +209,31 @@ function writeState(state: StoredThreatThreadState): void {
   } catch {
     // Local threading is a browser-only helper. The scan result remains valid without it.
   }
+}
+
+export function clearLocalChetanaScanMemory(): number {
+  if (typeof window === "undefined") return 0;
+
+  let removed = 0;
+  try {
+    for (const key of CLEARABLE_CHETANA_LOCAL_SCAN_KEYS) {
+      if (window.localStorage.getItem(key) !== null) removed += 1;
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // Browsers can block storage access. The app should keep working even then.
+  }
+
+  try {
+    for (const key of CLEARABLE_CHETANA_SESSION_SCAN_KEYS) {
+      if (window.sessionStorage.getItem(key) !== null) removed += 1;
+      window.sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Session storage is best-effort privacy hygiene.
+  }
+
+  return removed;
 }
 
 function makeId(prefix: string): string {

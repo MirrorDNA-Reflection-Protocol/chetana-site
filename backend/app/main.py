@@ -2175,6 +2175,12 @@ async def privacy_policy():
     h2 { font-size: 1.2rem; margin-top: 2rem; }
     .badge { display:inline-block; background:#d1fae5; color:#065f46; padding:2px 10px; border-radius:99px; font-size:.8rem; font-weight:600; margin-bottom:1.5rem; }
     a { color: #059669; }
+    .memory-box { margin:1rem 0; padding:1rem; border:1px solid #d1d5db; border-radius:8px; background:#f9fafb; }
+    .memory-box strong { display:block; margin-bottom:.25rem; }
+    .memory-box p { margin:.25rem 0 .75rem; color:#4b5563; font-size:.94rem; }
+    .memory-box button { border:0; border-radius:999px; background:#047857; color:#fff; padding:.65rem .9rem; font-weight:700; cursor:pointer; }
+    .memory-box button:hover { background:#065f46; }
+    .memory-status { display:block; min-height:1rem; margin-top:.5rem; color:#047857; font-size:.85rem; font-weight:700; }
     footer { margin-top:3rem; font-size:.85rem; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:1rem; }
   </style>
 </head>
@@ -2201,6 +2207,12 @@ async def privacy_policy():
 
   <h2>Local browser memory</h2>
   <p>Chetana may use localStorage for app preferences, install or consent state, local scan counters, and repeated-scan warnings. Repeated-scan warnings are stored only as private hashes. Raw scanned text, raw UPI IDs, raw phone numbers, and raw links are not saved in that thread store. Thread hints expire after 30 days and can be removed by clearing site data for chetana.activemirror.ai.</p>
+  <div class="memory-box">
+    <strong>Clear local scan memory</strong>
+    <p>Removes repeated-scan hints, local counters, queued scan events, old scan history, and vigilance receipts from this browser. It keeps language, install, consent, senior mode, and family settings.</p>
+    <button id="clear-local-scan-memory" type="button">Clear local scan memory</button>
+    <small id="clear-local-scan-memory-status" class="memory-status" aria-live="polite"></small>
+  </div>
 
   <h2>Data residency</h2>
   <p>Chetana servers are operated in India. We aim to keep processing close to the user and avoid collecting more than is needed for the scan result.</p>
@@ -2220,6 +2232,33 @@ async def privacy_policy():
   <footer>
     Last updated: March 2026 · Chetana is a product of ActiveMirror / MirrorDNA · Made in India
   </footer>
+  <script>
+    (function () {
+      var localKeys = [
+        "chetana_threat_threads_v1",
+        "chetana_v0_scan_count",
+        "chetana_v0_last_scan_at",
+        "chetana_v0_event_queue",
+        "chetana_history",
+        "chetana_scan_count",
+        "chetana_vigilance",
+        "chetana_vigilance_proof"
+      ];
+      var sessionKeys = ["chetana_v0_event_dedupe"];
+      var button = document.getElementById("clear-local-scan-memory");
+      var status = document.getElementById("clear-local-scan-memory-status");
+      if (!button || !status) return;
+      button.addEventListener("click", function () {
+        try {
+          localKeys.forEach(function (key) { window.localStorage.removeItem(key); });
+        } catch (error) {}
+        try {
+          sessionKeys.forEach(function (key) { window.sessionStorage.removeItem(key); });
+        } catch (error) {}
+        status.textContent = "Local scan memory cleared from this browser.";
+      });
+    })();
+  </script>
 </body>
 </html>"""
     return _HTML(content=html)

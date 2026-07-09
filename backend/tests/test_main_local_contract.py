@@ -25,6 +25,16 @@ class MainLocalContractTests(unittest.TestCase):
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
 
+    def test_privacy_route_exposes_local_scan_memory_clear_control(self) -> None:
+        resp = self.client.get("/privacy")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        self.assertIn("Clear local scan memory", html)
+        self.assertIn("Local scan memory cleared from this browser.", html)
+        self.assertIn("chetana_threat_threads_v1", html)
+        self.assertIn("chetana_v0_event_queue", html)
+        self.assertIn("It keeps language, install, consent, senior mode, and family settings.", html)
+
     @patch("app.main._notify_telegram", new_callable=AsyncMock, return_value=False)
     @patch(
         "app.main.build_live_scan_guidance",

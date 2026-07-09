@@ -36,6 +36,9 @@ const servedSafetyNudgeChecks = [
   "Copy case packet",
   "Chetana linked scam summary",
   "This is a warning signal, not an official fraud determination.",
+  "Clear local scan memory",
+  "Local scan memory cleared from this browser.",
+  "Clear repeated-scan hints, local counters, queued scan events",
 ];
 
 async function fetchText(pathOrUrl) {

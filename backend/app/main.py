@@ -62,7 +62,15 @@ from app.v0_runtime import (  # noqa: E402
     log_event as log_v0_event,
 )
 from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary  # noqa: E402
-from app.field_harness import FIELD_SOURCE_TAGS, build_field_harness, render_field_harness_html  # noqa: E402
+from app.field_harness import (  # noqa: E402
+    FIELD_SOURCE_TAGS,
+    campaign_url_for_source,
+    build_field_harness,
+    render_campaign_poster_html,
+    render_field_harness_html,
+    render_qr_svg,
+    source_label,
+)
 from app.pilottrace import build_pilottrace_report, render_pilottrace_html  # noqa: E402
 from app.llm_router import build_llm_status, generate_chat_reply  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
@@ -2576,6 +2584,34 @@ async def partners_field_harness():
     harness = build_field_harness(CHETANA_PUBLIC_ORIGIN)
     return HTMLResponse(
         content=render_field_harness_html(harness),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/partners/qr/{source}.svg", include_in_schema=False)
+async def partners_qr_svg(source: str):
+    try:
+        campaign_url = campaign_url_for_source(CHETANA_PUBLIC_ORIGIN, source)
+        svg = render_qr_svg(campaign_url, title=f"Chetana {source_label(source)} campaign code")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="unknown_campaign_source") from None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@app.get("/partners/poster/{source}", include_in_schema=False)
+async def partners_campaign_poster(source: str):
+    try:
+        html = render_campaign_poster_html(CHETANA_PUBLIC_ORIGIN, source)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="unknown_campaign_source") from None
+    return HTMLResponse(
+        content=html,
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
 

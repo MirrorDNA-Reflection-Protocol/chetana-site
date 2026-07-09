@@ -129,8 +129,39 @@ async function main() {
       throw new Error(`Field harness JSON is missing source tag: ${source}`);
     }
   }
+  const bankQrCampaign = (fieldHarnessJson.campaign_links || []).find((item) => item.source === "bank_qr");
+  if (!bankQrCampaign?.qr_svg_url?.includes("/partners/qr/bank_qr.svg")) {
+    throw new Error("Field harness JSON is missing bank_qr QR SVG URL.");
+  }
+  if (!bankQrCampaign?.poster_url?.includes("/partners/poster/bank_qr")) {
+    throw new Error("Field harness JSON is missing bank_qr poster URL.");
+  }
   if (!(fieldHarnessJson.feedback_buckets || []).every((bucket) => bucket.free_text === false)) {
     throw new Error("Field harness feedback buckets must stay free-text disabled.");
+  }
+
+  const bankQrSvg = await fetchText("/partners/qr/bank_qr.svg");
+  const bankQrNeedles = [
+    "<svg",
+    "viewBox=\"0 0 45 45\"",
+    "Chetana Bank branch QR campaign code",
+    "source=bank_qr&amp;action=scam_check",
+  ];
+  const missingBankQrNeedles = bankQrNeedles.filter((needle) => !bankQrSvg.includes(needle));
+  if (missingBankQrNeedles.length > 0) {
+    throw new Error(`Bank QR SVG missing strings: ${missingBankQrNeedles.join(", ")}`);
+  }
+
+  const bankPoster = await fetchText("/partners/poster/bank_qr");
+  const bankPosterNeedles = [
+    "Chetana Printable Poster - Bank branch QR",
+    "Fake hai kya?",
+    "Screenshot bhejo. Chetana bata degi.",
+    "source=bank_qr&amp;action=scam_check",
+  ];
+  const missingBankPosterNeedles = bankPosterNeedles.filter((needle) => !bankPoster.includes(needle));
+  if (missingBankPosterNeedles.length > 0) {
+    throw new Error(`Bank poster missing strings: ${missingBankPosterNeedles.join(", ")}`);
   }
 
   const pilotTrace = await fetchText("/partners/pilottrace");

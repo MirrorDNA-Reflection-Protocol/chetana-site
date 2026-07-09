@@ -104,6 +104,8 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("source=bank_qr&amp;action=scam_check", harness_html)
         self.assertIn("source=merchant_counter&amp;action=scam_check", harness_html)
         self.assertIn("Aggregate by default", harness_html)
+        self.assertIn("Open QR SVG", harness_html)
+        self.assertIn("Open printable poster", harness_html)
 
         sitemap_resp = self.client.get("/sitemap.xml")
         self.assertEqual(sitemap_resp.status_code, 200)
@@ -196,6 +198,8 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("merchant_counter", sources)
         self.assertEqual(sources["bank_qr"]["tracked_params"], {"source": "bank_qr", "action": "scam_check"})
         self.assertIn("source=bank_qr&action=scam_check", sources["bank_qr"]["url"])
+        self.assertIn("/partners/qr/bank_qr.svg", sources["bank_qr"]["qr_svg_url"])
+        self.assertIn("/partners/poster/bank_qr", sources["bank_qr"]["poster_url"])
 
         self.assertIn("No raw scan text is included in sponsor reporting.", data["privacy_boundary"])
         self.assertIn("source_params", data["pilottrace_metrics"])
@@ -205,6 +209,31 @@ class MainLocalContractTests(unittest.TestCase):
         serialized = json.dumps(data)
         self.assertNotIn("raw_scan_text\":", serialized)
         self.assertNotIn("screenshot_bytes", serialized)
+
+    def test_partner_field_harness_qr_and_poster_assets_are_local(self) -> None:
+        qr_resp = self.client.get("/partners/qr/bank_qr.svg")
+        self.assertEqual(qr_resp.status_code, 200)
+        self.assertIn("image/svg+xml", qr_resp.headers["content-type"])
+        qr_svg = qr_resp.text
+        self.assertIn("<svg", qr_svg)
+        self.assertIn("viewBox=\"0 0 45 45\"", qr_svg)
+        self.assertIn("Chetana Bank branch QR campaign code", qr_svg)
+        self.assertIn("source=bank_qr&amp;action=scam_check", qr_svg)
+        self.assertGreater(qr_svg.count("<rect"), 300)
+
+        poster_resp = self.client.get("/partners/poster/bank_qr")
+        self.assertEqual(poster_resp.status_code, 200)
+        poster_html = poster_resp.text
+        self.assertIn("Chetana Printable Poster - Bank branch QR", poster_html)
+        self.assertIn("Fake hai kya?", poster_html)
+        self.assertIn("Screenshot bhejo. Chetana bata degi.", poster_html)
+        self.assertIn("<svg", poster_html)
+        self.assertIn("source=bank_qr&amp;action=scam_check", poster_html)
+
+        bad_qr = self.client.get("/partners/qr/not_real.svg")
+        self.assertEqual(bad_qr.status_code, 404)
+        bad_poster = self.client.get("/partners/poster/not_real")
+        self.assertEqual(bad_poster.status_code, 404)
 
     def test_pilottrace_report_exposes_sponsor_safe_aggregates(self) -> None:
         original_log = main_module.PARTNER_INQUIRIES_LOG

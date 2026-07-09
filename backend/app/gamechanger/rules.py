@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Iterable
 from urllib.parse import parse_qs, urlparse
 
-from .schemas import AnalyzeRequest, AnalyzeResponse, EmergencyRequest, EmergencyResponse, OfficialRail, RiskLevel
+from .schemas import AnalyzeRequest, AnalyzeResponse, EmergencyRequest, EmergencyResponse, IntelligenceSource, OfficialRail, RiskLevel
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 OFFICIAL_RAILS_PATH = DATA_DIR / "official_rails.json"
+INTELLIGENCE_SOURCES_PATH = DATA_DIR / "intelligence_sources.json"
 
 AUTHORITY_WORDS = [
     "kyc", "bank", "rbi", "npci", "electricity", "power", "tata power", "adani",
@@ -87,6 +88,12 @@ def _safe_url(raw: str):
 def load_official_rails() -> list[OfficialRail]:
     data = json.loads(OFFICIAL_RAILS_PATH.read_text(encoding="utf-8"))
     return [OfficialRail.model_validate(item) for item in data]
+
+
+@lru_cache(maxsize=1)
+def load_intelligence_sources() -> list[IntelligenceSource]:
+    data = json.loads(INTELLIGENCE_SOURCES_PATH.read_text(encoding="utf-8"))
+    return [IntelligenceSource.model_validate(item) for item in data]
 
 
 @lru_cache(maxsize=1)

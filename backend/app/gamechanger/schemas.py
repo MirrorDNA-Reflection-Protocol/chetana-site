@@ -46,6 +46,21 @@ class OfficialRail(CamelModel):
     source_url: str
 
 
+class IntelligenceSource(CamelModel):
+    source_id: str
+    name: str
+    category: str
+    integration_status: str
+    integration_type: str
+    source_url: str
+    api_docs_url: Optional[str] = None
+    auth_model: str
+    update_model: str
+    use_for: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    priority: int = Field(ge=0, le=100)
+
+
 class AnalyzeRequest(CamelModel):
     mode: Mode = "message"
     text: str = ""

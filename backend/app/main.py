@@ -64,6 +64,7 @@ from app.llm_router import build_llm_status, generate_chat_reply  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
     analyze_request as analyze_gamechanger_request,
     build_emergency_response as build_gamechanger_emergency_response,
+    load_intelligence_sources,
     load_official_rails,
 )
 from app.gamechanger.schemas import (  # noqa: E402
@@ -71,6 +72,7 @@ from app.gamechanger.schemas import (  # noqa: E402
     AnalyzeResponse as GamechangerAnalyzeResponse,
     EmergencyRequest as GamechangerEmergencyRequest,
     EmergencyResponse as GamechangerEmergencyResponse,
+    IntelligenceSource as GamechangerIntelligenceSource,
     OfficialRail as GamechangerOfficialRail,
 )
 from app.scan_guidance import build_live_scan_guidance, enrich_v0_verdict  # noqa: E402
@@ -1828,6 +1830,12 @@ async def analytics_summary(days: int = Query(default=14, ge=1, le=90)):
 async def gamechanger_rails():
     """Return the verified official recovery rails used by the gamechanger runtime."""
     return load_official_rails()
+
+
+@app.get("/api/v1/intelligence-sources", response_model=list[GamechangerIntelligenceSource])
+async def gamechanger_intelligence_sources():
+    """Return Chetana's governed source/API ladder for scam intelligence."""
+    return load_intelligence_sources()
 
 
 @app.post("/api/v1/analyze", response_model=GamechangerAnalyzeResponse)

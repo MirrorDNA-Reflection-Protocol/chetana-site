@@ -72,3 +72,15 @@ def test_gamechanger_rails_endpoint_returns_verified_rails() -> None:
     body = response.json()
     assert any(rail["railId"] == "CYBER_HELPLINE_1930" for rail in body)
     assert any(rail["railId"] == "MEA_EMIGRATE" for rail in body)
+
+
+def test_gamechanger_intelligence_sources_exposes_source_ladder() -> None:
+    response = client.get("/api/v1/intelligence-sources")
+    assert response.status_code == 200
+    body = response.json()
+    by_id = {source["sourceId"]: source for source in body}
+    assert by_id["chetana_local_rules"]["integrationStatus"] == "live_internal"
+    assert by_id["google_safe_browsing"]["authModel"] == "api_key"
+    assert by_id["ncrp_suspect_repository"]["integrationStatus"] == "manual_official"
+    assert by_id["the420_in"]["integrationStatus"] == "research_only"
+    assert "Editorial reports must not be used as automated verdict ground truth." in by_id["the420_in"]["limitations"]

@@ -1,0 +1,232 @@
+[
+  {
+    "source_id": "chetana_local_rules",
+    "name": "Chetana local rules and entity extraction",
+    "category": "local_runtime",
+    "integration_status": "live_internal",
+    "integration_type": "browser_or_edge_local",
+    "source_url": "https://chetana.activemirror.ai/",
+    "api_docs_url": null,
+    "auth_model": "none",
+    "update_model": "repo_release",
+    "use_for": [
+      "offline first triage",
+      "tap-only risk classification",
+      "OTP, UPI, APK, remote-access, KYC, digital-arrest, job, courier, and merchant patterns"
+    ],
+    "limitations": [
+      "Pattern matching is advisory and cannot prove that an identifier is clean.",
+      "Needs periodic refresh from real incident reports and sponsor feedback."
+    ],
+    "priority": 100
+  },
+  {
+    "source_id": "google_safe_browsing",
+    "name": "Google Safe Browsing API",
+    "category": "url_reputation",
+    "integration_status": "candidate_keyed",
+    "integration_type": "api",
+    "source_url": "https://safebrowsing.google.com/",
+    "api_docs_url": "https://developers.google.com/safe-browsing",
+    "auth_model": "api_key",
+    "update_model": "provider_realtime",
+    "use_for": [
+      "phishing URL checks",
+      "malware URL checks",
+      "thin link risk before a user opens a site"
+    ],
+    "limitations": [
+      "URL-only signal; does not verify UPI IDs, phone numbers, screenshots, or caller intent.",
+      "Requires API key, quota governance, and privacy review before sending user-submitted URLs."
+    ],
+    "priority": 88
+  },
+  {
+    "source_id": "urlhaus",
+    "name": "abuse.ch URLhaus",
+    "category": "malware_url_feed",
+    "integration_status": "candidate_public",
+    "integration_type": "api_and_feed",
+    "source_url": "https://urlhaus.abuse.ch/",
+    "api_docs_url": "https://urlhaus-api.abuse.ch/",
+    "auth_model": "none_or_optional_auth_by_endpoint",
+    "update_model": "provider_feed",
+    "use_for": [
+      "malware URL enrichment",
+      "APK/dropper link enrichment",
+      "local denylist seeding for suspicious links"
+    ],
+    "limitations": [
+      "Focused on malware infrastructure, not consumer scam persuasion.",
+      "A missing hit must never be treated as safe."
+    ],
+    "priority": 82
+  },
+  {
+    "source_id": "phishtank",
+    "name": "PhishTank",
+    "category": "phishing_url_feed",
+    "integration_status": "candidate_public",
+    "integration_type": "api_and_feed",
+    "source_url": "https://phishtank.org/",
+    "api_docs_url": "https://phishtank.org/api_info.php",
+    "auth_model": "app_key_or_public_endpoint_limits",
+    "update_model": "community_feed",
+    "use_for": [
+      "known phishing URL checks",
+      "phishing feed backfill",
+      "suspicious website evidence enrichment"
+    ],
+    "limitations": [
+      "Community feed quality and freshness vary.",
+      "Does not cover phone, UPI, QR intent, or screenshot-only scams."
+    ],
+    "priority": 78
+  },
+  {
+    "source_id": "openphish",
+    "name": "OpenPhish",
+    "category": "phishing_url_feed",
+    "integration_status": "candidate_feed",
+    "integration_type": "feed_or_commercial_api",
+    "source_url": "https://openphish.com/",
+    "api_docs_url": "https://openphish.com/phishing_feeds.html",
+    "auth_model": "public_feed_or_commercial_license",
+    "update_model": "provider_feed",
+    "use_for": [
+      "known phishing URL denylist",
+      "link scan enrichment",
+      "sponsor-grade URL intelligence if licensed"
+    ],
+    "limitations": [
+      "The richer feed/API is commercial.",
+      "A no-match is not a clean verdict."
+    ],
+    "priority": 72
+  },
+  {
+    "source_id": "virustotal",
+    "name": "VirusTotal API v3",
+    "category": "url_file_domain_reputation",
+    "integration_status": "candidate_keyed",
+    "integration_type": "api",
+    "source_url": "https://www.virustotal.com/",
+    "api_docs_url": "https://docs.virustotal.com/reference/overview",
+    "auth_model": "api_key",
+    "update_model": "provider_realtime",
+    "use_for": [
+      "URL reputation enrichment",
+      "domain/IP reputation enrichment",
+      "APK hash or file reputation checks when user consent allows"
+    ],
+    "limitations": [
+      "Submitting files or URLs to a third party requires clear consent and privacy classification.",
+      "Free/public quotas and licensing constraints are not suitable for high-volume public scanning."
+    ],
+    "priority": 70
+  },
+  {
+    "source_id": "urlscan_io",
+    "name": "urlscan.io",
+    "category": "url_scan_sandbox",
+    "integration_status": "candidate_keyed",
+    "integration_type": "api",
+    "source_url": "https://urlscan.io/",
+    "api_docs_url": "https://urlscan.io/docs/api/",
+    "auth_model": "api_key_for_submission",
+    "update_model": "provider_realtime",
+    "use_for": [
+      "website screenshot and DOM enrichment",
+      "phishing landing-page analysis",
+      "analyst review for suspicious domains"
+    ],
+    "limitations": [
+      "Public scans can expose submitted URLs and metadata unless configured carefully.",
+      "Not appropriate for private bank links or sensitive screenshots by default."
+    ],
+    "priority": 58
+  },
+  {
+    "source_id": "ncrp_suspect_repository",
+    "name": "National Cyber Crime Portal suspect repository",
+    "category": "official_india_manual_lookup",
+    "integration_status": "manual_official",
+    "integration_type": "web_portal",
+    "source_url": "https://www.cybercrime.gov.in/Webform/suspect_search_repository.aspx",
+    "api_docs_url": null,
+    "auth_model": "manual_portal",
+    "update_model": "government_portal",
+    "use_for": [
+      "manual lookup of phone numbers, UPI IDs, account numbers, and suspicious identifiers",
+      "official second check when identifiers are extracted"
+    ],
+    "limitations": [
+      "No stable public API is treated as available.",
+      "Complaint-based lookup is not a definitive safe/unsafe verdict."
+    ],
+    "priority": 86
+  },
+  {
+    "source_id": "sanchar_saathi_chakshu",
+    "name": "Sanchar Saathi Chakshu",
+    "category": "official_india_reporting",
+    "integration_status": "manual_official",
+    "integration_type": "web_portal",
+    "source_url": "https://sancharsaathi.gov.in/sfc/",
+    "api_docs_url": null,
+    "auth_model": "manual_portal",
+    "update_model": "government_portal",
+    "use_for": [
+      "suspected fraud communication reports by call, SMS, or WhatsApp before money is lost",
+      "official telecom-abuse reporting rail"
+    ],
+    "limitations": [
+      "Not a general cybercrime complaint replacement.",
+      "If money is lost, Chetana must still route to 1930 and cybercrime.gov.in first."
+    ],
+    "priority": 84
+  },
+  {
+    "source_id": "the420_in",
+    "name": "The420.in",
+    "category": "india_cybercrime_osint",
+    "integration_status": "research_only",
+    "integration_type": "editorial_site",
+    "source_url": "https://the420.in/",
+    "api_docs_url": null,
+    "auth_model": "none_observed",
+    "update_model": "editorial_publication",
+    "use_for": [
+      "human review of India cybercrime trends",
+      "threat brief inspiration",
+      "potential partnership or citation research"
+    ],
+    "limitations": [
+      "No stable public machine API observed.",
+      "Editorial reports must not be used as automated verdict ground truth.",
+      "The420 Search Engine was observed as a site feature, not a confirmed API."
+    ],
+    "priority": 42
+  },
+  {
+    "source_id": "rbi_public_guidance",
+    "name": "Reserve Bank of India public guidance and CMS",
+    "category": "official_india_guidance",
+    "integration_status": "manual_official",
+    "integration_type": "guidance_and_portal",
+    "source_url": "https://www.rbi.org.in/",
+    "api_docs_url": null,
+    "auth_model": "manual_portal",
+    "update_model": "government_publication",
+    "use_for": [
+      "customer-liability guidance",
+      "bank/payment-system grievance routing",
+      "sponsor-facing compliance citations"
+    ],
+    "limitations": [
+      "Policy guidance, not a live scam identifier database.",
+      "Chetana should summarize and route, not provide legal advice."
+    ],
+    "priority": 68
+  }
+]

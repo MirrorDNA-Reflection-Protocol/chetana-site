@@ -16,6 +16,10 @@ from app.v0_runtime import now_utc
 class PilotTraceTotals(BaseModel):
     scans_completed: int = 0
     high_risk_pauses: int = 0
+    false_safe_complaints: int = 0
+    false_alarm_reports: int = 0
+    scam_confirmations: int = 0
+    feedback_submissions: int = 0
     official_rail_taps: int = 0
     evidence_or_case_packets_saved: int = 0
     case_packets_copied: int = 0
@@ -35,7 +39,7 @@ class PilotTraceQuality(BaseModel):
 
 
 class PilotTraceReport(BaseModel):
-    schema_version: str = "chetana.pilottrace.v0.1"
+    schema_version: str = "chetana.pilottrace.v0.2"
     generated_at_utc: str
     trailing_days: int
     source: str = "v0_event_ledger_and_partner_inquiry_log"
@@ -116,6 +120,10 @@ def build_pilottrace_report(
     totals = PilotTraceTotals(
         scans_completed=summary.totals.scan_completes,
         high_risk_pauses=summary.totals.risky_verdicts,
+        false_safe_complaints=summary.totals.false_safe_complaints,
+        false_alarm_reports=summary.totals.false_alarm_reports,
+        scam_confirmations=summary.totals.scam_confirmations,
+        feedback_submissions=summary.totals.feedback_submissions,
         official_rail_taps=official_rail_taps,
         evidence_or_case_packets_saved=summary.totals.evidence_saves,
         case_packets_copied=case_packets_copied,
@@ -133,6 +141,8 @@ def build_pilottrace_report(
             "official_or_recovery_taps": item.report_taps,
             "case_or_evidence_saves": item.evidence_saves,
             "privacy_controls_used": item.local_scan_memory_clears,
+            "feedback_submissions": item.feedback_submissions,
+            "false_safe_complaints": item.false_safe_complaints,
         }
         for item in summary.daily
     ]
@@ -150,6 +160,8 @@ def build_pilottrace_report(
             "recovery_steps": summary.breakdowns.recovery_steps,
             "share_channels": summary.breakdowns.share_channels,
             "privacy_actions": summary.breakdowns.local_privacy_actions,
+            "feedback_types": summary.breakdowns.feedback_types,
+            "feedback_surfaces": summary.breakdowns.feedback_surfaces,
             "partner_inquiry_types": _sorted_counts(inquiry_types),
         },
         daily=daily,
@@ -167,6 +179,7 @@ def build_pilottrace_report(
             "No raw UPI IDs, phone numbers, URLs, emails, or message bodies are included.",
             "No user profiles, account records, or sponsor-visible identity graph is created.",
             "Partner inquiries are counted by pilot lane only; names, emails, roles, and messages are excluded.",
+            "Feedback is counted by reason bucket only; no free-text complaint body is collected for PilotTrace.",
             "Synthetic, QA, test, and duplicate event rows are excluded from the sponsor report.",
         ],
         excluded_fields=[
@@ -178,15 +191,15 @@ def build_pilottrace_report(
             "partner_name",
             "partner_email",
             "partner_message",
+            "feedback_text",
             "ip_address",
             "device_identifier",
         ],
-        missing_metrics=[
-            "false_safe_complaints_not_instrumented_yet",
-        ],
+        missing_metrics=[],
         proof_notes=[
             "PilotTrace is derived from the Chetana v0 event ledger and the local partner inquiry log.",
             "This is an aggregate sponsor-safe report, not a fraud determination database.",
+            "False-safe complaints are user-submitted correction signals and require review before being treated as confirmed misses.",
             "Chetana routes users to official rails; it does not auto-file complaints.",
         ],
     )
@@ -216,7 +229,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chetana PilotTrace v0.1 Sponsor Proof Report</title>
+  <title>Chetana PilotTrace v0.2 Sponsor Proof Report</title>
   <meta name="description" content="Sponsor-safe Chetana PilotTrace aggregate proof report for scam-check pilots.">
   <style>
     :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
@@ -258,7 +271,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
     <div class="top">
       <div>
         <div class="label">Chetana by Active Mirror</div>
-        <strong>PilotTrace v0.1</strong>
+        <strong>PilotTrace v0.2</strong>
       </div>
       <p>Generated {html.escape(report.generated_at_utc)} | Last {report.trailing_days} days | Status: <strong>{html.escape(report.status)}</strong></p>
     </div>
@@ -266,12 +279,15 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
     <p>PilotTrace converts Chetana usage into aggregate proof a bank, public program, CSR team, or merchant network can review without seeing raw user scan content.</p>
     <div class="cta">
       <a class="primary" href="https://chetana.activemirror.ai/api/v1/partners/pilottrace">Open JSON report</a>
+      <a class="primary" href="https://chetana.activemirror.ai/partners#pilot-inquiry">Request 30-day pilot</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners">Back to partner page</a>
       <a class="secondary" href="https://chetana.activemirror.ai/partners/packet">Open pilot packet</a>
     </div>
     <section class="grid">
       {_metric_tile("Scans completed", totals.scans_completed)}
       {_metric_tile("High-risk pauses", totals.high_risk_pauses)}
+      {_metric_tile("False-safe complaints", totals.false_safe_complaints)}
+      {_metric_tile("Feedback reports", totals.feedback_submissions)}
       {_metric_tile("Official rail taps", totals.official_rail_taps)}
       {_metric_tile("Case packets copied", totals.case_packets_copied)}
       {_metric_tile("Evidence saves", totals.evidence_or_case_packets_saved)}
@@ -283,6 +299,7 @@ def render_pilottrace_html(report: PilotTraceReport) -> str:
       {_count_rows("Top scam types", report.breakdowns.get("scam_types", {}))}
       {_count_rows("Official rails", report.breakdowns.get("official_rails", {}))}
       {_count_rows("Input types", report.breakdowns.get("input_types", {}))}
+      {_count_rows("Feedback types", report.breakdowns.get("feedback_types", {}))}
       {_count_rows("Partner inquiry lanes", report.breakdowns.get("partner_inquiry_types", {}))}
     </div>
     <div class="split">

@@ -30,6 +30,10 @@ class V0AnalyticsTotals(BaseModel):
     share_taps: int = 0
     share_completes: int = 0
     local_scan_memory_clears: int = 0
+    feedback_submissions: int = 0
+    false_safe_complaints: int = 0
+    false_alarm_reports: int = 0
+    scam_confirmations: int = 0
 
 
 class V0AnalyticsFunnel(BaseModel):
@@ -42,6 +46,7 @@ class V0AnalyticsFunnel(BaseModel):
     evidence_saved_sessions: int = 0
     recovery_support_sessions: int = 0
     share_completed_sessions: int = 0
+    feedback_submitted_sessions: int = 0
     start_rate_from_open_pct: float = 0.0
     completion_rate_from_start_pct: float = 0.0
     report_rate_from_complete_pct: float = 0.0
@@ -67,6 +72,8 @@ class V0AnalyticsBreakdowns(BaseModel):
     utm_sources: dict[str, int] = Field(default_factory=dict)
     event_versions: dict[str, int] = Field(default_factory=dict)
     local_privacy_actions: dict[str, int] = Field(default_factory=dict)
+    feedback_types: dict[str, int] = Field(default_factory=dict)
+    feedback_surfaces: dict[str, int] = Field(default_factory=dict)
 
 
 class V0AnalyticsDailyBucket(BaseModel):
@@ -81,6 +88,8 @@ class V0AnalyticsDailyBucket(BaseModel):
     report_taps: int = 0
     share_completes: int = 0
     local_scan_memory_clears: int = 0
+    feedback_submissions: int = 0
+    false_safe_complaints: int = 0
 
 
 class V0AnalyticsQuality(BaseModel):
@@ -323,6 +332,8 @@ def build_v0_analytics_summary(
     utm_sources: Counter[str] = Counter()
     event_versions: Counter[str] = Counter()
     local_privacy_actions: Counter[str] = Counter()
+    feedback_types: Counter[str] = Counter()
+    feedback_surfaces: Counter[str] = Counter()
 
     for event in filtered_events:
         event_name = str(event.get("event_name") or "").strip()
@@ -463,6 +474,27 @@ def build_v0_analytics_summary(
             privacy_action = _metadata_value(event, "privacy_action") or "clear_scan_memory"
             local_privacy_actions[privacy_action] += 1
 
+        if event_name == "feedback_submitted":
+            totals.feedback_submissions += 1
+            if session_id:
+                funnel_sessions["feedback_submitted"].add(session_id)
+            if day_key:
+                daily_counts[day_key]["feedback_submissions"] += 1
+
+            feedback_type = _metadata_value(event, "feedback_type") or "unknown"
+            feedback_surface = _metadata_value(event, "feedback_surface") or "result_card"
+            feedback_types[feedback_type] += 1
+            feedback_surfaces[feedback_surface] += 1
+
+            if feedback_type == "missed_scam":
+                totals.false_safe_complaints += 1
+                if day_key:
+                    daily_counts[day_key]["false_safe_complaints"] += 1
+            elif feedback_type == "too_cautious":
+                totals.false_alarm_reports += 1
+            elif feedback_type == "scammed_after_scan":
+                totals.scam_confirmations += 1
+
     totals.unique_sessions = len(unique_sessions)
     completed_after_start = funnel_sessions["scan_started"] & funnel_sessions["scan_completed"]
     orphan_completed = funnel_sessions["scan_completed"] - funnel_sessions["scan_started"]
@@ -478,6 +510,7 @@ def build_v0_analytics_summary(
         evidence_saved_sessions=len(funnel_sessions["evidence_saved"]),
         recovery_support_sessions=len(recovery_support_sessions),
         share_completed_sessions=len(funnel_sessions["share_completed"]),
+        feedback_submitted_sessions=len(funnel_sessions["feedback_submitted"]),
         start_rate_from_open_pct=_pct(len(funnel_sessions["scan_started"]), len(funnel_sessions["app_open"])),
         completion_rate_from_start_pct=_pct(len(completed_after_start), len(funnel_sessions["scan_started"])),
         report_rate_from_complete_pct=_pct(len(funnel_sessions["report_tapped"]), len(funnel_sessions["scan_completed"])),
@@ -503,6 +536,8 @@ def build_v0_analytics_summary(
         utm_sources=_sorted_counts(utm_sources),
         event_versions=_sorted_counts(event_versions),
         local_privacy_actions=_sorted_counts(local_privacy_actions),
+        feedback_types=_sorted_counts(feedback_types),
+        feedback_surfaces=_sorted_counts(feedback_surfaces),
     )
 
     daily: list[V0AnalyticsDailyBucket] = []
@@ -523,6 +558,8 @@ def build_v0_analytics_summary(
                 report_taps=counts.get("report_taps", 0),
                 share_completes=counts.get("share_completes", 0),
                 local_scan_memory_clears=counts.get("local_scan_memory_clears", 0),
+                feedback_submissions=counts.get("feedback_submissions", 0),
+                false_safe_complaints=counts.get("false_safe_complaints", 0),
             )
         )
 

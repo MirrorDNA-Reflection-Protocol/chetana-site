@@ -274,6 +274,80 @@ class AnalyticsSummaryTests(unittest.TestCase):
         self.assertEqual(summary.breakdowns.event_versions, {"chetana.v0.analytics.v2": 1})
         self.assertEqual(summary.daily[-1].local_scan_memory_clears, 1)
 
+    def test_summary_counts_bucketed_feedback_events(self) -> None:
+        now = datetime.now(UTC).isoformat()
+        events = [
+            {
+                "event_name": "feedback_submitted",
+                "session_id": "prod-feedback-a",
+                "timestamp_utc": now,
+                "scan_id": "scan-a",
+                "input_type": "text",
+                "verdict": "low_signal",
+                "scam_type": "fake_kyc",
+                "confidence_band": "low",
+                "metadata": {
+                    "event_version": "chetana.v0.analytics.v2",
+                    "feedback_type": "missed_scam",
+                    "feedback_surface": "result_card",
+                    "no_free_text_collected": True,
+                },
+            },
+            {
+                "event_name": "feedback_submitted",
+                "session_id": "prod-feedback-b",
+                "timestamp_utc": now,
+                "scan_id": "scan-b",
+                "input_type": "text",
+                "verdict": "high_risk",
+                "scam_type": "upi_qr_scam",
+                "confidence_band": "high",
+                "metadata": {
+                    "event_version": "chetana.v0.analytics.v2",
+                    "feedback_type": "too_cautious",
+                    "feedback_surface": "result_card",
+                    "no_free_text_collected": True,
+                },
+            },
+            {
+                "event_name": "feedback_submitted",
+                "session_id": "prod-feedback-c",
+                "timestamp_utc": now,
+                "scan_id": "scan-c",
+                "input_type": "text",
+                "verdict": "needs_review",
+                "scam_type": "remote_support_scam",
+                "confidence_band": "medium",
+                "metadata": {
+                    "event_version": "chetana.v0.analytics.v2",
+                    "feedback_type": "scammed_after_scan",
+                    "feedback_surface": "result_card",
+                    "no_free_text_collected": True,
+                },
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            events_path = Path(temp_dir) / "events.jsonl"
+            with events_path.open("w", encoding="utf-8") as handle:
+                for event in events:
+                    handle.write(json.dumps(event) + "\n")
+
+            summary = build_v0_analytics_summary(events_path=events_path, trailing_days=7)
+
+        self.assertEqual(summary.totals.feedback_submissions, 3)
+        self.assertEqual(summary.totals.false_safe_complaints, 1)
+        self.assertEqual(summary.totals.false_alarm_reports, 1)
+        self.assertEqual(summary.totals.scam_confirmations, 1)
+        self.assertEqual(summary.funnel.feedback_submitted_sessions, 3)
+        self.assertEqual(
+            summary.breakdowns.feedback_types,
+            {"missed_scam": 1, "too_cautious": 1, "scammed_after_scan": 1},
+        )
+        self.assertEqual(summary.breakdowns.feedback_surfaces, {"result_card": 3})
+        self.assertEqual(summary.daily[-1].feedback_submissions, 3)
+        self.assertEqual(summary.daily[-1].false_safe_complaints, 1)
+
     def test_summary_flags_orphan_completions_without_exceeding_hundred_percent(self) -> None:
         now = datetime.now(UTC).isoformat()
         events = [

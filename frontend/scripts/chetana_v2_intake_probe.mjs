@@ -48,6 +48,10 @@ const servedSafetyNudgeChecks = [
   "No raw scam scan text",
   "PilotTrace report",
   "View PilotTrace report",
+  "Was Chetana right?",
+  "No message text is sent.",
+  "Missed a scam",
+  "I was scammed",
 ];
 
 async function fetchText(pathOrUrl) {

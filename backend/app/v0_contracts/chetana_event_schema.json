@@ -27,7 +27,9 @@
         "report_tapped",
         "evidence_saved",
         "first_scan",
-        "repeat_scan_7d"
+        "repeat_scan_7d",
+        "local_scan_memory_cleared",
+        "feedback_submitted"
       ]
     },
     "timestamp_utc": {

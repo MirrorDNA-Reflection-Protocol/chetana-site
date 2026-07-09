@@ -175,6 +175,7 @@ type RecoveryActionOptions = {
   href?: string;
 };
 type MoneyMovedAnswer = "yes" | "no" | null;
+type ResultFeedbackType = "missed_scam" | "too_cautious" | "scammed_after_scan" | "useful";
 type CasePacketRow = {
   label: string;
   value: string;
@@ -197,6 +198,37 @@ type ComposerSafetyNudge = {
 const APP_OPEN_TTL_MS = 30 * 60 * 1000;
 const TAP_EVENT_TTL_MS = 4_000;
 const EXPORT_EVENT_TTL_MS = 10_000;
+const RESULT_FEEDBACK_OPTIONS: Array<{
+  id: ResultFeedbackType;
+  label: string;
+  helper: string;
+  tone: "danger" | "warning" | "neutral" | "safe";
+}> = [
+  {
+    id: "missed_scam",
+    label: "Missed a scam",
+    helper: "Chetana looked too safe.",
+    tone: "danger",
+  },
+  {
+    id: "too_cautious",
+    label: "Too cautious",
+    helper: "This was probably okay.",
+    tone: "warning",
+  },
+  {
+    id: "scammed_after_scan",
+    label: "I was scammed",
+    helper: "Switch me to recovery.",
+    tone: "danger",
+  },
+  {
+    id: "useful",
+    label: "Useful",
+    helper: "This helped me pause.",
+    tone: "safe",
+  },
+];
 
 function eventNameForVerdict(verdict: V0Verdict["verdict"]): V0EventName {
   if (verdict === "high_risk") return "verdict_high_risk";
@@ -306,6 +338,8 @@ export default function ChetanaV0Experience({
   const [linkedPacketCopied, setLinkedPacketCopied] = useState(false);
   const [localMemoryClearStatus, setLocalMemoryClearStatus] = useState<string | null>(null);
   const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
+  const [resultFeedback, setResultFeedback] = useState<ResultFeedbackType | null>(null);
+  const [resultFeedbackStatus, setResultFeedbackStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialInput) setText(initialInput);
@@ -570,6 +604,8 @@ export default function ChetanaV0Experience({
     setLinkedPacketCopied(false);
     setLocalMemoryClearStatus(null);
     setMoneyMovedAnswer(null);
+    setResultFeedback(null);
+    setResultFeedbackStatus(null);
     setStatus(nextStatus);
   };
 
@@ -1225,6 +1261,47 @@ export default function ChetanaV0Experience({
     window.setTimeout(() => setLocalMemoryClearStatus(null), 2800);
   };
 
+  const submitResultFeedback = async (feedbackType: ResultFeedbackType) => {
+    if (!result || resultFeedback) return;
+    const option = RESULT_FEEDBACK_OPTIONS.find((item) => item.id === feedbackType);
+    setResultFeedback(feedbackType);
+    setResultFeedbackStatus("Feedback saved without message text.");
+    if (feedbackType === "scammed_after_scan") {
+      setMoneyMovedAnswer("yes");
+      setDetailsOpen(true);
+    }
+
+    try {
+      await trackV0Event({
+        event_name: "feedback_submitted",
+        session_id: sessionId,
+        scan_id: result.scan_id,
+        input_type: result.input_type,
+        verdict: result.verdict,
+        scam_type: result.scam_type,
+        confidence_band: result.confidence_band,
+        device_class: deviceClass(),
+        language_hint: result.language_hint || navigator.language.slice(0, 2),
+        payload_class: "cross_surface_signal",
+        persistence_class: "P1",
+        metadata: {
+          feedback_type: feedbackType,
+          feedback_label: option?.label || feedbackType,
+          feedback_surface: "result_card",
+          no_free_text_collected: true,
+          action_route_hash: actionRoute?.route_hash || null,
+          route_id: actionRoute?.route_id || null,
+        },
+      }, {
+        dedupeKey: `feedback:${result.scan_id}:${feedbackType}`,
+        dedupeTtlMs: 24 * 60 * 60 * 1000,
+        keepalive: true,
+      });
+    } catch {
+      setResultFeedbackStatus("Feedback saved locally and will retry when possible.");
+    }
+  };
+
   const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
     if (!result) return;
     const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
@@ -1659,6 +1736,32 @@ export default function ChetanaV0Experience({
                   <small>{(loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
                 </div>
               )}
+
+              <div className="v0-feedback-card">
+                <div className="v0-feedback-copy">
+                  <div className="v0-section-label">Feedback loop</div>
+                  <strong>Was Chetana right?</strong>
+                  <p>No message text is sent. These taps only help count misses, false alarms, recovery cases, and useful pauses.</p>
+                  {resultFeedbackStatus && <small aria-live="polite">{resultFeedbackStatus}</small>}
+                </div>
+                <div className="v0-feedback-options" role="group" aria-label="Chetana result feedback">
+                  {RESULT_FEEDBACK_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`v0-feedback-option ${option.tone} ${resultFeedback === option.id ? "active" : ""}`}
+                      onClick={() => {
+                        void submitResultFeedback(option.id);
+                      }}
+                      disabled={Boolean(resultFeedback)}
+                    >
+                      {option.tone === "safe" ? <Check size={14} /> : <AlertTriangle size={14} />}
+                      <span>{option.label}</span>
+                      <small>{option.helper}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {actionRoute && (
                 <div className={`v0-action-route ${actionRoute.primary_action.urgency}`}>

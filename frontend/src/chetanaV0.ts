@@ -46,7 +46,8 @@ export type V0EventName =
   | "evidence_saved"
   | "first_scan"
   | "repeat_scan_7d"
-  | "local_scan_memory_cleared";
+  | "local_scan_memory_cleared"
+  | "feedback_submitted";
 
 export interface V0Reason {
   code: string;

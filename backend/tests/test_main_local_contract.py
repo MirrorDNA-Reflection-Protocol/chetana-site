@@ -100,6 +100,40 @@ class MainLocalContractTests(unittest.TestCase):
             finally:
                 main_module.PARTNER_INQUIRIES_LOG = original_log
 
+    def test_feedback_event_endpoint_accepts_bucketed_result_feedback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            events_path = Path(tmpdir) / "events.jsonl"
+            with patch("app.v0_runtime.V0_EVENTS_LOG", events_path):
+                resp = self.client.post(
+                    "/api/v0/events",
+                    json={
+                        "event_name": "feedback_submitted",
+                        "session_id": "session-feedback",
+                        "scan_id": "scan-feedback",
+                        "input_type": "text",
+                        "verdict": "low_signal",
+                        "scam_type": "fake_kyc",
+                        "confidence_band": "low",
+                        "device_class": "web",
+                        "payload_class": "cross_surface_signal",
+                        "metadata": {
+                            "feedback_type": "missed_scam",
+                            "feedback_surface": "result_card",
+                            "no_free_text_collected": True,
+                            "free_text_that_should_not_exist": "",
+                        },
+                    },
+                )
+                self.assertTrue(events_path.exists())
+                self.assertEqual(len(events_path.read_text(encoding="utf-8").splitlines()), 1)
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["event"]["event_name"], "feedback_submitted")
+        self.assertEqual(data["event"]["metadata"]["feedback_type"], "missed_scam")
+        self.assertTrue(data["event"]["metadata"]["no_free_text_collected"])
+
     def test_pilottrace_report_exposes_sponsor_safe_aggregates(self) -> None:
         original_log = main_module.PARTNER_INQUIRIES_LOG
         with tempfile.TemporaryDirectory() as tempdir:
@@ -155,6 +189,22 @@ class MainLocalContractTests(unittest.TestCase):
                         "metadata": {"privacy_action": "clear_scan_memory"},
                     },
                     {
+                        "event_name": "feedback_submitted",
+                        "session_id": "session-a",
+                        "timestamp_utc": now.isoformat(),
+                        "scan_id": "scan-a",
+                        "input_type": "text",
+                        "verdict": "low_signal",
+                        "scam_type": "fake_kyc",
+                        "confidence_band": "low",
+                        "metadata": {
+                            "feedback_type": "missed_scam",
+                            "feedback_surface": "result_card",
+                            "no_free_text_collected": True,
+                            "private_feedback_note": "Do not expose this correction note.",
+                        },
+                    },
+                    {
                         "event_name": "scan_completed",
                         "session_id": "qa-synthetic",
                         "timestamp_utc": now.isoformat(),
@@ -201,25 +251,30 @@ class MainLocalContractTests(unittest.TestCase):
 
         self.assertEqual(json_resp.status_code, 200)
         data = json_resp.json()
-        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.1")
+        self.assertEqual(data["schema_version"], "chetana.pilottrace.v0.2")
         self.assertTrue(data["sponsor_safe"])
         self.assertEqual(data["totals"]["scans_completed"], 1)
         self.assertEqual(data["totals"]["high_risk_pauses"], 1)
+        self.assertEqual(data["totals"]["false_safe_complaints"], 1)
+        self.assertEqual(data["totals"]["feedback_submissions"], 1)
         self.assertEqual(data["totals"]["official_rail_taps"], 1)
         self.assertEqual(data["totals"]["case_packets_copied"], 1)
         self.assertEqual(data["totals"]["privacy_controls_used"], 1)
         self.assertEqual(data["totals"]["partner_inquiries"], 1)
+        self.assertEqual(data["breakdowns"]["feedback_types"], {"missed_scam": 1})
         self.assertEqual(data["breakdowns"]["partner_inquiry_types"], {"bank_psp": 1})
         self.assertEqual(data["quality"]["invalid_inquiry_rows"], 1)
         self.assertEqual(data["quality"]["out_of_window_inquiry_rows"], 1)
         serialized = json.dumps(data)
         self.assertNotIn("private@example.com", serialized)
         self.assertNotIn("Do not expose this raw message.", serialized)
+        self.assertNotIn("Do not expose this correction note.", serialized)
 
         self.assertEqual(html_resp.status_code, 200)
-        self.assertIn("Chetana PilotTrace v0.1 Sponsor Proof Report", html_resp.text)
+        self.assertIn("Chetana PilotTrace v0.2 Sponsor Proof Report", html_resp.text)
         self.assertIn("No raw scan text is included.", html_resp.text)
-        self.assertIn("false_safe_complaints_not_instrumented_yet", html_resp.text)
+        self.assertIn("False-safe complaints", html_resp.text)
+        self.assertIn("Request 30-day pilot", html_resp.text)
 
     @patch("app.main._notify_telegram", new_callable=AsyncMock, return_value=False)
     @patch(

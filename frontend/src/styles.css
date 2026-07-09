@@ -1715,6 +1715,113 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
+.v0-feedback-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(260px, 1.35fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 16px;
+  border: 1px solid rgba(96,165,250,0.18);
+  border-radius: 8px;
+  background: rgba(96,165,250,0.055);
+}
+
+.v0-feedback-copy {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v0-feedback-copy strong {
+  color: var(--heading);
+  font-size: 1.04rem;
+}
+
+.v0-feedback-copy p,
+.v0-feedback-copy small {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.v0-feedback-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.v0-feedback-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  align-items: center;
+  gap: 2px 8px;
+  min-height: 58px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text-bright);
+  cursor: pointer;
+  text-align: left;
+}
+
+.v0-feedback-option svg {
+  grid-row: span 2;
+  color: var(--primary-bright);
+  flex: 0 0 auto;
+}
+
+.v0-feedback-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.v0-feedback-option small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.v0-feedback-option.danger svg {
+  color: #fca5a5;
+}
+
+.v0-feedback-option.warning svg {
+  color: #facc15;
+}
+
+.v0-feedback-option.safe svg {
+  color: var(--safe);
+}
+
+.v0-feedback-option.active {
+  border-color: rgba(248,250,252,0.36);
+  background: rgba(248,250,252,0.92);
+  color: #0f172a;
+}
+
+.v0-feedback-option.active small {
+  color: #475569;
+}
+
+.v0-feedback-option:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.v0-feedback-option.active:disabled {
+  opacity: 1;
+}
+
 .v0-action-route {
   display: grid;
   gap: 14px;
@@ -2341,6 +2448,14 @@ main {
   .v0-action-secondary button,
   .v0-choice-button {
     width: 100%;
+  }
+
+  .v0-feedback-card {
+    grid-template-columns: 1fr;
+  }
+
+  .v0-feedback-options {
+    grid-template-columns: 1fr;
   }
 
   .v0-case-grid {

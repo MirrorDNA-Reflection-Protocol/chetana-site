@@ -94,18 +94,30 @@ export default function App() {
 
             const fileCount = Number(payload.fileCount || 0);
             if (fileCount > 0) {
-              const fileResp = await cache.match("/shared-file-0");
-              if (fileResp) {
+              for (let i = 0; i < fileCount; i += 1) {
+                const fileResp = await cache.match(`/shared-file-${i}`);
+                if (!fileResp) continue;
                 const blob = await fileResp.blob();
-                const filename = fileResp.headers.get("X-Filename") || `shared-${Date.now()}`;
-                sharedFile = new File([blob], filename, {
-                  type: blob.type || fileResp.headers.get("Content-Type") || "application/octet-stream",
-                });
+                const contentType = fileResp.headers.get("Content-Type") || blob.type || "";
+                if (contentType.startsWith("image/") || blob.type.startsWith("image/")) {
+                  const filename = fileResp.headers.get("X-Filename") || `shared-screenshot-${Date.now()}`;
+                  sharedFile = new File([blob], filename, {
+                    type: contentType || blob.type || "image/png",
+                  });
+                  break;
+                }
               }
 
               for (let i = 0; i < fileCount; i += 1) {
                 await cache.delete(`/shared-file-${i}`);
               }
+            }
+
+            const unsupportedFileTypes = Array.isArray(payload.unsupportedFileTypes)
+              ? payload.unsupportedFileTypes.filter((item: unknown) => typeof item === "string")
+              : [];
+            if (!sharedText && !sharedFile && unsupportedFileTypes.length > 0) {
+              sharedText = "Shared file received, but Chetana's quick scanner currently works best with screenshot images. Take a screenshot of it or paste the message text here.";
             }
 
             await cache.delete("/shared-payload");

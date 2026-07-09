@@ -16,7 +16,7 @@
     { "src": "/logo.png", "sizes": "1024x1024", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
-    "action": "/?share=true",
+    "action": "/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -26,7 +26,7 @@
       "files": [
         {
           "name": "media",
-          "accept": ["image/*", "audio/*", "video/*", "application/pdf"]
+          "accept": ["image/*"]
         }
       ]
     }

@@ -48,6 +48,7 @@ import {
   verdictSummary,
   V0ExtractedInput,
 } from "./chetanaV0";
+import { recordLocalThreatThread, type V0ThreatThreadSignal } from "./chetanaThreatThreading";
 import ChetanaResultScreen, { riskFromVerdict } from "./ChetanaResultScreen";
 
 const DEFAULT_PROMPTS: Record<V0Mode, string> = {
@@ -289,6 +290,7 @@ export default function ChetanaV0Experience({
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
   const [actionRoute, setActionRoute] = useState<V0ActionRoute | null>(null);
   const [loopReceipt, setLoopReceipt] = useState<V0LoopReceipt | null>(null);
+  const [threadSignal, setThreadSignal] = useState<V0ThreatThreadSignal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
   const [improving, setImproving] = useState(false);
@@ -509,6 +511,7 @@ export default function ChetanaV0Experience({
     setTrustBundle(null);
     setActionRoute(null);
     setLoopReceipt(null);
+    setThreadSignal(null);
     setError(null);
     setImproveError(null);
     setVoiceError(null);
@@ -776,6 +779,7 @@ export default function ChetanaV0Experience({
 
       const scanData = (await scanResp.json()) as V0Verdict;
       setResult(scanData);
+      setThreadSignal(await recordLocalThreatThread(scanData, extracted));
 
       const elapsed = Math.round(performance.now() - started);
       void trackV0Event({
@@ -937,6 +941,7 @@ export default function ChetanaV0Experience({
 
       const improved = (await improveResp.json()) as V0Verdict;
       setResult(improved);
+      setThreadSignal(await recordLocalThreatThread(improved, lastExtractedInput?.text || ""));
       setEvidence(null);
       setActionRoute(null);
       let improvedTrustBundle: V0TrustBundle | null = null;
@@ -1509,6 +1514,14 @@ export default function ChetanaV0Experience({
                 <div className={`v0-kavach-strip ${kavachSignal.tone}`}>
                   <AlertTriangle size={15} />
                   <span>{kavachSignal.text}</span>
+                </div>
+              )}
+
+              {threadSignal && (
+                <div className="v0-thread-strip">
+                  <Shield size={15} />
+                  <span>{threadSignal.message}</span>
+                  <small>{threadSignal.privacy_note}</small>
                 </div>
               )}
 

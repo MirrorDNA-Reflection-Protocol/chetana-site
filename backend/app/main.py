@@ -2192,17 +2192,21 @@ async def privacy_policy():
     <li>We do <strong>not</strong> link submissions to your identity, IP address, or device.</li>
     <li>We do <strong>not</strong> sell, share, or transfer your data to third parties.</li>
     <li>Submitted media is processed only for the scan flow and is not kept longer than needed for the response.</li>
-    <li>Scan and chat analysis stay on Chetana's own infrastructure. We do not send that content to external LLM providers.</li>
+    <li>Core scam scan analysis stays on Chetana's own infrastructure. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond. Gemini is excluded from Chetana chat.</li>
+    <li>Your browser may keep SHA-256 hashes of UPI IDs, phone numbers, and link domains for local repeated-scan warnings. Chetana's server does not receive your thread history or local identifier index.</li>
   </ul>
 
   <h2>Telemetry</h2>
   <p>We collect aggregate, non-identifiable usage metrics (e.g., scan counts by type and language) to understand how Chetana is used and improve it. No personal identifiers are included.</p>
 
+  <h2>Local browser memory</h2>
+  <p>Chetana may use localStorage for app preferences, install or consent state, local scan counters, and repeated-scan warnings. Repeated-scan warnings are stored only as private hashes. Raw scanned text, raw UPI IDs, raw phone numbers, and raw links are not saved in that thread store. Thread hints expire after 30 days and can be removed by clearing site data for chetana.activemirror.ai.</p>
+
   <h2>Data residency</h2>
   <p>Chetana servers are operated in India. We aim to keep processing close to the user and avoid collecting more than is needed for the scan result.</p>
 
   <h2>Third-party services</h2>
-  <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Chetana's own scan and chat analysis remain local to our infrastructure.</p>
+  <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Chetana's scam scan analysis remains local to our infrastructure. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>

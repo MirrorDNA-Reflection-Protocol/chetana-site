@@ -143,6 +143,7 @@
                 <li>Your scam scans stay on <strong>local AI models on our servers</strong>. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
                 <li>We collect <strong>zero personal information</strong>.</li>
                 <li>We track only anonymous scan counts (e.g., "400 scans today") for service health.</li>
+                <li>Your browser may keep private hashed thread hints so repeated UPI IDs, phone numbers, or links can be recognized on your device.</li>
             </ul>
         </div>
 
@@ -201,6 +202,15 @@
         </table>
         <p>These are aggregate counters only. They cannot be traced back to any individual user or scan.</p>
 
+        <h3>3.4 Local Browser Thread Hints (On Your Device)</h3>
+        <p>Chetana can remember whether a UPI ID, phone number, or link domain appeared in another scan on the same browser. This is done with SHA-256 hashes in your browser's localStorage. The server does not receive your thread history, thread IDs, or local identifier index.</p>
+        <ul>
+            <li>Raw scanned text is not saved in this thread store</li>
+            <li>Raw UPI IDs, phone numbers, and links are not saved in this thread store</li>
+            <li>Thread hints expire automatically after 30 days</li>
+            <li>You can delete them anytime by clearing site data for chetana.activemirror.ai</li>
+        </ul>
+
         <!-- 4 -->
         <h2>4. What We Do NOT Collect</h2>
         <div class="green-box">
@@ -241,7 +251,7 @@
         <ul>
             <li>Does <strong>not use cookies</strong></li>
             <li>Does <strong>not use tracking pixels</strong></li>
-            <li>May use <strong>localStorage</strong> in your browser to remember your language preference. This data stays on your device and is never sent to us.</li>
+            <li>May use <strong>localStorage</strong> in your browser for app preferences, install or consent state, local scan counters, and local hashed thread hints. This data stays on your device and is never sent to us.</li>
         </ul>
 
         <!-- 8 -->
@@ -302,7 +312,7 @@
                     <td>Kept indefinitely. Aggregate counters only, no PII.</td>
                 </tr>
                 <tr>
-                    <td>Language preference (localStorage)</td>
+                    <td>App preferences, local counters, and hashed thread hints (localStorage)</td>
                     <td>Stays on your device. You can clear it anytime.</td>
                 </tr>
             </tbody>

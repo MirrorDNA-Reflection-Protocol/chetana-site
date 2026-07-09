@@ -31,6 +31,8 @@ const servedSafetyNudgeChecks = [
   "Extra check found risk in this",
   "Do not pay or reply yet.",
   "No known match found. Still verify before paying.",
+  "appeared in another scan on this device",
+  "Threading stays in this browser as private hashes.",
 ];
 
 async function fetchText(pathOrUrl) {

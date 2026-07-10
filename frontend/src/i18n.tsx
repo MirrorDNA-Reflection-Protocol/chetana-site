@@ -1,17 +1,10 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
-export type Lang = "en" | "hi" | "ta" | "te" | "bn" | "mr" | "kn" | "ml" | "gu";
+export type Lang = "en" | "hi";
 
 export const LANG_OPTIONS: { code: Lang; label: string; native: string }[] = [
   { code: "en", label: "English", native: "English" },
-  { code: "hi", label: "Hindi", native: "हिन्दी" },
-  { code: "ta", label: "Tamil", native: "தமிழ்" },
-  { code: "te", label: "Telugu", native: "తెలుగు" },
-  { code: "bn", label: "Bengali", native: "বাংলা" },
-  { code: "mr", label: "Marathi", native: "मराठी" },
-  { code: "kn", label: "Kannada", native: "ಕನ್ನಡ" },
-  { code: "ml", label: "Malayalam", native: "മലയാളം" },
-  { code: "gu", label: "Gujarati", native: "ગુજરાતી" },
+  { code: "hi", label: "Hindi beta", native: "हिन्दी" },
 ];
 
 const STORAGE_KEY = "chetana_lang";
@@ -71,7 +64,7 @@ const en: UIStrings = {
   hero_title: "Check before you act",
   hero_sub: "Paste a suspicious message, upload a screenshot, or scan a QR code.",
   scanning: "Scanning...",
-  result_safe: "Looks safe",
+  result_safe: "Low signal, not cleared",
   result_caution: "Be careful",
   result_danger: "Likely a scam",
   do_not_pay: "Do not pay yet",
@@ -105,7 +98,7 @@ const hi: UIStrings = {
   hero_title: "करने से पहले जांचें",
   hero_sub: "संदिग्ध मैसेज पेस्ट करें, स्क्रीनशॉट अपलोड करें, या QR कोड स्कैन करें।",
   scanning: "जांच हो रही है...",
-  result_safe: "सुरक्षित लगता है",
+  result_safe: "कम संकेत, सुरक्षित नहीं माना",
   result_caution: "सावधान रहें",
   result_danger: "शायद धोखा है",
   do_not_pay: "अभी भुगतान न करें",

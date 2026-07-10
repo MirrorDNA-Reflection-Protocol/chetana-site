@@ -20,9 +20,19 @@ class ChatRouterControlTests(unittest.TestCase):
         main_module._CHAT_WINDOW_S = self._orig_chat_window
         main_module._CHAT_REQUEST_LOG.clear()
 
-    def test_llm_status_keeps_gemini_disabled_and_local_models_listed(self) -> None:
+    @patch.dict(
+        "os.environ",
+        {
+            "CHETANA_CLOUD_FALLBACK": "false",
+            "CHETANA_ENABLE_ANTHROPIC": "false",
+            "CHETANA_ENABLE_OPENAI": "false",
+        },
+        clear=False,
+    )
+    def test_llm_status_keeps_cloud_disabled_and_local_models_listed(self) -> None:
         status = build_llm_status()
         self.assertFalse(status["policy"]["gemini_enabled"])
+        self.assertFalse(status["policy"]["cloud_fallback_enabled"])
         self.assertFalse(status["policy"]["caller_model_selection"])
         provider_ids = [provider["id"] for provider in status["providers"]]
         self.assertEqual(provider_ids, ["ollama", "anthropic", "openai"])
@@ -35,8 +45,13 @@ class ChatRouterControlTests(unittest.TestCase):
         catalog_ids = {entry["id"] for entry in status["providers"][0]["catalog"]}
         self.assertIn("hf.co/mradermacher/sarvam-translate-i1-GGUF:Q4_K_M", catalog_ids)
         self.assertIn("qwen2.5vl:7b", catalog_ids)
-        self.assertEqual(status["routing"]["chat_ladder"][-2]["provider"], "anthropic")
-        self.assertEqual(status["routing"]["chat_ladder"][-1]["provider"], "openai")
+        self.assertEqual(status["routing"]["chat_ladder"][0]["model"], "phi4-mini")
+        self.assertTrue(all(item["provider"] == "ollama" for item in status["routing"]["chat_ladder"]))
+        self.assertEqual(status["routing"]["cloud_fallback_order"], [])
+        self.assertFalse(status["providers"][1]["enabled"])
+        self.assertFalse(status["providers"][2]["enabled"])
+        self.assertIn("available_models", status["providers"][0])
+        self.assertIn("missing_models", status["providers"][0])
 
     @patch.dict(
         "os.environ",

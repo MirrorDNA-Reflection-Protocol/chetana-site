@@ -103,9 +103,9 @@ curl -X POST https://chetana.activemirror.ai/api/v0/scan \
 
 Chetana keeps the scam scan contract local-first.
 
-- primary local chat ladder: `sarvam-m`, `chetana-guard-fast`, `phi4-mini`, `qwen2.5:7b`, `llama3.2:3b`, `mirrorstudent`
+- primary local chat ladder: `phi4-mini`, `mirrorstudent`, then allowlisted optional local models
 - local reserve models: `vajra-shield`, `sarvam-translate`, `qwen2.5vl`
-- cloud chat fallback: Anthropic first, then OpenAI
+- cloud chat fallback is off by default; Anthropic or OpenAI require explicit operator opt-in
 - Gemini is intentionally not part of the Chetana chat ladder
 - caller-supplied model choice is blocked; the backend only accepts an allowlisted non-Gemini roster
 - local chat attempts are budget-capped before cloud fallback to avoid hanging on dead models
@@ -113,10 +113,10 @@ Chetana keeps the scam scan contract local-first.
 Relevant backend env vars:
 
 ```bash
-CHETANA_OLLAMA_CHAT_MODELS=hf.co/Mungert/sarvam-m-GGUF:Q4_K_M,chetana-guard-fast,phi4-mini,qwen2.5:7b,llama3.2:3b,mirrorstudent:latest
-CHETANA_CLOUD_FALLBACK=true
-CHETANA_ENABLE_ANTHROPIC=true
-CHETANA_ENABLE_OPENAI=true
+CHETANA_OLLAMA_CHAT_MODELS=phi4-mini,mirrorstudent:latest,hf.co/Mungert/sarvam-m-GGUF:Q4_K_M,chetana-guard-fast,qwen2.5:7b,llama3.2:3b
+CHETANA_CLOUD_FALLBACK=false
+CHETANA_ENABLE_ANTHROPIC=false
+CHETANA_ENABLE_OPENAI=false
 CHETANA_ANTHROPIC_MODEL=claude-3-5-haiku-latest
 CHETANA_OPENAI_MODEL=gpt-4.1-mini
 CHETANA_CHAT_MAX_REQUESTS=12
@@ -126,7 +126,7 @@ CHETANA_LLM_MAX_INPUT_CHARS=1200
 CHETANA_LLM_MAX_OUTPUT_TOKENS=400
 ```
 
-The public chat route is rate-limited and does not allow caller-supplied model selection, tool use, arbitrary model injection, or Gemini fallback. Inspect `/api/llm/status` to verify the bounded live roster.
+The public chat route is rate-limited and does not allow caller-supplied model selection, tool use, arbitrary model injection, or Gemini fallback. `/api/llm/status` separates configured local models from models actually present and reports whether cloud fallback is enabled.
 
 ## Local dev
 

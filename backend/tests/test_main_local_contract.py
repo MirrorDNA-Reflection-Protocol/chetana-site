@@ -38,6 +38,26 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertEqual(data["kavach_mode"], "embedded_local_seed")
         self.assertEqual(data["legacy_kavach"], "down")
 
+    @patch("app.main.ollama_model_available", return_value=True)
+    def test_language_contract_separates_live_beta_and_experimental(self, _model_available) -> None:
+        resp = self.client.get("/api/languages")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        by_code = {item["code"]: item for item in data["languages"]}
+        self.assertEqual(data["live_count"], 1)
+        self.assertEqual(data["beta_count"], 1)
+        self.assertEqual(by_code["en"]["status"], "live")
+        self.assertEqual(by_code["hi"]["status"], "beta")
+        self.assertEqual(by_code["ta"]["status"], "experimental")
+
+        budget = self.client.get("/api/translate/budget").json()
+        self.assertTrue(budget["sarvam_available"])
+        self.assertEqual(budget["verified_languages"], ["en", "hi"])
+
+        language_faq = next(item for item in main_module.FAQ_ENTRIES if item["topic"] == "languages")
+        self.assertNotIn("works in all 22", language_faq["reply"])
+        self.assertIn("Hindi", language_faq["reply"])
+
     def test_privacy_route_exposes_local_scan_memory_clear_control(self) -> None:
         resp = self.client.get("/privacy")
         self.assertEqual(resp.status_code, 200)

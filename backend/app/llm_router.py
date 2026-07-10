@@ -66,7 +66,14 @@ LOCAL_MODEL_CATALOG: tuple[dict[str, Any], ...] = (
     },
 )
 LOCAL_MODEL_BY_ID = {entry["id"]: entry for entry in LOCAL_MODEL_CATALOG}
-DEFAULT_LOCAL_CHAT_MODELS = tuple(entry["id"] for entry in LOCAL_MODEL_CATALOG if entry["auto_chat"])
+DEFAULT_LOCAL_CHAT_MODELS = (
+    "phi4-mini",
+    "mirrorstudent:latest",
+    "hf.co/Mungert/sarvam-m-GGUF:Q4_K_M",
+    "chetana-guard-fast",
+    "qwen2.5:7b",
+    "llama3.2:3b",
+)
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 DEFAULT_ANTHROPIC_MODEL = "claude-3-5-haiku-latest"
 _SECRET_CACHE: dict[str, str | None] = {}
@@ -137,9 +144,9 @@ def _settings() -> dict[str, Any]:
         ),
         "local_timeout_s": float(os.getenv("CHETANA_LOCAL_LLM_TIMEOUT_S", "6")),
         "local_total_budget_s": float(os.getenv("CHETANA_LOCAL_LLM_BUDGET_S", "14")),
-        "cloud_enabled": _env_bool("CHETANA_CLOUD_FALLBACK", True),
-        "openai_enabled": _env_bool("CHETANA_ENABLE_OPENAI", True),
-        "anthropic_enabled": _env_bool("CHETANA_ENABLE_ANTHROPIC", True),
+        "cloud_enabled": _env_bool("CHETANA_CLOUD_FALLBACK", False),
+        "openai_enabled": _env_bool("CHETANA_ENABLE_OPENAI", False),
+        "anthropic_enabled": _env_bool("CHETANA_ENABLE_ANTHROPIC", False),
         "openai_model": os.getenv("CHETANA_OPENAI_MODEL", DEFAULT_OPENAI_MODEL).strip() or DEFAULT_OPENAI_MODEL,
         "anthropic_model": os.getenv("CHETANA_ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL).strip() or DEFAULT_ANTHROPIC_MODEL,
         "max_input_chars": int(os.getenv("CHETANA_LLM_MAX_INPUT_CHARS", "1200")),
@@ -148,16 +155,71 @@ def _settings() -> dict[str, Any]:
     }
 
 
+def _ollama_runtime_models() -> tuple[bool, set[str]]:
+    try:
+        response = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=0.75)
+        response.raise_for_status()
+        models = response.json().get("models") or []
+    except Exception:
+        return False, set()
+
+    names: set[str] = set()
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        for key in ("name", "model"):
+            value = str(item.get(key) or "").strip()
+            if value:
+                names.add(value)
+                if value.endswith(":latest"):
+                    names.add(value.removesuffix(":latest"))
+    return True, names
+
+
+def ollama_model_available(model: str) -> bool:
+    reachable, installed = _ollama_runtime_models()
+    return reachable and (model in installed or f"{model}:latest" in installed)
+
+
 def build_llm_status() -> dict[str, Any]:
     settings = _settings()
-    routing = [{"provider": "ollama", "model": model} for model in settings["local_models"]]
-    routing.append({"provider": "anthropic", "model": settings["anthropic_model"]})
-    routing.append({"provider": "openai", "model": settings["openai_model"]})
+    ollama_reachable, installed_models = _ollama_runtime_models()
+
+    def local_available(model: str) -> bool:
+        return model in installed_models or f"{model}:latest" in installed_models
+
+    anthropic_enabled = (
+        settings["cloud_enabled"]
+        and settings["anthropic_enabled"]
+        and bool(_secret("ANTHROPIC_API_KEY"))
+    )
+    openai_enabled = (
+        settings["cloud_enabled"]
+        and settings["openai_enabled"]
+        and bool(_secret("OPENAI_API_KEY"))
+    )
+    routing = [
+        {"provider": "ollama", "model": model, "available": local_available(model)}
+        for model in settings["local_models"]
+    ]
+    if anthropic_enabled:
+        routing.append({"provider": "anthropic", "model": settings["anthropic_model"], "available": True})
+    if openai_enabled:
+        routing.append({"provider": "openai", "model": settings["openai_model"], "available": True})
+
+    available_local_models = [model for model in settings["local_models"] if local_available(model)]
+    missing_local_models = [model for model in settings["local_models"] if not local_available(model)]
+    cloud_fallback_order = [
+        provider
+        for provider, enabled in (("anthropic", anthropic_enabled), ("openai", openai_enabled))
+        if enabled
+    ]
     return {
         "policy": {
             "local_first": True,
             "gemini_enabled": settings["gemini_enabled"],
-            "cloud_tools_enabled": False,
+            "cloud_fallback_enabled": bool(cloud_fallback_order),
+            "cloud_tools_enabled": bool(cloud_fallback_order),
             "caller_model_selection": False,
             "max_input_chars": settings["max_input_chars"],
             "max_output_tokens": settings["max_output_tokens"],
@@ -165,23 +227,26 @@ def build_llm_status() -> dict[str, Any]:
         },
         "routing": {
             "chat_ladder": routing,
-            "cloud_fallback_order": ["anthropic", "openai"],
+            "cloud_fallback_order": cloud_fallback_order,
         },
         "providers": [
             {
                 "id": "ollama",
-                "enabled": True,
+                "enabled": ollama_reachable and bool(available_local_models),
+                "reachable": ollama_reachable,
                 "models": list(settings["local_models"]),
+                "available_models": available_local_models,
+                "missing_models": missing_local_models,
                 "catalog": [dict(entry) for entry in LOCAL_MODEL_CATALOG],
             },
             {
                 "id": "anthropic",
-                "enabled": bool(_secret("ANTHROPIC_API_KEY")) and settings["cloud_enabled"] and settings["anthropic_enabled"],
+                "enabled": anthropic_enabled,
                 "model": settings["anthropic_model"],
             },
             {
                 "id": "openai",
-                "enabled": bool(_secret("OPENAI_API_KEY")) and settings["cloud_enabled"] and settings["openai_enabled"],
+                "enabled": openai_enabled,
                 "model": settings["openai_model"],
             },
         ],

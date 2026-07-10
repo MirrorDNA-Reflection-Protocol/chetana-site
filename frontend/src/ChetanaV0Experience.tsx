@@ -1507,6 +1507,24 @@ export default function ChetanaV0Experience({
               </button>
             </div>
 
+            {mode !== "text" && (
+              <label className="v0-upload v0-upload-large">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(event) => {
+                    const selected = event.target.files?.[0];
+                    if (selected) acceptScreenshotFile(selected, "chooser");
+                  }}
+                />
+                <span className="v0-upload-inner">
+                  <Upload size={20} />
+                  {file ? file.name : "Choose screenshot"}
+                </span>
+              </label>
+            )}
+
             <div className="v0-lazy-panel">
               <div className="v0-lazy-copy">
                 <div className="v0-section-label">Fast path</div>
@@ -1624,24 +1642,6 @@ export default function ChetanaV0Experience({
                   </span>
                 ))}
               </div>
-            )}
-
-            {mode !== "text" && (
-              <label className="v0-upload v0-upload-large">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(event) => {
-                    const selected = event.target.files?.[0];
-                    if (selected) acceptScreenshotFile(selected, "chooser");
-                  }}
-                />
-                <span className="v0-upload-inner">
-                  <Upload size={20} />
-                  {file ? file.name : "Choose screenshot"}
-                </span>
-              </label>
             )}
 
             <label className="v0-input-label">

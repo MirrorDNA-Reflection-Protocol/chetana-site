@@ -115,7 +115,7 @@ def _level_from_score(score: int) -> RiskLevel:
         return "suspicious"
     if score >= 15:
         return "caution"
-    return "safe"
+    return "caution"
 
 
 def _share_warning(threat_types: list[str], risk_level: RiskLevel) -> str:
@@ -153,6 +153,12 @@ def _select_rail_ids(threats: list[str], req: AnalyzeRequest) -> list[str]:
         rails.extend(["CYBER_HELPLINE_1930", "NCRP_PORTAL", "RBI_CMS"])
     if "digital_arrest" in threats:
         rails.append("ERSS_112")
+    if "fake_echallan" in threats:
+        rails.append("PARIVAHAN_ECHALLAN")
+    if "investment_trading_scam" in threats:
+        rails.append("SEBI_CHECK")
+    if "fake_ekyc_apk" in threats and "aadhaar" in req.text.lower():
+        rails.append("UIDAI_BIOMETRIC_LOCK")
     if "cyber_slavery_recruitment" in threats or req.mode == "job":
         rails.extend(["MEA_EMIGRATE", "MEA_OVERSEAS_EMPLOYMENT"])
     if req.mode == "qr":
@@ -342,7 +348,7 @@ def analyze_request(req: AnalyzeRequest) -> AnalyzeResponse:
     else:
         risk_level = _level_from_score(min(score, 100))
 
-    if insufficient_evidence and risk_level == "safe":
+    if insufficient_evidence:
         risk_level = "caution"
         evidence.append("The current material is too thin to clear safely.")
 

@@ -49,6 +49,10 @@ function installPromptDismissedRecently(): boolean {
   return dismissedAt > 0 && Date.now() - dismissedAt < INSTALL_DISMISS_TTL_MS;
 }
 
+function hasCompletedScamCheck(): boolean {
+  return Number(localStorage.getItem("chetana_v0_scan_count") || 0) > 0;
+}
+
 function initialPageFromLocation(): PageId {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("page");
@@ -207,7 +211,13 @@ export default function App() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [page]);
 
   useEffect(() => {
-    if (appInstalled || directScanIntent || !isInstallSurfacePage(page) || installPromptDismissedRecently()) return;
+    if (
+      appInstalled ||
+      directScanIntent ||
+      !isInstallSurfacePage(page) ||
+      installPromptDismissedRecently() ||
+      !hasCompletedScamCheck()
+    ) return;
     if (installPrompt || isLikelyMobileBrowser()) {
       setInstallBannerVisible(true);
     }
@@ -217,7 +227,7 @@ export default function App() {
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
-      if (!installPromptDismissedRecently()) {
+      if (!installPromptDismissedRecently() && hasCompletedScamCheck()) {
         setInstallBannerVisible(true);
       }
     };
@@ -350,7 +360,8 @@ export default function App() {
     installBannerVisible &&
     isInstallSurfacePage(page) &&
     !directScanIntent &&
-    !appInstalled
+    !appInstalled &&
+    hasCompletedScamCheck()
   );
 
   return (

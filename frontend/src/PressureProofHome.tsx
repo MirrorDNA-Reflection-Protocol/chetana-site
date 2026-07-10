@@ -146,7 +146,7 @@ export default function PressureProofHome({
           <div className="pp-trust-row">
             <span>Free</span>
             <span>No login</span>
-            <span>12 Indian languages</span>
+            <span>English + Hindi beta</span>
             <span>Shows 1930 help</span>
           </div>
         </div>

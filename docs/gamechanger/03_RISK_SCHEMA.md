@@ -2,12 +2,8 @@
 
 ## Risk levels
 
-`safe`
-- No strong scam indicators.
-- Only allowed when the input is rich enough to evaluate.
-
 `caution`
-- Thin, incomplete, or low-signal material.
+- Thin, incomplete, benign-looking, or low-signal material.
 - Also used for weak anomalies where independent verification is still required.
 
 `suspicious`
@@ -23,7 +19,7 @@
 
 ## Anti-failure rule
 
-If evidence is thin, Chetana must not produce a comforting `safe` verdict.
+No analysis response can clear material as `safe`. If evidence is thin, Chetana must fail toward caution.
 It should set:
 - `insufficientEvidence: true`
 - `riskLevel: caution`

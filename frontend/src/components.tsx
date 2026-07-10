@@ -35,10 +35,6 @@ const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: {
 const PASTE_LANGUAGE_PROMPTS = [
   { language: "English", text: "just paste it" },
   { language: "हिन्दी", text: "बस पेस्ट करो" },
-  { language: "বাংলা", text: "শুধু পেস্ট করুন" },
-  { language: "தமிழ்", text: "இதை பேஸ்ட் பண்ணுங்க" },
-  { language: "తెలుగు", text: "ఇక్కడ పేస్ట్ చేయండి" },
-  { language: "मराठी", text: "फक्त पेस्ट करा" },
 ];
 
 /* ── Background Mesh — single radial glow, no noise ──────────── */
@@ -87,9 +83,8 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         <LanguagePicker />
         <button className="theme-toggle" onClick={() => {
           document.documentElement.classList.toggle("theme-light");
-        }} aria-label="Toggle light/dark mode">
-          <span style={{ fontSize: 18 }}>🌓</span>
-          <span style={{ fontSize: 12 }}>Theme</span>
+        }} aria-label="Toggle light or dark theme" title="Toggle theme">
+          <Moon size={18} aria-hidden="true" />
         </button>
       </div>
       <div className="nav-right">
@@ -495,7 +490,7 @@ export function ScanGuideRail({ signals, onNavigate }: { signals: WeatherSignal[
 
 /* ── Stats Strip ─────────────────────────────────────────────── */
 export function StatsStrip() {
-  const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 12 });
+  const [stats, setStats] = useState({ total_scans: 0, scams_caught: 0, languages: 2 });
   const personalScans = parseInt(localStorage.getItem("chetana_scan_count") || "0");
   const trustLevel = personalScans >= 50 ? "Helping many" : personalScans >= 20 ? "Regular helper" : personalScans >= 5 ? "Getting started" : personalScans >= 1 ? "First check done" : "New here";
   const trustColor = personalScans >= 50 ? "var(--teal)" : personalScans >= 20 ? "var(--primary)" : personalScans >= 5 ? "#22c55e" : personalScans >= 1 ? "var(--primary)" : "var(--muted)";
@@ -518,10 +513,9 @@ export function StatsStrip() {
         const totalScans = Number(summary?.totals?.scan_completes ?? liveStats.total_scans ?? 0);
         const scamsCaught = Number(summary?.totals?.risky_verdicts ?? liveStats.scams_caught ?? 0);
         const languageCount = Math.max(
-          Number(languages.live_count ?? 0),
+          Number(languages.live_count ?? 0) + Number(languages.beta_count ?? 0),
           Number(Object.keys(summary?.breakdowns?.languages ?? {}).length || 0),
-          Number(liveStats.languages ?? 0),
-          12,
+          1,
         );
 
         if (!cancelled) {
@@ -533,7 +527,7 @@ export function StatsStrip() {
         }
       } catch {
         if (!cancelled) {
-          setStats(prev => ({ ...prev, languages: prev.languages || 12 }));
+          setStats(prev => ({ ...prev, languages: prev.languages || 2 }));
         }
       }
     };
@@ -558,7 +552,7 @@ export function StatsStrip() {
       </div>
       <div className="stat-item" translate="no">
         <div className="stat-value stat-value-glow">{stats.languages.toLocaleString()}</div>
-        <div className="stat-label">Languages</div>
+        <div className="stat-label">Verified input languages</div>
       </div>
       {personalScans > 0 && (
         <div className="stat-item" translate="no" style={{ borderLeft: '1px solid var(--line)', paddingLeft: 24 }}>
@@ -1083,17 +1077,7 @@ function EmergencyActionBar({ verdict, reasons }: { verdict?: string; reasons?: 
 
 const LANGUAGES = [
   { code: "en", label: "EN", name: "English" },
-  { code: "hi", label: "हि", name: "Hindi" },
-  { code: "ta", label: "த", name: "Tamil" },
-  { code: "te", label: "తె", name: "Telugu" },
-  { code: "bn", label: "বা", name: "Bengali" },
-  { code: "mr", label: "म", name: "Marathi" },
-  { code: "gu", label: "ગુ", name: "Gujarati" },
-  { code: "kn", label: "ಕ", name: "Kannada" },
-  { code: "ml", label: "മ", name: "Malayalam" },
-  { code: "pa", label: "ਪੰ", name: "Punjabi" },
-  { code: "or", label: "ଓ", name: "Odia" },
-  { code: "ur", label: "اردو", name: "Urdu" },
+  { code: "hi", label: "हि", name: "Hindi beta" },
 ];
 
 const LANG_TO_BCP47: Record<string, string> = {
@@ -1469,7 +1453,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
                   <span>UPI payment fraud</span>
                   <span>Phishing links</span>
                   <span>Digital arrest scams</span>
-                  <span>Voice deepfakes</span>
+                  <span>Voice impersonation pressure</span>
                   <span>QR code traps</span>
                   <span>Job & lottery scams</span>
                   <span>Bank impersonation</span>
@@ -1822,7 +1806,7 @@ const STORIES = [
   { img: "/02-student-train.png", alt: "Illustration: student on Mumbai train checking phone", caption: "A student checks a WhatsApp forward on his commute. Chetana flags it as a known phishing link — instantly." },
   { img: "/03-family-kitchen.png", alt: "Illustration: Indian family gathered around kitchen table", caption: "Families check every suspicious message together. Screenshot, upload, know in seconds." },
   { img: "/04-safe-hands.png", alt: "Illustration: elderly hands holding phone with safety shield", caption: "When something looks suspicious, check it before you act. That's the Chetana habit." },
-  { img: "/05-street-scene.png", alt: "Illustration: Indian marketplace with people on phones", caption: "From Mumbai to Madurai — a free scam checker that works in 12 Indian languages." },
+  { img: "/05-street-scene.png", alt: "Illustration: Indian marketplace with people on phones", caption: "From Mumbai to Madurai - a free scam checker with English checks and Hindi screenshot reading in beta." },
 ];
 
 export function StoriesSection() {
@@ -1870,7 +1854,7 @@ export function ConsumerSection({ onNavigate }: { onNavigate: (p: PageId) => voi
     { icon: <MessageCircle size={22} />, color: "blue", title: "Screenshot & Upload", desc: "Got a suspicious WhatsApp or SMS? Screenshot it. Upload it here. We scan it instantly.", click: "scan" as PageId },
     { icon: <Link2 size={22} />, color: "teal", title: "Paste Any Message", desc: "Copy the suspicious text. Paste it in the scanner. Chetana cross-checks common India scam patterns before you act.", click: "scan" as PageId },
     { icon: <CreditCard size={22} />, color: "saffron", title: "Check UPI & Links", desc: "Someone sent a payment link or UPI ID? Check it before you click. Don't lose money.", click: "scan" as PageId },
-    { icon: <Users size={22} />, color: "violet", title: "Teach Your Family", desc: "Show your parents and elders how to screenshot and check. Works in 12 Indian languages.", click: "scan" as PageId },
+    { icon: <Users size={22} />, color: "violet", title: "Teach Your Family", desc: "Show your parents and elders one habit: screenshot anything suspicious and check before acting.", click: "scan" as PageId },
   ];
   return (
     <>
@@ -3552,7 +3536,7 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
       icon: <Search size={18} />,
       status: "API candidates",
       title: "URL and file reputation",
-      text: "Google Safe Browsing, URLhaus, PhishTank, OpenPhish, VirusTotal, and urlscan can enrich suspicious links with consent and keys.",
+      text: "Google Web Risk, keyed URLhaus, and PhishTank are the practical first candidates. Browser sandboxes require explicit consent because submitted URLs may be retained or exposed.",
     },
     {
       icon: <Globe size={18} />,

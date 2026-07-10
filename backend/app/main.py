@@ -73,7 +73,7 @@ from app.field_harness import (  # noqa: E402
     source_label,
 )
 from app.pilottrace import build_pilottrace_report, render_pilottrace_html  # noqa: E402
-from app.llm_router import build_llm_status, generate_chat_reply  # noqa: E402
+from app.llm_router import build_llm_status, generate_chat_reply, ollama_model_available  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
     analyze_request as analyze_gamechanger_request,
     build_emergency_response as build_gamechanger_emergency_response,
@@ -332,10 +332,14 @@ async def _close_client():
 @app.get("/api/translate/budget")
 async def translate_budget():
     """Expose the current local-only translation posture."""
+    translation_ready = ollama_model_available(SARVAM_MODEL)
     return {
-        "sarvam_available": True,
+        "sarvam_available": translation_ready,
         "google_available": False,
         "mode": "local_only",
+        "model": SARVAM_MODEL,
+        "verified_languages": ["en", "hi"] if translation_ready else ["en"],
+        "status": "ready" if translation_ready else "degraded",
     }
 
 
@@ -1146,17 +1150,17 @@ async def kb_article(article_id: str):
 
 SUPPORTED_LANGUAGES = [
     {"code": "en", "name": "English", "status": "live"},
-    {"code": "hi", "name": "Hindi", "status": "live"},
-    {"code": "ta", "name": "Tamil", "status": "live"},
-    {"code": "te", "name": "Telugu", "status": "live"},
-    {"code": "kn", "name": "Kannada", "status": "live"},
-    {"code": "ml", "name": "Malayalam", "status": "live"},
-    {"code": "bn", "name": "Bengali", "status": "live"},
-    {"code": "mr", "name": "Marathi", "status": "live"},
-    {"code": "gu", "name": "Gujarati", "status": "live"},
-    {"code": "pa", "name": "Punjabi", "status": "live"},
-    {"code": "or", "name": "Odia", "status": "live"},
-    {"code": "as", "name": "Assamese", "status": "live"},
+    {"code": "hi", "name": "Hindi", "status": "beta"},
+    {"code": "ta", "name": "Tamil", "status": "experimental"},
+    {"code": "te", "name": "Telugu", "status": "experimental"},
+    {"code": "kn", "name": "Kannada", "status": "experimental"},
+    {"code": "ml", "name": "Malayalam", "status": "experimental"},
+    {"code": "bn", "name": "Bengali", "status": "experimental"},
+    {"code": "mr", "name": "Marathi", "status": "experimental"},
+    {"code": "gu", "name": "Gujarati", "status": "experimental"},
+    {"code": "pa", "name": "Punjabi", "status": "experimental"},
+    {"code": "or", "name": "Odia", "status": "experimental"},
+    {"code": "as", "name": "Assamese", "status": "experimental"},
     {"code": "ur", "name": "Urdu", "status": "coming_soon"},
     {"code": "mai", "name": "Maithili", "status": "coming_soon"},
     {"code": "sat", "name": "Santali", "status": "coming_soon"},
@@ -1172,8 +1176,21 @@ SUPPORTED_LANGUAGES = [
 
 @app.get("/api/languages")
 async def languages():
-    """Return all 22 scheduled Indian languages with live/coming_soon status."""
-    return {"languages": SUPPORTED_LANGUAGES, "live_count": 12, "total_count": 22}
+    """Return the tested language tiers without promoting experiments to live."""
+    translation_ready = ollama_model_available(SARVAM_MODEL)
+    languages = [dict(item) for item in SUPPORTED_LANGUAGES]
+    if not translation_ready:
+        for item in languages:
+            if item["status"] in {"beta", "experimental"}:
+                item["status"] = "unavailable"
+    return {
+        "languages": languages,
+        "live_count": 1,
+        "beta_count": 1 if translation_ready else 0,
+        "experimental_count": 10 if translation_ready else 0,
+        "total_count": 22,
+        "translation_model_available": translation_ready,
+    }
 
 
 @app.get("/api/radar/public")
@@ -1339,12 +1356,12 @@ FAQ_ENTRIES = [
     },
     {
         "keywords": ["language", "hindi", "tamil", "telugu", "kannada", "malayalam", "bengali", "marathi", "gujarati"],
-        "reply": "Chetana works in all 22 scheduled Indian languages: English, Hindi, Tamil, Telugu, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Odia, Assamese, Urdu, Maithili, Santali, Kashmiri, Nepali, Sindhi, Konkani, Dogri, Manipuri, and Bodo.",
+        "reply": "English is live. Hindi screenshot reading and local translation-assisted checks are in beta. Other Indian-language paths remain experimental or planned until they pass the same scam-class and recovery tests.",
         "topic": "languages",
     },
     {
         "keywords": ["chetana", "what is", "about", "tell me", "who"],
-        "reply": "Chetana is a living trust surface for Indian digital life. It protects consumers, merchants, and institutions against scams, fraud, and deception. It covers messages, links, payments, QR codes, and media across all 22 scheduled Indian languages. Made in India.",
+        "reply": "Chetana is an independent scam checker for India. Paste a suspicious message or upload a screenshot and it returns one of four evidence states, the reasons, and the safest next action. It does not certify that content is safe or claim government affiliation.",
         "topic": "about",
     },
     {

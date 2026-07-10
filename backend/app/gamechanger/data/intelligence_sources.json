@@ -21,14 +21,14 @@
     "priority": 100
   },
   {
-    "source_id": "google_safe_browsing",
-    "name": "Google Safe Browsing API",
+    "source_id": "google_web_risk",
+    "name": "Google Cloud Web Risk",
     "category": "url_reputation",
     "integration_status": "candidate_keyed",
     "integration_type": "api",
-    "source_url": "https://safebrowsing.google.com/",
-    "api_docs_url": "https://developers.google.com/safe-browsing",
-    "auth_model": "api_key",
+    "source_url": "https://cloud.google.com/web-risk",
+    "api_docs_url": "https://cloud.google.com/web-risk/docs/lookup-api",
+    "auth_model": "google_cloud_project_and_api_key",
     "update_model": "provider_realtime",
     "use_for": [
       "phishing URL checks",
@@ -37,19 +37,39 @@
     ],
     "limitations": [
       "URL-only signal; does not verify UPI IDs, phone numbers, screenshots, or caller intent.",
-      "Requires API key, quota governance, and privacy review before sending user-submitted URLs."
+      "Requires a Google Cloud project, quota governance, and privacy review before sending user-submitted URLs.",
+      "Lookup API pricing currently includes 100,000 calls per month at no charge, then usage pricing."
     ],
-    "priority": 88
+    "priority": 90
+  },
+  {
+    "source_id": "google_safe_browsing_noncommercial",
+    "name": "Google Safe Browsing API",
+    "category": "url_reputation",
+    "integration_status": "not_eligible_for_commercial_product",
+    "integration_type": "api",
+    "source_url": "https://safebrowsing.google.com/",
+    "api_docs_url": "https://developers.google.com/safe-browsing/v4/usage-limits",
+    "auth_model": "api_key",
+    "update_model": "provider_realtime",
+    "use_for": [
+      "non-commercial research only"
+    ],
+    "limitations": [
+      "Google states that Safe Browsing API is for non-commercial use only and directs commercial users to Web Risk.",
+      "Do not wire this API into a sponsored, bank, government, or revenue-generating Chetana deployment."
+    ],
+    "priority": 10
   },
   {
     "source_id": "urlhaus",
     "name": "abuse.ch URLhaus",
     "category": "malware_url_feed",
-    "integration_status": "candidate_public",
+    "integration_status": "candidate_auth_required",
     "integration_type": "api_and_feed",
     "source_url": "https://urlhaus.abuse.ch/",
     "api_docs_url": "https://urlhaus-api.abuse.ch/",
-    "auth_model": "none_or_optional_auth_by_endpoint",
+    "auth_model": "free_auth_key_required",
     "update_model": "provider_feed",
     "use_for": [
       "malware URL enrichment",
@@ -57,6 +77,7 @@
       "local denylist seeding for suspicious links"
     ],
     "limitations": [
+      "The current API requires an Auth-Key; the old anonymous refresh assumption is stale.",
       "Focused on malware infrastructure, not consumer scam persuasion.",
       "A missing hit must never be treated as safe."
     ],
@@ -84,14 +105,35 @@
     "priority": 78
   },
   {
+    "source_id": "phishing_database",
+    "name": "Phishing.Database community feeds",
+    "category": "phishing_url_feed",
+    "integration_status": "candidate_local_feed",
+    "integration_type": "downloaded_feed",
+    "source_url": "https://github.com/Phishing-Database/Phishing.Database",
+    "api_docs_url": "https://github.com/Phishing-Database/Phishing.Database/blob/master/README.md",
+    "auth_model": "none",
+    "update_model": "github_release_and_feed_refresh",
+    "use_for": [
+      "local phishing denylist enrichment",
+      "offline URL evaluation",
+      "regression fixtures with source and retrieval timestamps"
+    ],
+    "limitations": [
+      "Community feeds require freshness, deduplication, source attribution, and false-positive controls.",
+      "A missing hit must never be treated as safe."
+    ],
+    "priority": 74
+  },
+  {
     "source_id": "openphish",
     "name": "OpenPhish",
     "category": "phishing_url_feed",
-    "integration_status": "candidate_feed",
+    "integration_status": "license_blocked_without_written_consent",
     "integration_type": "feed_or_commercial_api",
     "source_url": "https://openphish.com/",
     "api_docs_url": "https://openphish.com/phishing_feeds.html",
-    "auth_model": "public_feed_or_commercial_license",
+    "auth_model": "written_commercial_consent_or_paid_license",
     "update_model": "provider_feed",
     "use_for": [
       "known phishing URL denylist",
@@ -99,20 +141,21 @@
       "sponsor-grade URL intelligence if licensed"
     ],
     "limitations": [
-      "The richer feed/API is commercial.",
+      "OpenPhish terms restrict the service to personal use and prohibit commercial use without prior written consent.",
+      "Do not use the community feed in Chetana sponsor or institutional pilots without a signed license.",
       "A no-match is not a clean verdict."
     ],
-    "priority": 72
+    "priority": 12
   },
   {
     "source_id": "virustotal",
     "name": "VirusTotal API v3",
     "category": "url_file_domain_reputation",
-    "integration_status": "candidate_keyed",
+    "integration_status": "public_api_blocked_for_commercial_use",
     "integration_type": "api",
     "source_url": "https://www.virustotal.com/",
     "api_docs_url": "https://docs.virustotal.com/reference/overview",
-    "auth_model": "api_key",
+    "auth_model": "premium_commercial_license_required",
     "update_model": "provider_realtime",
     "use_for": [
       "URL reputation enrichment",
@@ -121,15 +164,15 @@
     ],
     "limitations": [
       "Submitting files or URLs to a third party requires clear consent and privacy classification.",
-      "Free/public quotas and licensing constraints are not suitable for high-volume public scanning."
+      "VirusTotal states that its Public API must not be used in commercial products or services; a premium agreement is required."
     ],
-    "priority": 70
+    "priority": 14
   },
   {
     "source_id": "urlscan_io",
     "name": "urlscan.io",
     "category": "url_scan_sandbox",
-    "integration_status": "candidate_keyed",
+    "integration_status": "analyst_only_with_explicit_consent",
     "integration_type": "api",
     "source_url": "https://urlscan.io/",
     "api_docs_url": "https://urlscan.io/docs/api/",
@@ -144,7 +187,28 @@
       "Public scans can expose submitted URLs and metadata unless configured carefully.",
       "Not appropriate for private bank links or sensitive screenshots by default."
     ],
-    "priority": 58
+    "priority": 34
+  },
+  {
+    "source_id": "cloudflare_url_scanner",
+    "name": "Cloudflare URL Scanner",
+    "category": "url_scan_sandbox",
+    "integration_status": "analyst_only_with_explicit_consent",
+    "integration_type": "api",
+    "source_url": "https://radar.cloudflare.com/scan",
+    "api_docs_url": "https://developers.cloudflare.com/radar/investigate/url-scanner/",
+    "auth_model": "cloudflare_account_api_token",
+    "update_model": "provider_realtime",
+    "use_for": [
+      "analyst investigation of suspicious public URLs",
+      "redirect, network, screenshot, and phishing-verdict enrichment"
+    ],
+    "limitations": [
+      "Scans are public by default; unlisted scans remain accessible to anyone who knows the scan ID.",
+      "Successful scans are retained for 12 months, so private bank links and user-specific URLs must not be submitted by default.",
+      "Use only after URL extraction, sensitivity classification, and explicit user or analyst consent."
+    ],
+    "priority": 42
   },
   {
     "source_id": "ncrp_suspect_repository",

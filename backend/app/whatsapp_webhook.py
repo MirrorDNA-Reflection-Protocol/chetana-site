@@ -259,7 +259,7 @@ async def _send_welcome(phone: str):
         "• Phone numbers\n"
         "• Bank/KYC update messages\n"
         "\n"
-        "Available in 12 Indian languages.\n"
+        "English checks. Hindi support is in beta.\n"
         "No data stored. No login required.\n"
         "\n"
         "_Just paste the message below_ 👇"

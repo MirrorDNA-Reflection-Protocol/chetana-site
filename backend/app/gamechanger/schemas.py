@@ -18,7 +18,7 @@ class CamelModel(BaseModel):
     )
 
 
-RiskLevel = Literal["safe", "caution", "suspicious", "dangerous", "critical"]
+RiskLevel = Literal["caution", "suspicious", "dangerous", "critical"]
 Mode = Literal["message", "qr", "call", "job", "apk", "emergency"]
 SourceChannel = Literal["whatsapp", "sms", "telegram", "email", "browser", "qr", "unknown"]
 EmergencyTrigger = Literal[

@@ -6,7 +6,7 @@ export default function StoryPage() {
   return (
     <section style={{ maxWidth: 800, margin: "0 auto", padding: "80px 20px 60px" }}>
 
-      {/* Deepfake hook */}
+      {/* Synthetic-media awareness hook */}
       <motion.div {...fadeUp} style={{ textAlign: "center", marginBottom: 48 }}>
         <video
           src="/deepfake_hero.mp4"
@@ -23,7 +23,7 @@ export default function StoryPage() {
           That wasn't real. It took less than 60 seconds to make.
         </p>
         <p style={{ color: "#b0b0c0", fontSize: "1rem", margin: "0 0 32px", lineHeight: 1.6 }}>
-          <span style={{ color: "#00d4aa", fontWeight: 600 }}>Chetana</span> detects deepfakes, scam links, and fraud — so you don't have to.
+          <span style={{ color: "#00d4aa", fontWeight: 600 }}>Chetana</span> helps you pause, inspect the surrounding claim, and verify it through a channel you already trust.
         </p>
         <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "0 0 32px" }} />
         <p style={{ color: "#00d4aa", fontWeight: 600, fontSize: "0.875rem", letterSpacing: 2, textTransform: "uppercase", margin: "0 0 8px" }}>
@@ -37,7 +37,7 @@ export default function StoryPage() {
         </p>
       </motion.div>
 
-      {/* Video 1 — Deepfake awareness */}
+      {/* Video 1 - synthetic-media awareness */}
       <motion.div {...fadeUp} style={{ marginBottom: 48 }}>
         <div style={{
           display: "flex",
@@ -57,16 +57,16 @@ export default function StoryPage() {
           />
           <div style={{ flex: 1, minWidth: 240 }}>
             <h3 style={{ color: "#fff", fontSize: "1.25rem", fontWeight: 600, margin: "0 0 8px" }}>
-              Deepfakes are here
+              Synthetic media changes the habit
             </h3>
             <p style={{ color: "#b0b0c0", fontSize: "1rem", lineHeight: 1.7, margin: 0 }}>
-              Anyone's face can be cloned in seconds. Chetana scans videos, images, and voice recordings to detect manipulation before it causes harm.
+              A convincing face or voice is no longer proof. Chetana checks the surrounding pressure, payment request, message, and link, then shows the safest independent verification step.
             </p>
           </div>
         </div>
       </motion.div>
 
-      {/* Video 2 — Detection in action */}
+      {/* Video 2 - verification in action */}
       <motion.div {...fadeUp} style={{ marginBottom: 48 }}>
         <div style={{
           display: "flex",
@@ -87,10 +87,10 @@ export default function StoryPage() {
           />
           <div style={{ flex: 1, minWidth: 240 }}>
             <h3 style={{ color: "#fff", fontSize: "1.25rem", fontWeight: 600, margin: "0 0 8px" }}>
-              Real-time detection
+              Verify the claim, not the pixels
             </h3>
             <p style={{ color: "#b0b0c0", fontSize: "1rem", lineHeight: 1.7, margin: 0 }}>
-              Upload any suspicious media. Chetana analyzes facial artifacts, audio patterns, and behavioral signals that human eyes miss.
+              Chetana does not claim to prove media authenticity. Use the known phone number, official app, or trusted family code word before you send money or share access.
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function StoryPage() {
           The Build
         </h2>
         <p style={{ color: "#b0b0c0", fontSize: "1rem", lineHeight: 1.7, margin: "0 0 24px", maxWidth: 500, marginLeft: "auto", marginRight: "auto" }}>
-          Built on local hardware from Day 1. No cloud. Here's a walkthrough of the live system that powers Chetana.
+          Built on local hardware from Day 1. The core scam check is local-first, with explicit server help only when a user asks for it.
         </p>
         <div style={{
           position: "relative",

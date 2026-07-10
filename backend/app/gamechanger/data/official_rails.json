@@ -112,5 +112,61 @@
     ],
     "verified_on": "2026-04-28",
     "source_url": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss"
+  },
+  {
+    "rail_id": "SEBI_CHECK",
+    "name": "SEBI Check",
+    "channel": "web",
+    "url": "https://siportal.sebi.gov.in/intermediary/sebi-check",
+    "contact": null,
+    "use_when": [
+      "verify a UPI ID presented as belonging to a securities-market intermediary",
+      "verify account details before NEFT or RTGS to an intermediary",
+      "investment or trading payment request"
+    ],
+    "verified_on": "2026-07-10",
+    "source_url": "https://siportal.sebi.gov.in/intermediary/sebi-check"
+  },
+  {
+    "rail_id": "PARIVAHAN_ECHALLAN",
+    "name": "Parivahan eChallan Status",
+    "channel": "web",
+    "url": "https://echallan.parivahan.gov.in/index/check-challan-status",
+    "contact": null,
+    "use_when": [
+      "verify a traffic challan independently",
+      "fake e-challan SMS, WhatsApp, APK, or payment link",
+      "vehicle penalty impersonation"
+    ],
+    "verified_on": "2026-07-10",
+    "source_url": "https://echallan.parivahan.gov.in/index/check-challan-status"
+  },
+  {
+    "rail_id": "NCH_1915",
+    "name": "National Consumer Helpline 1915",
+    "channel": "phone_and_web",
+    "url": "https://consumerhelpline.gov.in/",
+    "contact": "1915",
+    "use_when": [
+      "consumer grievance after a purchase or service dispute",
+      "merchant or platform redress before litigation",
+      "non-cyber consumer complaint"
+    ],
+    "verified_on": "2026-07-10",
+    "source_url": "https://consumerhelpline.gov.in/public/about"
+  },
+  {
+    "rail_id": "UIDAI_BIOMETRIC_LOCK",
+    "name": "UIDAI Biometric Lock and Aadhaar Help",
+    "channel": "web_and_phone",
+    "url": "https://uidai.gov.in/index.php?Itemid=2524&id=925&lang=en&option=com_content&view=category",
+    "contact": "1947",
+    "use_when": [
+      "suspected Aadhaar biometric misuse",
+      "identity theft involving Aadhaar",
+      "lock biometrics after exposure"
+    ],
+    "verified_on": "2026-07-10",
+    "source_url": "https://uidai.gov.in/index.php?Itemid=2524&id=925&lang=en&option=com_content&view=category"
   }
 ]

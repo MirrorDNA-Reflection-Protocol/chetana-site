@@ -170,7 +170,9 @@
             <ul style="margin-top: 0.5rem;">
                 <li>No accounts. No login. No sign-up.</li>
                 <li>Your scans are checked and <strong>not stored</strong>.</li>
-                <li>Your scam scans stay on <strong>local models on our servers</strong>. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
+                <li>Core scam checks use browser-side extraction and <strong>local models on our servers</strong>. A screenshot reaches Mistral OCR only if local extraction is weak, the fallback is enabled, and you explicitly choose it.</li>
+                <li>Optional domain-registration checks send only the normalized hostname &mdash; never its path or query &mdash; to the IANA-designated RDAP registry after explicit consent.</li>
+                <li>Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
                 <li>Voice notes are sent only after you tap Ask Chetana, transcribed on our host, and the raw audio is deleted before the response returns.</li>
                 <li>We do not require an account or build a personal profile. A scan can still contain personal information that you choose to submit.</li>
                 <li>We track only anonymous scan counts (e.g., "400 scans today") for service health.</li>
@@ -200,7 +202,15 @@
             <li>The transcript is checked like typed scan text and is not retained by the voice transcriber</li>
         </ul>
 
-        <h3>3.3 During Chat (Not Stored by Chetana)</h3>
+        <h3>3.3 Optional Screenshot and Domain Improvement</h3>
+        <ul>
+            <li>Screenshot OCR starts in your browser. If the result is weak, Chetana may offer an optional Mistral OCR retry. The screenshot is sent only after you choose that retry and only when the service is configured.</li>
+            <li>An optional RDAP check sends only the normalized domain name to the IANA-designated registry after explicit consent. URL paths, query strings, and fragments are removed first.</li>
+            <li>OCR confidence, domain age, registrar, and registry status are supporting evidence only. A failed lookup, old domain, or missing record never means safe.</li>
+            <li>Chetana does not retain the submitted screenshot, normalized domain, or returned lookup metadata after the response.</li>
+        </ul>
+
+        <h3>3.4 During Chat (Not Stored by Chetana)</h3>
         <p>When you send a chat message for guidance:</p>
         <ul>
             <li>Chetana tries local allowlisted models first</li>
@@ -209,7 +219,7 @@
             <li>Chetana does not retain the chat content after the response is sent</li>
         </ul>
 
-        <h3>3.4 Anonymous Analytics (Aggregated Only)</h3>
+        <h3>3.5 Anonymous Analytics (Aggregated Only)</h3>
         <table>
             <thead>
                 <tr>
@@ -243,7 +253,7 @@
         </table>
         <p>These are aggregate counters only. They cannot be traced back to any individual user or scan.</p>
 
-        <h3>3.5 Local Browser Thread Hints (On Your Device)</h3>
+        <h3>3.6 Local Browser Thread Hints (On Your Device)</h3>
         <p>Chetana can remember whether a UPI ID, phone number, or link domain appeared in another scan on the same browser. This is done with SHA-256 hashes in your browser's localStorage. The server does not receive your thread history, thread IDs, or local identifier index.</p>
         <ul>
             <li>Raw scanned text is not saved in this thread store</li>
@@ -284,13 +294,14 @@
         <p>When you submit something for scanning:</p>
         <ol>
             <li>Your submitted text, screenshot, or consented voice note reaches our server over an encrypted connection (HTTPS)</li>
-            <li>Our <strong>local AI models</strong> (Ollama, running on our own infrastructure) and pattern-matching rules analyze scam scans</li>
+            <li>Browser-side extraction, our <strong>local AI models</strong>, and deterministic pattern-matching rules analyze the core scam scan</li>
+            <li>Only an explicitly selected OCR retry or domain-registration check uses the external service described in Section 8</li>
             <li>Chat uses a local-first allowlisted model ladder and only falls back to Anthropic or OpenAI if that operator setting is enabled and the local chat ladder does not respond</li>
             <li>A risk score and explanation are generated</li>
             <li>The result is sent back to you</li>
             <li>Submitted content and results are <strong>discarded</strong> &mdash; not written to an individual scan database or content log. Raw voice audio is deleted before the transcription response returns.</li>
         </ol>
-        <p><strong>Core scam scan analysis stays on Chetana's own infrastructure.</strong> If chat fallback is active, the specific chat message may be sent to Anthropic or OpenAI for that reply. Gemini is excluded from Chetana chat.</p>
+        <p><strong>Core scam analysis stays in the browser and on Chetana's own infrastructure.</strong> Explicit OCR improvement, domain-registration checks, and optional chat fallback are the bounded exceptions described here. Gemini is excluded from Chetana chat.</p>
 
         <!-- 7 -->
         <h2>7. Cookies and Local Storage</h2>
@@ -332,6 +343,16 @@
                     <td>Optional fallback for chat replies when local chat models do not respond</td>
                     <td>Only the chat message needed for that reply. Scam scan payloads stay local.</td>
                 </tr>
+                <tr>
+                    <td>Mistral OCR</td>
+                    <td>Optional retry when browser screenshot extraction is weak</td>
+                    <td>Only the screenshot or document you explicitly choose to retry. It does not receive voice audio.</td>
+                </tr>
+                <tr>
+                    <td>IANA-designated RDAP registry</td>
+                    <td>Optional domain registration age, registrar, and status metadata</td>
+                    <td>Only the normalized hostname after explicit consent. URL paths, queries, fragments, and scan text are not sent.</td>
+                </tr>
             </tbody>
         </table>
         <p>We do not use Google Analytics, Facebook Pixel, or any advertising or tracking service.</p>
@@ -362,6 +383,10 @@
                 <tr>
                     <td>Voice transcript</td>
                     <td><strong>Not retained by the transcriber.</strong> It is returned to your browser and processed as scan text.</td>
+                </tr>
+                <tr>
+                    <td>Optional OCR and RDAP request/response data</td>
+                    <td><strong>Not retained by Chetana.</strong> External providers may process it under their own service terms.</td>
                 </tr>
                 <tr>
                     <td>Anonymous analytics</td>

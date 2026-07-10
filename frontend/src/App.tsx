@@ -23,6 +23,7 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISSED_KEY = "chetana_install_prompt_dismissed_at";
 const INSTALL_DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SERVICE_WORKER_PATH = "/sw.js";
 
 const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 
@@ -250,7 +251,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator) || !import.meta.env.PROD) return;
 
     let disposed = false;
     let registrationCleanup: (() => void) | undefined;
@@ -292,10 +293,16 @@ export default function App() {
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
     document.addEventListener("visibilitychange", onVisibility);
 
-    navigator.serviceWorker.getRegistration().then((registration) => {
-      if (disposed || !registration) return;
+    const ensureRegistration = async () => {
+      const existing = await navigator.serviceWorker.getRegistration();
+      const registration = existing ?? await navigator.serviceWorker.register(SERVICE_WORKER_PATH);
+      if (disposed) return;
       registrationCleanup = attachRegistration(registration);
       registration.update().catch(() => {});
+    };
+
+    ensureRegistration().catch((error) => {
+      console.warn("Chetana service worker registration failed", error);
     });
 
     return () => {

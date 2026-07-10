@@ -4,6 +4,7 @@ const manifestPath = new URL("../public/manifest.json", import.meta.url);
 const serviceWorkerPath = new URL("../public/sw.js", import.meta.url);
 const builtManifestPath = new URL("../dist/manifest.json", import.meta.url);
 const builtServiceWorkerPath = new URL("../dist/sw.js", import.meta.url);
+const appSourcePath = new URL("../src/App.tsx", import.meta.url);
 
 const failures = [];
 const checked = [];
@@ -79,6 +80,18 @@ function checkServiceWorker(serviceWorker, label, path) {
 
 checkManifest(await readFile(manifestPath, "utf8"), "public manifest", manifestPath);
 checkServiceWorker(await readFile(serviceWorkerPath, "utf8"), "public", serviceWorkerPath);
+
+const appSource = await readFile(appSourcePath, "utf8");
+includesAll(appSource, [
+  "const SERVICE_WORKER_PATH = \"/sw.js\"",
+  "navigator.serviceWorker.register(SERVICE_WORKER_PATH)",
+  "import.meta.env.PROD",
+], "application service worker registration");
+checked.push({
+  kind: "service_worker_registration",
+  label: "application source",
+  path: appSourcePath.pathname,
+});
 
 const builtManifest = await readMaybe(builtManifestPath);
 const builtServiceWorker = await readMaybe(builtServiceWorkerPath);

@@ -11,10 +11,20 @@
 
 interface LocalScanResult {
   score: number;
-  verdict: "HIGH" | "MEDIUM" | "LOW_RISK";
+  verdict: "HIGH" | "MEDIUM" | "LOW_RISK" | "LOW_SIGNAL";
   signals: string[];
   needsDeepScan: boolean;
   extractedText?: string;
+}
+
+export function unreadableScreenshotResult(): LocalScanResult {
+  return {
+    score: 0,
+    verdict: "LOW_SIGNAL",
+    signals: ["Chetana could not read enough text to assess this image"],
+    needsDeepScan: true,
+    extractedText: "",
+  };
 }
 
 // High-confidence scam patterns — English (score 70+)
@@ -203,7 +213,32 @@ let tesseractModule: typeof import("tesseract.js") | null = null;
 export interface BrowserOcrResult {
   text: string;
   confidence: number | null;
+  engine: "tesseract" | "paddleocr";
+  latencyMs: number;
+  challenger?: {
+    engine: "paddleocr";
+    confidence: number | null;
+    characterCount: number;
+    latencyMs: number;
+    selected: boolean;
+  };
 }
+
+interface PaddleOcrItem {
+  text: string;
+  score: number;
+}
+
+interface PaddleOcrPrediction {
+  items: PaddleOcrItem[];
+  metrics?: { totalMs?: number };
+}
+
+interface PaddleOcrInstance {
+  predict(image: Blob): Promise<PaddleOcrPrediction[]>;
+}
+
+let paddleOcrPromise: Promise<PaddleOcrInstance> | null = null;
 
 async function getTesseract() {
   if (!tesseractModule) {
@@ -274,15 +309,110 @@ async function preprocessForOCR(imageFile: File): Promise<Blob> {
 }
 
 export async function browserOCRWithConfidence(imageFile: File): Promise<BrowserOcrResult> {
+  const started = performance.now();
   const w = await getWorker();
   const preprocessed = await preprocessForOCR(imageFile);
   const { data: { text, confidence } } = await w.recognize(preprocessed);
   const normalizedConfidence = typeof confidence === "number"
     ? Math.max(0, Math.min(1, confidence > 1 ? confidence / 100 : confidence))
     : null;
-  return {
+  const tesseractResult: BrowserOcrResult = {
     text: text.trim(),
     confidence: normalizedConfidence,
+    engine: "tesseract",
+    latencyMs: Math.max(0, Math.round(performance.now() - started)),
+  };
+
+  if (!paddleChallengerConfigured()) return tesseractResult;
+  try {
+    const paddleResult = await runPaddleOcr(preprocessed);
+    return selectPreferredOcrResult(tesseractResult, paddleResult);
+  } catch (error) {
+    console.warn("PaddleOCR challenger unavailable; keeping Tesseract result", error);
+    return tesseractResult;
+  }
+}
+
+function paddleChallengerConfigured(): boolean {
+  return Boolean(
+    import.meta.env.VITE_CHETANA_PADDLE_OCR === "1" &&
+      import.meta.env.VITE_CHETANA_PADDLE_DET_MODEL_URL?.trim() &&
+      import.meta.env.VITE_CHETANA_PADDLE_REC_MODEL_URL?.trim(),
+  );
+}
+
+async function getPaddleOcr(): Promise<PaddleOcrInstance> {
+  if (!paddleChallengerConfigured()) {
+    throw new Error("paddleocr_challenger_not_configured");
+  }
+  if (!paddleOcrPromise) {
+    paddleOcrPromise = (async () => {
+      const { PaddleOCR } = await import("@paddleocr/paddleocr-js");
+      return PaddleOCR.create({
+        worker: true,
+        textDetectionModelName:
+          import.meta.env.VITE_CHETANA_PADDLE_DET_MODEL_NAME || "PP-OCRv5_mobile_det",
+        textDetectionModelAsset: {
+          url: import.meta.env.VITE_CHETANA_PADDLE_DET_MODEL_URL,
+        },
+        textRecognitionModelName:
+          import.meta.env.VITE_CHETANA_PADDLE_REC_MODEL_NAME || "devanagari_PP-OCRv5_mobile_rec",
+        textRecognitionModelAsset: {
+          url: import.meta.env.VITE_CHETANA_PADDLE_REC_MODEL_URL,
+        },
+        ortOptions: {
+          backend: "auto",
+          wasmPaths: import.meta.env.VITE_CHETANA_PADDLE_WASM_PATHS || "/models/paddleocr/ort/",
+          numThreads: 1,
+          simd: true,
+        },
+      }) as Promise<PaddleOcrInstance>;
+    })();
+  }
+  return paddleOcrPromise;
+}
+
+async function runPaddleOcr(image: Blob): Promise<BrowserOcrResult> {
+  const started = performance.now();
+  const paddle = await getPaddleOcr();
+  const [prediction] = await paddle.predict(image);
+  const items = prediction?.items?.filter((item) => item.text.trim()) || [];
+  const text = items.map((item) => item.text.trim()).join("\n").trim();
+  const confidence = items.length
+    ? Math.max(0, Math.min(1, items.reduce((sum, item) => sum + item.score, 0) / items.length))
+    : null;
+  return {
+    text,
+    confidence,
+    engine: "paddleocr",
+    latencyMs: Math.max(
+      0,
+      Math.round(prediction?.metrics?.totalMs ?? performance.now() - started),
+    ),
+  };
+}
+
+export function selectPreferredOcrResult(
+  baseline: BrowserOcrResult,
+  challenger: BrowserOcrResult,
+): BrowserOcrResult {
+  const baselineConfidence = baseline.confidence ?? 0;
+  const challengerConfidence = challenger.confidence ?? 0;
+  const challengerUsable = challenger.text.trim().length >= 5;
+  const baselineUsable = baseline.text.trim().length >= 5;
+  const selectChallenger =
+    challengerUsable &&
+    (!baselineUsable || challengerConfidence >= Math.max(0.45, baselineConfidence + 0.08));
+  const selected = selectChallenger ? challenger : baseline;
+  return {
+    ...selected,
+    challenger: {
+      engine: "paddleocr",
+      confidence: challenger.confidence,
+      characterCount: challenger.text.trim().length,
+      latencyMs: challenger.latencyMs,
+      selected: selectChallenger,
+    },
   };
 }
 
@@ -301,13 +431,7 @@ export async function localScreenshotScan(
   const text = await browserOCR(imageFile);
 
   if (!text || text.length < 5) {
-    return {
-      score: 0,
-      verdict: "LOW_RISK",
-      signals: ["No text found in image — may need visual analysis"],
-      needsDeepScan: true,
-      extractedText: "",
-    };
+    return unreadableScreenshotResult();
   }
 
   onProgress?.("pattern");

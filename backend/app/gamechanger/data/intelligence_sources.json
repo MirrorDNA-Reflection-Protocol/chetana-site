@@ -211,6 +211,28 @@
     "priority": 42
   },
   {
+    "source_id": "icann_rdap",
+    "name": "ICANN Registration Data Access Protocol",
+    "category": "domain_registration_metadata",
+    "integration_status": "live_on_demand_consent",
+    "integration_type": "iana_bootstrap_and_registry_api",
+    "source_url": "https://www.icann.org/rdap/",
+    "api_docs_url": "https://data.iana.org/rdap/",
+    "auth_model": "none",
+    "update_model": "iana_bootstrap_and_registry_realtime",
+    "use_for": [
+      "domain registration age as supporting evidence",
+      "registrar and registry status checks",
+      "structured replacement for legacy WHOIS lookups"
+    ],
+    "limitations": [
+      "Chetana sends only the normalized hostname after explicit consent; URL paths and query strings are not sent.",
+      "A recent registration is a weak risk signal, not proof of fraud.",
+      "An old domain, missing record, or failed lookup must never be treated as safe."
+    ],
+    "priority": 76
+  },
+  {
     "source_id": "ncrp_suspect_repository",
     "name": "National Cyber Crime Portal suspect repository",
     "category": "official_india_manual_lookup",

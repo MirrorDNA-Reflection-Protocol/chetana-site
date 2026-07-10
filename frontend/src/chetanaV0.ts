@@ -147,6 +147,8 @@ export interface V0VoiceRuntimeStatus {
   available: boolean;
   provider: "whisper.cpp";
   model: string;
+  runtime_mode?: "resident_server" | "cli_fallback" | "unavailable";
+  vad_enabled?: boolean;
   processing_location: "chetana_host";
   external_ai_provider: false;
   language_mode: "multilingual_auto_detect";
@@ -167,6 +169,9 @@ export interface V0VoiceTranscription {
     model: string;
     location: "chetana_host";
     external_ai_provider: false;
+    mode?: "resident_server" | "cli_fallback";
+    resident_model?: boolean;
+    vad_enabled?: boolean;
   };
   privacy: {
     audio_retained: false;
@@ -935,6 +940,11 @@ function buildExtractionMetadata(
   extractedText: string,
   source: V0ScanExtraction["source"],
   confidence: number | null,
+  ocr?: {
+    engine: "tesseract" | "paddleocr";
+    latencyMs: number;
+    challengerSelected?: boolean;
+  },
 ): V0ScanExtraction {
   const characterCount = extractedText.trim().length;
   const qualityFlags: string[] = [];
@@ -964,6 +974,13 @@ function buildExtractionMetadata(
           file_name: file.name,
           file_size: file.size,
           file_type: file.type || "unknown",
+          ...(ocr
+            ? {
+                ocr_engine: ocr.engine,
+                ocr_latency_ms: ocr.latencyMs,
+                ocr_challenger_selected: Boolean(ocr.challengerSelected),
+              }
+            : {}),
         }
       : undefined,
   };
@@ -997,7 +1014,11 @@ export async function extractScanInputForMode(mode: V0Mode, file: File | null, t
   const extracted = [pasted, ocr.text].filter(Boolean).join("\n\n").trim();
   return {
     text: extracted,
-    extraction: buildExtractionMetadata(mode, file, extracted, "browser", ocr.confidence),
+    extraction: buildExtractionMetadata(mode, file, extracted, "browser", ocr.confidence, {
+      engine: ocr.engine,
+      latencyMs: ocr.latencyMs,
+      challengerSelected: ocr.challenger?.selected,
+    }),
   };
 }
 

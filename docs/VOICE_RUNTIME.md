@@ -9,7 +9,8 @@ Date: 2026-07-10
 - `POST /api/v0/voice/transcribe` requires `local-voice-consent`.
 - The Chetana host validates type, size, duration, and upload trust before decoding.
 - `ffmpeg` converts the note to 16 kHz mono PCM inside a private temporary directory.
-- `whisper.cpp` runs `whisper-large-v3-turbo-q5_0` locally with automatic language detection.
+- A loopback-only `whisper-server` keeps `whisper-large-v3-turbo-q5_0` resident, uses Silero VAD 6.2, and runs automatic language detection.
+- If that resident process is unavailable, the same model runs through the existing bounded `whisper-cli` path with VAD when its verified model is present.
 - One transcription runs at a time, with queue and process deadlines.
 - Raw audio and temporary transcript files are deleted before the API responds.
 - The returned transcript enters the canonical four-state Chetana scan. Transcription failure never becomes a low-risk verdict.
@@ -20,9 +21,11 @@ Install or repair the runtime with:
 backend/scripts/install_voice_runtime.sh
 ```
 
-## Measured host smoke
+The public status and transcription receipts expose `runtime_mode` and `vad_enabled`; they never imply that a failed transcription was safe.
 
-The active host transcribed a 7.45-second Indian-English synthetic scam sample in 0.79 seconds and a Hindi synthetic sample in 0.73 seconds with a warm Metal cache. A cold end-to-end runtime call took 7.65 seconds; the immediately repeated call took 0.81 seconds. Both retained the key entities `KYC`, `OTP`, and `UPI`. These are smoke results, not a population accuracy claim.
+## Previous host smoke
+
+Before the resident server was added, the active host transcribed a 7.45-second Indian-English synthetic scam sample in 0.79 seconds and a Hindi synthetic sample in 0.73 seconds with a warm Metal cache. A cold end-to-end CLI call took 7.65 seconds; the immediately repeated call took 0.81 seconds. Both retained the key entities `KYC`, `OTP`, and `UPI`. These are smoke results, not a population accuracy claim.
 
 ## India speech ladder
 

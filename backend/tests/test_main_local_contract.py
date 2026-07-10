@@ -61,6 +61,7 @@ class MainLocalContractTests(unittest.TestCase):
     def test_privacy_route_exposes_local_scan_memory_clear_control(self) -> None:
         resp = self.client.get("/privacy")
         self.assertEqual(resp.status_code, 200)
+        self.assertIn("no-transform", resp.headers["cache-control"])
         html = resp.text
         self.assertIn("Clear local scan memory", html)
         self.assertIn("Local scan memory cleared from this browser.", html)
@@ -69,6 +70,10 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("chetana_threat_threads_v1", html)
         self.assertIn("chetana_v0_event_queue", html)
         self.assertIn("It keeps language, install, consent, senior mode, and family settings.", html)
+        self.assertIn("Mistral OCR", html)
+        self.assertIn("IANA-designated RDAP registry", html)
+        self.assertIn("normalized hostname", html)
+        self.assertIn("never means safe", html)
 
     def test_partner_packet_route_and_sitemap_are_public(self) -> None:
         partners_resp = self.client.get("/partners")

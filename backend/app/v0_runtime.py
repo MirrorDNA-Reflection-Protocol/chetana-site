@@ -431,20 +431,24 @@ AMOUNT_RE = re.compile(r"(?:₹\s?\d[\d,]*|\bRs\.?\s?\d[\d,]*|\bINR\s?\d[\d,]*)"
 MERCHANT_RE = re.compile(r"\b(?:merchant|payee|receiver|beneficiary)[:\-]?\s*([A-Z][A-Za-z0-9 &.-]{2,})")
 PERSON_RE = re.compile(r"\b(?:mr|mrs|ms|dr)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)")
 
-URGENCY_RE = re.compile(r"(?:\b(?:urgent|immediately|now|today|last chance|within\s+\d+\s*(?:minutes?|hours?)|abhi|turant|fauran|jaldi)\b|अभी|तुरंत|तुरंट|फौरन|जल्दी|आज)", re.IGNORECASE)
-MONEY_RE = re.compile(r"(?:\b(?:pay|payment|transfer|send money|deposit|advance fee|processing fee|security deposit|upi|collect request|refund fee|scan and pay)\b|भुगतान|पैसे|रुपये|ट्रांसफर|यूपीआई|कलेक्ट रिक्वेस्ट)", re.IGNORECASE)
+URGENCY_RE = re.compile(r"(?:\b(?:urgent|immediately|now|today|last chance|within\s+\d+\s*(?:minutes?|hours?)|abhi|turant|fauran|jaldi)\b|अभी|तुरंत|तुरंट|फौरन|जल्दी|आज|এখনই|অবিলম্বে|உடனே|இப்போது)", re.IGNORECASE)
+MONEY_RE = re.compile(r"(?:\b(?:pay|payment|transfer|send money|deposit|advance fee|processing fee|security deposit|upi|collect request|refund fee|scan and pay)\b|भुगतान|पैसे|रुपये|ट्रांसफर|यूपीआई|कलेक्ट रिक्वेस्ट|টাকা|পেমেন্ট|অর্থ|பணம்|கட்டணம்|பரிமாற்றம்)", re.IGNORECASE)
 CREDENTIAL_REQUEST_RE = re.compile(
-    r"(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा).{0,32}(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड)"
-    r"|(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड).{0,32}(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा)",
+    r"(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा|শেয়ার|দিন|বলুন|পাঠান|சொல்ல|பகிர|அனுப்ப|உள்ளிட).{0,32}(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड|ওটিপি|পিন|পাসওয়ার্ড|ஓடிபி|கடவுச்சொல்)"
+    r"|(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड|ওটিপি|পিন|পাসওয়ার্ড|ஓடிபி|கடவுச்சொல்).{0,32}(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा|শেয়ার|দিন|বলুন|পাঠান|சொல்ல|பகிர|அனுப்ப|உள்ளிட)",
     re.IGNORECASE,
 )
 CREDENTIAL_NEGATION_RE = re.compile(
-    r"(?:never|do\s+not|don't|dont|मत|नहीं)[^.!?]{0,24}$",
+    r"(?:never|do\s+not|don't|dont|मत|नहीं|কখনও\s+না|করবেন\s+না|দেবেন\s+না|வேண்டாம்|கூடாது|பகிராத|சொல்லாத)[^.!?]{0,24}$",
+    re.IGNORECASE,
+)
+CREDENTIAL_TRAILING_NEGATION_RE = re.compile(
+    r"^\s*(?:করবেন\s+না|দেবেন\s+না|வேண்டாம்|கூடாது|செய்யாதீர்கள்)",
     re.IGNORECASE,
 )
 RETURN_RE = re.compile(r"\b(guaranteed return|assured return|fixed return|double your money|daily profit|risk[- ]free profit)\b", re.IGNORECASE)
-AUTHORITY_RE = re.compile(r"(?:\b(?:bank|sbi|hdfc|icici|axis|rbi|uidai|aadhaar|pan|kyc|police|cbi|crime branch|customs|income tax|court|government|govt|sarkar)\b|बैंक|पुलिस|सीबीआई|कस्टम|सरकार|केवाईसी)", re.IGNORECASE)
-THREAT_RE = re.compile(r"(?:\b(?:arrest|blocked|suspended|penalty|fine|legal action|case registered|jail|freeze)\b|बंद|ब्लॉक|गिरफ्तार|जुर्माना|खाता)", re.IGNORECASE)
+AUTHORITY_RE = re.compile(r"(?:\b(?:bank|sbi|hdfc|icici|axis|rbi|uidai|aadhaar|pan|kyc|police|cbi|crime branch|customs|income tax|court|government|govt|sarkar)\b|बैंक|पुलिस|सीबीआई|कस्टम|सरकार|केवाईसी|ব্যাংক|পুলিশ|সরকার|வங்கி|காவல்|அரசு)", re.IGNORECASE)
+THREAT_RE = re.compile(r"(?:\b(?:arrest|blocked|suspended|penalty|fine|legal action|case registered|jail|freeze)\b|बंद|ब्लॉक|गिरफ्तार|जुर्माना|खाता|বন্ধ\s+হবে|গ্রেফতার|জরিমানা|முடக்க|கைது|அபராதம்)", re.IGNORECASE)
 OFFPLATFORM_RE = re.compile(r"\b(telegram|whatsapp me|personal number|private number|call me on another number|move to another app)\b", re.IGNORECASE)
 PARCEL_RE = re.compile(r"\b(parcel|courier|delivery|customs|shipment|reschedule|india post|bluedart|delhivery)\b", re.IGNORECASE)
 JOB_RE = re.compile(r"\b(job|recruitment|work from home|part time|salary|hr team|interview)\b", re.IGNORECASE)
@@ -461,8 +465,11 @@ REMOTE_ACCESS_RE = re.compile(
 def _requests_credentials(text: str) -> bool:
     for match in CREDENTIAL_REQUEST_RE.finditer(text):
         prefix = text[max(0, match.start() - 32):match.start()]
+        suffix = text[match.end():match.end() + 24]
         matched_text = match.group(0)
         if CREDENTIAL_NEGATION_RE.search(prefix):
+            continue
+        if CREDENTIAL_TRAILING_NEGATION_RE.search(suffix):
             continue
         if re.search(r"(?:मत|नहीं)", matched_text):
             continue

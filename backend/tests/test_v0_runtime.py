@@ -102,6 +102,53 @@ class V0TrustRuntimeTests(unittest.TestCase):
 
         self.assertIn("asks_for_credentials", {reason.code for reason in scan.reasons})
 
+    def test_bengali_bank_pressure_flags_credential_and_payment_request(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="আপনার ব্যাংক অ্যাকাউন্ট বন্ধ হবে। এখনই OTP দিন এবং টাকা পাঠান।",
+                language_hint="bn",
+                session_id="bengali-experimental-probe",
+            )
+        )
+
+        reason_codes = {reason.code for reason in scan.reasons}
+        self.assertIn(scan.verdict, {"high_risk", "caution"})
+        self.assertIn("asks_for_credentials", reason_codes)
+        self.assertIn("asks_for_money", reason_codes)
+
+    def test_tamil_bank_pressure_flags_credential_and_payment_request(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="உங்கள் வங்கி கணக்கு முடக்கப்படும். OTP சொல்லி உடனே பணம் அனுப்புங்கள்.",
+                language_hint="ta",
+                session_id="tamil-experimental-probe",
+            )
+        )
+
+        reason_codes = {reason.code for reason in scan.reasons}
+        self.assertIn(scan.verdict, {"high_risk", "caution"})
+        self.assertIn("asks_for_credentials", reason_codes)
+        self.assertIn("asks_for_money", reason_codes)
+
+    def test_bengali_and_tamil_credential_safety_warnings_are_not_requests(self) -> None:
+        messages = (
+            ("OTP শেয়ার করবেন না।", "bn"),
+            ("OTP பகிர வேண்டாம்.", "ta"),
+        )
+        for text, language in messages:
+            with self.subTest(language=language):
+                scan = analyze_scan(
+                    V0ScanInput(
+                        input_type="text",
+                        text=text,
+                        language_hint=language,
+                        session_id=f"{language}-negation-probe",
+                    )
+                )
+                self.assertNotIn("asks_for_credentials", {reason.code for reason in scan.reasons})
+
     def test_otp_safety_warning_is_not_misread_as_a_credential_request(self) -> None:
         scan = analyze_scan(
             V0ScanInput(

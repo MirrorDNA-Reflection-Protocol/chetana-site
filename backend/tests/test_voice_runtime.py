@@ -13,6 +13,8 @@ from app.voice_runtime import (
     LocalVoiceRuntime,
     VoiceRuntimeConfig,
     VoiceRuntimeError,
+    VoiceServerUnavailable,
+    VoiceTranscriptResult,
     VoiceTranscription,
 )
 
@@ -30,9 +32,14 @@ class StubVoiceRuntime(LocalVoiceRuntime):
         assert source_path != wav_path
         wav_path.write_bytes(source_path.read_bytes())
 
-    async def _transcribe_wav(self, wav_path: Path, output_prefix: Path) -> tuple[str, str]:
+    async def _transcribe_wav(self, wav_path: Path, output_prefix: Path) -> VoiceTranscriptResult:
         assert wav_path.exists()
-        return "Share the OTP and approve the UPI collect request now.", "en"
+        return VoiceTranscriptResult(
+            transcript="Share the OTP and approve the UPI collect request now.",
+            language_code="en",
+            runtime_mode="cli_fallback",
+            vad_enabled=False,
+        )
 
 
 def runtime_config(tmp_path: Path, **overrides) -> VoiceRuntimeConfig:
@@ -43,6 +50,7 @@ def runtime_config(tmp_path: Path, **overrides) -> VoiceRuntimeConfig:
         "ffmpeg": sys.executable,
         "ffprobe": sys.executable,
         "model_path": model_path,
+        "prefer_server": False,
         "max_bytes": 64,
         "max_duration_seconds": 30.0,
         "queue_timeout_seconds": 0.02,
@@ -64,6 +72,7 @@ def test_local_voice_runtime_returns_receipt_and_removes_temp_files(tmp_path: Pa
     assert result.language_code == "en"
     assert result.duration_seconds == 4.25
     assert result.to_dict()["runtime"]["external_ai_provider"] is False
+    assert result.to_dict()["runtime"]["mode"] == "cli_fallback"
     assert result.to_dict()["privacy"] == {
         "audio_retained": False,
         "transcript_persisted_by_transcriber": False,
@@ -107,6 +116,62 @@ def test_local_voice_runtime_rejects_audio_over_duration_limit(tmp_path: Path) -
         except VoiceRuntimeError as exc:
             assert exc.code == "voice_too_long"
             assert exc.status_code == 413
+
+
+def test_resident_server_payload_preserves_language_code_and_mode(tmp_path: Path) -> None:
+    runtime = LocalVoiceRuntime(runtime_config(tmp_path))
+    transcript, language_code = runtime._parse_server_transcription(
+        {
+            "text": " Share the OTP now. ",
+            "language_probabilities": {"hi": 0.91, "en": 0.09},
+        }
+    )
+
+    assert transcript == "Share the OTP now."
+    assert language_code == "hi"
+
+
+def test_resident_server_failure_falls_back_to_bounded_cli(tmp_path: Path) -> None:
+    runtime = LocalVoiceRuntime(runtime_config(tmp_path, prefer_server=True))
+    cli_result = VoiceTranscriptResult(
+        transcript="Fallback transcript",
+        language_code="en",
+        runtime_mode="cli_fallback",
+        vad_enabled=True,
+    )
+
+    with (
+        patch.object(runtime, "_resident_server_available", return_value=True),
+        patch.object(
+            runtime,
+            "_transcribe_with_server",
+            new=AsyncMock(side_effect=VoiceServerUnavailable("server_down")),
+        ),
+        patch.object(runtime, "_transcribe_with_cli", new=AsyncMock(return_value=cli_result)) as cli,
+    ):
+        result = asyncio.run(runtime._transcribe_wav(tmp_path / "decoded.wav", tmp_path / "out"))
+
+    assert result.runtime_mode == "cli_fallback"
+    cli.assert_awaited_once()
+
+
+def test_cli_enables_vad_when_verified_model_is_present(tmp_path: Path) -> None:
+    vad_path = tmp_path / "vad.bin"
+    vad_path.write_bytes(b"vad")
+    runtime = LocalVoiceRuntime(runtime_config(tmp_path, vad_model_path=vad_path))
+    output_prefix = tmp_path / "transcript"
+    output_prefix.with_suffix(".json").write_text(
+        '{"result":{"language":"en"},"transcription":[{"text":"hello"}]}',
+        encoding="utf-8",
+    )
+
+    with patch.object(runtime, "_run_process", new=AsyncMock(return_value=(b"", b""))) as process:
+        result = asyncio.run(runtime._transcribe_with_cli(tmp_path / "decoded.wav", output_prefix))
+
+    args = process.await_args.args[0]
+    assert "--vad" in args
+    assert str(vad_path) in args
+    assert result.vad_enabled is True
 
 
 def test_local_voice_runtime_rejects_unsupported_and_oversized_audio(tmp_path: Path) -> None:

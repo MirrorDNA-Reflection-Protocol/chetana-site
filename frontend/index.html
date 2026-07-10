@@ -6,11 +6,6 @@
     <title>Chetana — Screenshot anything. Ask Chetana.</title>
     <meta name="description" content="Upload a screenshot or paste a message. Chetana checks suspicious content and gives the next safest step." />
 
-    <!-- Design System Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Syne:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href="https://chetana.activemirror.ai/" />
@@ -66,26 +61,6 @@
     </script>
     <div id="root"></div>
     <noscript><h1>Screenshot anything. Ask Chetana.</h1><p>Upload a screenshot or paste a suspicious message and get a simple risk check.</p><p>Need help now? Cybercrime Helpline 1930 | cybercrime.gov.in | Women helpline 181</p></noscript>
-        <script>
-      // Kill Service Worker for dev
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.getRegistrations().then(r => r.forEach(sw => sw.unregister()));
-        });
-      }
-    </script>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Google Translate — full page translation, 100+ languages -->
-    <script>
-      function googleTranslateElementInit() {
-        new google.translate.TranslateElement({
-          pageLanguage: 'en',
-          includedLanguages: 'en,hi,ta,te,bn,mr,gu,kn,ml,pa,or,ur,as,kok,ne,sd,mai,sat,doi,mni,bho',
-          layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL,
-          autoDisplay: false,
-        }, 'google_translate_element');
-      }
-    </script>
-    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </body>
 </html>

@@ -31,6 +31,19 @@ class MistralOcrResult:
     latency_ms: int
     confidence: float | None
     page_count: int
+    block_count: int
+    block_types: tuple[str, ...]
+    bounded_block_count: int
+
+
+@dataclass(frozen=True)
+class MistralOcrPayloadSummary:
+    text: str
+    confidence: float | None
+    page_count: int
+    block_count: int
+    block_types: tuple[str, ...]
+    bounded_block_count: int
 
 
 def mistral_ocr_available() -> bool:
@@ -103,25 +116,80 @@ def _page_confidence(page: dict[str, Any]) -> float | None:
     return None
 
 
-def _extract_ocr_text(payload: dict[str, Any]) -> tuple[str, float | None, int]:
+def _block_confidence(block: dict[str, Any]) -> float | None:
+    for key in ("confidence", "confidence_score", "ocr_confidence", "score"):
+        confidence = _coerce_confidence(block.get(key))
+        if confidence is not None:
+            return confidence
+    return None
+
+
+def _block_text(block: dict[str, Any]) -> str:
+    return str(block.get("markdown") or block.get("text") or block.get("content") or "").strip()
+
+
+def _block_type(block: dict[str, Any]) -> str:
+    value = str(block.get("type") or block.get("label") or block.get("block_type") or "unknown").strip().lower()
+    return value[:48] or "unknown"
+
+
+def _block_has_bounds(block: dict[str, Any]) -> bool:
+    for key in ("bbox", "bounding_box", "polygon", "coordinates"):
+        value = block.get(key)
+        if isinstance(value, (list, dict)) and bool(value):
+            return True
+    return False
+
+
+def _extract_ocr_text(payload: dict[str, Any]) -> MistralOcrPayloadSummary:
     pages = payload.get("pages")
     if not isinstance(pages, list):
-        return "", None, 0
+        pages = []
 
     chunks: list[str] = []
     confidences: list[float] = []
+    all_blocks: list[dict[str, Any]] = []
     for page in pages:
         if not isinstance(page, dict):
             continue
         markdown = str(page.get("markdown") or page.get("text") or "").strip()
         if markdown:
             chunks.append(markdown)
-        confidence = _page_confidence(page)
-        if confidence is not None:
-            confidences.append(confidence)
+        blocks = [item for item in page.get("blocks") or [] if isinstance(item, dict)]
+        all_blocks.extend(blocks)
+        block_scores = [score for item in blocks if (score := _block_confidence(item)) is not None]
+        if block_scores:
+            confidences.extend(block_scores)
+        else:
+            confidence = _page_confidence(page)
+            if confidence is not None:
+                confidences.append(confidence)
+        if not markdown:
+            block_text = "\n".join(text for item in blocks if (text := _block_text(item)))
+            if block_text:
+                chunks.append(block_text)
+
+    root_blocks = [item for item in payload.get("blocks") or [] if isinstance(item, dict)]
+    all_blocks.extend(root_blocks)
+    if not chunks and root_blocks:
+        root_text = "\n".join(text for item in root_blocks if (text := _block_text(item)))
+        if root_text:
+            chunks.append(root_text)
+    if not confidences:
+        confidences.extend(
+            score for item in root_blocks if (score := _block_confidence(item)) is not None
+        )
 
     confidence = round(sum(confidences) / len(confidences), 3) if confidences else None
-    return "\n\n".join(chunks).strip(), confidence, len(pages)
+    block_types = tuple(dict.fromkeys(_block_type(item) for item in all_blocks))[:12]
+    return MistralOcrPayloadSummary(
+        text="\n\n".join(chunks).strip(),
+        confidence=confidence,
+        page_count=len(pages),
+        block_count=len(all_blocks),
+        block_types=block_types,
+        bounded_block_count=sum(1 for item in all_blocks if _block_has_bounds(item)),
+    )
 
 
 async def extract_text_with_mistral_ocr(
@@ -170,12 +238,15 @@ async def extract_text_with_mistral_ocr(
     except ValueError as exc:
         raise MistralOcrError("ocr_invalid_json") from exc
 
-    text, confidence, page_count = _extract_ocr_text(response_payload)
+    summary = _extract_ocr_text(response_payload)
     return MistralOcrResult(
-        text=text,
+        text=summary.text,
         provider="mistral",
         model=model,
         latency_ms=max(0, round((time.perf_counter() - started) * 1000)),
-        confidence=confidence,
-        page_count=page_count,
+        confidence=summary.confidence,
+        page_count=summary.page_count,
+        block_count=summary.block_count,
+        block_types=summary.block_types,
+        bounded_block_count=summary.bounded_block_count,
     )

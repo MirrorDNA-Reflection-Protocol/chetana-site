@@ -103,6 +103,11 @@ from app.voice_runtime import (  # noqa: E402
     transcribe_voice,
     voice_runtime_status,
 )
+from app.rdap_intelligence import (  # noqa: E402
+    RDAP_CONSENT_TOKEN,
+    RdapLookupError,
+    lookup_domain_with_rdap,
+)
 from app.whatsapp_webhook import whatsapp_router  # noqa: E402
 
 KAVACH_URL = "http://127.0.0.1:8790"
@@ -209,6 +214,12 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    if response.headers.get("content-type", "").lower().startswith("text/html"):
+        cache_control = response.headers.get("Cache-Control", "")
+        directives = [item.strip() for item in cache_control.split(",") if item.strip()]
+        if not any(item.lower() == "no-transform" for item in directives):
+            directives.append("no-transform")
+        response.headers["Cache-Control"] = ", ".join(directives)
     if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
@@ -2121,6 +2132,22 @@ async def v0_voice_status():
     return voice_runtime_status()
 
 
+class V0DomainIntelligenceRequest(BaseModel):
+    domain: str = Field(min_length=1, max_length=512)
+    consent_token: str
+
+
+@app.post("/api/v0/intelligence/domain")
+async def v0_domain_intelligence(req: V0DomainIntelligenceRequest):
+    """Return consented RDAP metadata as supporting evidence, never as a safe verdict."""
+    if req.consent_token != RDAP_CONSENT_TOKEN:
+        raise HTTPException(status_code=400, detail="domain_intelligence_consent_required")
+    try:
+        return await lookup_domain_with_rdap(req.domain)
+    except RdapLookupError as exc:
+        raise HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message}) from exc
+
+
 async def _transcribe_voice_upload(
     file: UploadFile,
     consent_token: str,
@@ -2251,6 +2278,9 @@ async def v0_scan_improve(
                 "character_count": len(ocr_text),
                 "image_metadata": {
                     "page_count": ocr.page_count,
+                    "block_count": ocr.block_count,
+                    "block_types": ",".join(ocr.block_types),
+                    "bounded_block_count": ocr.bounded_block_count,
                 },
             },
         )
@@ -2992,9 +3022,13 @@ async def privacy_policy():
   <ul>
     <li>We do <strong>not</strong> store your submissions after analysis completes.</li>
     <li>We do <strong>not</strong> link submissions to your identity, IP address, or device.</li>
-    <li>We do <strong>not</strong> sell, share, or transfer your data to third parties.</li>
+    <li>We do <strong>not</strong> sell your data or share it for advertising. Bounded external processing happens only for the explicit OCR, domain, or chat choices described below.</li>
     <li>Submitted media is processed only for the scan flow and is not kept longer than needed for the response.</li>
-    <li>Core scam scan analysis stays on Chetana's own infrastructure. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond. Gemini is excluded from Chetana chat.</li>
+    <li>Core scam analysis stays in your browser and on Chetana's own infrastructure. Voice transcription uses a local resident whisper.cpp model with VAD and no external AI provider.</li>
+    <li>If browser OCR is weak, a screenshot reaches Mistral OCR only when that fallback is configured and you explicitly choose it.</li>
+    <li>An optional RDAP check sends only the normalized hostname &mdash; never its path, query, fragment, or surrounding scan text &mdash; to the IANA-designated registry after explicit consent.</li>
+    <li>OCR confidence and domain-registration metadata are supporting evidence. A failed lookup, old domain, or missing record never means safe.</li>
+    <li>Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond. Gemini is excluded from Chetana chat.</li>
     <li>Your browser may keep SHA-256 hashes of UPI IDs, phone numbers, and link domains for local repeated-scan warnings. Chetana's server does not receive your thread history or local identifier index.</li>
   </ul>
 
@@ -3014,7 +3048,7 @@ async def privacy_policy():
   <p>Chetana servers are operated in India. We aim to keep processing close to the user and avoid collecting more than is needed for the scan result.</p>
 
   <h2>Third-party services</h2>
-  <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Chetana's scam scan analysis remains local to our infrastructure. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI.</p>
+  <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Explicit screenshot improvement may send that screenshot to Mistral OCR. Explicit domain checks send only the normalized hostname to the IANA-designated RDAP registry. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI. Chetana does not retain these request or response payloads.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>
@@ -3026,7 +3060,7 @@ async def privacy_policy():
   <p>Questions: <a href="mailto:trust@activemirror.ai">trust@activemirror.ai</a></p>
 
   <footer>
-    Last updated: March 2026 · Chetana is a product of ActiveMirror / MirrorDNA · Made in India
+    Last updated: July 2026 · Chetana is a product of ActiveMirror / MirrorDNA · Made in India
   </footer>
   <script>
     (function () {

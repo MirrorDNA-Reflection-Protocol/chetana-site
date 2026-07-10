@@ -12,7 +12,10 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlparse
 from uuid import uuid4
+
+import httpx
 
 
 logger = logging.getLogger("chetana.voice")
@@ -62,12 +65,20 @@ class VoiceRuntimeError(RuntimeError):
         self.status_code = status_code
 
 
+class VoiceServerUnavailable(RuntimeError):
+    """Resident server failed; the bounded CLI may still handle the request."""
+
+
 @dataclass(frozen=True, slots=True)
 class VoiceRuntimeConfig:
     whisper_cli: str
     ffmpeg: str
     ffprobe: str
     model_path: Path
+    whisper_server_url: str = "http://127.0.0.1:8109"
+    vad_model_path: Path | None = None
+    prefer_server: bool = True
+    server_probe_timeout_seconds: float = 0.25
     max_bytes: int = VOICE_MAX_BYTES
     max_duration_seconds: float = VOICE_MAX_DURATION_SECONDS
     queue_timeout_seconds: float = 1.0
@@ -95,7 +106,34 @@ class VoiceRuntimeConfig:
                     ),
                 )
             ),
+            whisper_server_url=os.getenv(
+                "CHETANA_WHISPER_SERVER_URL",
+                "http://127.0.0.1:8109",
+            ).rstrip("/"),
+            vad_model_path=Path(
+                os.getenv(
+                    "CHETANA_VAD_MODEL_PATH",
+                    str(
+                        Path.home()
+                        / "Library"
+                        / "Application Support"
+                        / "Chetana"
+                        / "models"
+                        / "ggml-silero-v6.2.0.bin"
+                    ),
+                )
+            ),
+            prefer_server=os.getenv("CHETANA_WHISPER_SERVER_ENABLED", "1").strip().lower()
+            not in {"0", "false", "no", "off"},
         )
+
+
+@dataclass(frozen=True, slots=True)
+class VoiceTranscriptResult:
+    transcript: str
+    language_code: str
+    runtime_mode: str
+    vad_enabled: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +145,8 @@ class VoiceTranscription:
     processing_ms: int
     provider: str = "whisper.cpp"
     model: str = "whisper-large-v3-turbo-q5_0"
+    runtime_mode: str = "cli_fallback"
+    vad_enabled: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -120,6 +160,9 @@ class VoiceTranscription:
                 "model": self.model,
                 "location": "chetana_host",
                 "external_ai_provider": False,
+                "mode": self.runtime_mode,
+                "resident_model": self.runtime_mode == "resident_server",
+                "vad_enabled": self.vad_enabled,
             },
             "privacy": {
                 "audio_retained": False,
@@ -143,17 +186,51 @@ class LocalVoiceRuntime:
             return path.is_file() and os.access(path, os.X_OK)
         return shutil.which(command) is not None
 
+    def _server_urls(self) -> tuple[str, str] | None:
+        if not self.config.prefer_server:
+            return None
+        parsed = urlparse(self.config.whisper_server_url)
+        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+            return None
+        base_url = self.config.whisper_server_url.rstrip("/")
+        if parsed.path.rstrip("/").endswith("/inference"):
+            root_url = base_url[: -len("/inference")]
+            return root_url, base_url
+        return base_url, f"{base_url}/inference"
+
+    def _resident_server_available(self) -> bool:
+        urls = self._server_urls()
+        if not urls:
+            return False
+        root_url, _ = urls
+        try:
+            with httpx.Client(timeout=self.config.server_probe_timeout_seconds, trust_env=False) as client:
+                response = client.get(root_url or "http://127.0.0.1")
+        except httpx.HTTPError:
+            return False
+        return response.status_code == 200 and "Whisper.cpp Server" in response.text[:2000]
+
+    def _vad_model_available(self) -> bool:
+        return bool(self.config.vad_model_path and self.config.vad_model_path.expanduser().is_file())
+
     def status(self) -> dict[str, Any]:
+        resident_server = self._resident_server_available()
         checks = {
+            "whisper_server": resident_server,
             "whisper_cli": self._command_available(self.config.whisper_cli),
             "ffmpeg": self._command_available(self.config.ffmpeg),
             "ffprobe": self._command_available(self.config.ffprobe),
             "model": self.config.model_path.expanduser().is_file(),
+            "vad_model": self._vad_model_available(),
         }
+        core_ready = checks["ffmpeg"] and checks["ffprobe"] and checks["model"]
+        runtime_mode = "resident_server" if resident_server else "cli_fallback" if checks["whisper_cli"] else "unavailable"
         return {
-            "available": all(checks.values()),
+            "available": core_ready and (resident_server or checks["whisper_cli"]),
             "provider": "whisper.cpp",
             "model": "whisper-large-v3-turbo-q5_0",
+            "runtime_mode": runtime_mode,
+            "vad_enabled": checks["vad_model"] and runtime_mode != "unavailable",
             "processing_location": "chetana_host",
             "external_ai_provider": False,
             "language_mode": "multilingual_auto_detect",
@@ -276,22 +353,77 @@ class LocalVoiceRuntime:
             failure_status=422,
         )
 
-    async def _transcribe_wav(self, wav_path: Path, output_prefix: Path) -> tuple[str, str]:
+    @staticmethod
+    def _parse_server_transcription(payload: dict[str, Any]) -> tuple[str, str]:
+        transcript = " ".join(str(payload.get("text") or "").split())[:8000]
+        probabilities = payload.get("language_probabilities")
+        language_code = "und"
+        if isinstance(probabilities, dict):
+            candidates = [
+                (str(code)[:16], float(score))
+                for code, score in probabilities.items()
+                if isinstance(score, int | float)
+            ]
+            if candidates:
+                language_code = max(candidates, key=lambda item: item[1])[0]
+        if not transcript:
+            raise VoiceRuntimeError(
+                "voice_no_speech",
+                "No clear speech was found. Try again closer to the microphone.",
+                422,
+            )
+        return transcript, language_code
+
+    async def _transcribe_with_server(self, wav_path: Path) -> VoiceTranscriptResult:
+        urls = self._server_urls()
+        if not urls:
+            raise VoiceServerUnavailable("resident_server_not_configured")
+        _, inference_url = urls
+        try:
+            with wav_path.open("rb") as audio:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(self.config.transcription_timeout_seconds, connect=1.0),
+                    trust_env=False,
+                ) as client:
+                    response = await client.post(
+                        inference_url,
+                        files={"file": ("decoded.wav", audio, "audio/wav")},
+                        data={"response_format": "verbose_json", "language": "auto"},
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+        except (OSError, httpx.HTTPError, ValueError) as exc:
+            raise VoiceServerUnavailable(type(exc).__name__) from exc
+        if not isinstance(payload, dict):
+            raise VoiceServerUnavailable("resident_server_invalid_payload")
+        transcript, language_code = self._parse_server_transcription(payload)
+        return VoiceTranscriptResult(
+            transcript=transcript,
+            language_code=language_code,
+            runtime_mode="resident_server",
+            vad_enabled=self._vad_model_available(),
+        )
+
+    async def _transcribe_with_cli(self, wav_path: Path, output_prefix: Path) -> VoiceTranscriptResult:
+        args = [
+            self.config.whisper_cli,
+            "-m",
+            str(self.config.model_path.expanduser()),
+            "-f",
+            str(wav_path),
+            "-l",
+            "auto",
+            "-oj",
+            "-of",
+            str(output_prefix),
+            "-np",
+            "-nt",
+        ]
+        vad_enabled = self._vad_model_available()
+        if vad_enabled and self.config.vad_model_path:
+            args.extend(["--vad", "--vad-model", str(self.config.vad_model_path.expanduser())])
         await self._run_process(
-            [
-                self.config.whisper_cli,
-                "-m",
-                str(self.config.model_path.expanduser()),
-                "-f",
-                str(wav_path),
-                "-l",
-                "auto",
-                "-oj",
-                "-of",
-                str(output_prefix),
-                "-np",
-                "-nt",
-            ],
+            args,
             timeout_seconds=self.config.transcription_timeout_seconds,
             failure_code="voice_transcription_failed",
             failure_detail="Local voice transcription did not finish.",
@@ -321,7 +453,20 @@ class LocalVoiceRuntime:
                 "No clear speech was found. Try again closer to the microphone.",
                 422,
             )
-        return transcript, language_code
+        return VoiceTranscriptResult(
+            transcript=transcript,
+            language_code=language_code,
+            runtime_mode="cli_fallback",
+            vad_enabled=vad_enabled,
+        )
+
+    async def _transcribe_wav(self, wav_path: Path, output_prefix: Path) -> VoiceTranscriptResult:
+        if self._resident_server_available():
+            try:
+                return await self._transcribe_with_server(wav_path)
+            except VoiceServerUnavailable as exc:
+                logger.warning("Resident voice runtime unavailable; using CLI fallback: %s", exc)
+        return await self._transcribe_with_cli(wav_path, output_prefix)
 
     async def _transcribe_locked(self, content: bytes, content_type: str) -> VoiceTranscription:
         started = time.perf_counter()
@@ -342,14 +487,16 @@ class LocalVoiceRuntime:
                     "Chetana could not determine the voice-note duration.",
                     422,
                 )
-            transcript, language_code = await self._transcribe_wav(wav_path, output_prefix)
+            transcript_result = await self._transcribe_wav(wav_path, output_prefix)
 
         return VoiceTranscription(
             transcription_id=f"vtx_{uuid4().hex[:20]}",
-            transcript=transcript,
-            language_code=language_code,
+            transcript=transcript_result.transcript,
+            language_code=transcript_result.language_code,
             duration_seconds=round(duration, 2),
             processing_ms=max(1, round((time.perf_counter() - started) * 1000)),
+            runtime_mode=transcript_result.runtime_mode,
+            vad_enabled=transcript_result.vad_enabled,
         )
 
     async def transcribe(self, content: bytes, content_type: str | None) -> VoiceTranscription:

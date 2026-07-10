@@ -802,7 +802,7 @@ function detectIncidentPattern(mode: ScanMode, explanation: string, signals: str
 
 function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: string; scanResult: ChatMsg["scanResult"]; suggestions: string[] } {
   const score = data.risk_score ?? data.score ?? data.threat_score ?? 0;
-  const verdict = data.verdict ?? data.risk_level?.toUpperCase() ?? (score >= 70 ? "SUSPICIOUS" : score >= 40 ? "UNCLEAR" : "LOW_RISK");
+  const verdict = data.verdict ?? data.risk_level?.toUpperCase() ?? (score >= 70 ? "SUSPICIOUS" : "NEEDS_REVIEW");
   const signals: string[] = data.why_flagged || data.signals || data.red_flags || [];
   const action = data.action_eligibility || data.recommended_action || "";
   const explanation = data.explanation || data.analysis || "";
@@ -812,6 +812,8 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
   const needsMoreEvidence =
     guidance?.needs_more_evidence ||
     data.trust_state === "unverified" ||
+    verdict === "NEEDS_REVIEW" ||
+    verdict === "LOW_SIGNAL" ||
     ((verdict === "UNCLEAR" || verdict === "MEDIUM") && (signals.length < 2 || score < 55)) ||
     ((mode === "media" || mode === "voice") && signals.length === 0 && score < 45);
   const hindiQuickLine = needsMoreEvidence
@@ -928,9 +930,9 @@ function buildBotReply(mode: ScanMode, data: any, fileName?: string): { text: st
     text += "\n\n**Remember:**\n• One wrong letter can turn a real site into a fake one\n• If money is involved, verify before you approve or transfer";
     text += `\n\n**Hindi quick line:**\n• ${hindiQuickLine}`;
   } else {
-    text = `**Probably okay. Still verify if money is involved.**\n\n`;
+    text = `**Low signal. This is not a safety confirmation.**\n\n`;
     if (explanation) text += explanation + "\n\n";
-    else text += "No obvious scam signals found.\n\n";
+    else text += "Chetana does not have enough evidence for a stronger warning.\n\n";
     text += "**Stay safe anyway:**\n• Never share OTPs or passwords, even if asked by \"your bank\"\n• Verify payment or account requests inside the real app\n• Check back here anytime something feels off";
   }
 
@@ -988,7 +990,13 @@ function TrustWrapCard({ scanResult, fullText }: { scanResult: NonNullable<ChatM
   };
 
   const isDanger = scanResult.trust_state === "blocked" || scanResult.verdict === "SUSPICIOUS" || scanResult.verdict === "HIGH";
-  const isUnclear = scanResult.trust_state === "inspect" || scanResult.verdict === "UNCLEAR" || scanResult.verdict === "MEDIUM";
+  const isUnclear =
+    scanResult.trust_state === "inspect" ||
+    scanResult.trust_state === "unverified" ||
+    scanResult.verdict === "UNCLEAR" ||
+    scanResult.verdict === "MEDIUM" ||
+    scanResult.verdict === "NEEDS_REVIEW" ||
+    scanResult.verdict === "LOW_SIGNAL";
   const signals = scanResult.signals || [];
   const topReasons = signals.slice(0, 3);
 
@@ -996,7 +1004,7 @@ function TrustWrapCard({ scanResult, fullText }: { scanResult: NonNullable<ChatM
     ? "Do not pay, click, or share any codes. Verify through an official channel you already trust."
     : isUnclear
     ? "Pause. Verify this through a second trusted source before you act."
-    : "No obvious scam signals found. Still verify if money is involved.";
+    : "Low signal is not a safety confirmation. Verify independently before you act.";
 
   return (
     <div className={`trust-wrap-card ${isDanger ? "trust-wrap-danger" : isUnclear ? "trust-wrap-caution" : "trust-wrap-safe"}`}>
@@ -1278,6 +1286,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
       setFile(null); setLoading(true);
       try {
         const fd = new FormData(); fd.append("file", currentFile); fd.append("lang", lang);
+        if (fileMode === "voice") fd.append("consent_token", "local-voice-consent");
         const endpoint = fileMode === "voice" ? "/api/voice/analyze" : isImage ? "/api/media/ocr" : "/api/media/analyze";
         const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
         if (!resp.ok) throw new Error(`Server error (${resp.status})`);
@@ -1352,7 +1361,7 @@ export function ScanBox({ onRequireProof, onNavigate }: { onRequireProof?: () =>
   const typeLabels: Partial<Record<ScanMode, string>> = { message: "Message", link: "Link", upi: "UPI ID", phone: "Phone number", media: "Screenshot / media", voice: "Voice note", qr: "QR code" };
   const loadingHint = file
     ? detectFileType(file) === "voice"
-      ? "Listening for pressure, urgency, and voice-clone signs..."
+      ? "Transcribing locally and checking the words for pressure, urgency, and payment requests..."
       : "Reading the screenshot or file and checking for scam signs..."
     : detectedType === "link"
     ? "Checking the link before you open it..."
@@ -2537,6 +2546,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
         } else {
           // Non-image files: send to server directly
           const fd = new FormData(); fd.append("file", f); fd.append("lang", lang);
+          if (fileMode === "voice") fd.append("consent_token", "local-voice-consent");
           const endpoint = fileMode === "voice" ? "/api/voice/analyze" : "/api/media/analyze";
           const resp = await fetch(`${API}${endpoint}`, { method: "POST", body: fd });
           if (!resp.ok) throw new Error("Server error");
@@ -3901,7 +3911,7 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
               <div style={{ fontSize: 11, color: "var(--muted)" }}>check before you act</div>
             </div>
           </div>
-          <p className="footer-desc">Check suspicious messages, QR requests, and payment screenshots. Chetana explains the risk and shows the safest next step.</p>
+          <p className="footer-desc">Check suspicious messages, voice notes, QR requests, and payment screenshots. Chetana explains the risk and shows the safest next step.</p>
         </div>
         <div className="footer-links">
           <div className="footer-col">

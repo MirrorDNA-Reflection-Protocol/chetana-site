@@ -47,6 +47,8 @@ import {
   verdictLabel,
   verdictSummary,
   V0ExtractedInput,
+  V0VoiceRuntimeStatus,
+  V0VoiceTranscription,
 } from "./chetanaV0";
 import {
   clearLocalChetanaScanMemory,
@@ -64,6 +66,7 @@ const DEFAULT_PROMPTS: Record<V0Mode, string> = {
 
 const SAMPLE_SCAM_TEXT =
   "Urgent: your bank KYC will expire today. Update now to avoid account block and pay Rs 499 immediately. https://secure-kyc-update.top/verify";
+const VOICE_MAX_DURATION_MS = 30_000;
 
 const QUICK_CONTEXT_OPTIONS = [
   { id: "otp", label: "OTP or code", text: "Urgent bank, KYC, SIM, Aadhaar, or wallet warning: they are asking for OTP, PIN, CVV, password, or verification code now, and say the account may be blocked." },
@@ -182,6 +185,7 @@ type CasePacketRow = {
   hint: string;
 };
 type VoiceCaptureState = "idle" | "recording" | "recorded";
+type InputSurface = "screenshot" | "voice" | "text";
 type IntakeSource = "chooser" | "clipboard" | "drop";
 type ComposerSafetyNudge = {
   tone: "danger" | "warning";
@@ -306,10 +310,12 @@ export default function ChetanaV0Experience({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceStreamRef = useRef<MediaStream | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceBlobRef = useRef<Blob | null>(null);
   const voiceStartedAtRef = useRef<number | null>(null);
   const [sessionId] = useState(() => getOrCreateV0SessionId());
   const defaultMode: V0Mode = presetMode || (initialFile ? "screenshot" : initialInput ? "text" : "screenshot");
   const [mode, setMode] = useState<V0Mode>(defaultMode);
+  const [inputSurface, setInputSurface] = useState<InputSurface>(defaultMode === "text" ? "text" : "screenshot");
   const [text, setText] = useState(initialInput || "");
   const [file, setFile] = useState<File | null>(initialFile || null);
   const [quickContextIds, setQuickContextIds] = useState<string[]>([]);
@@ -318,6 +324,8 @@ export default function ChetanaV0Experience({
   const [voiceDurationMs, setVoiceDurationMs] = useState(0);
   const [voiceElapsedMs, setVoiceElapsedMs] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceRuntimeAvailable, setVoiceRuntimeAvailable] = useState<boolean | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Ready when you are.");
@@ -342,12 +350,16 @@ export default function ChetanaV0Experience({
   const [resultFeedbackStatus, setResultFeedbackStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialInput) setText(initialInput);
+    if (initialInput) {
+      setText(initialInput);
+      setInputSurface("text");
+    }
   }, [initialInput]);
 
   useEffect(() => {
     if (initialFile) {
       setFile(initialFile);
+      setInputSurface("screenshot");
       if (!presetMode) {
         setMode("screenshot");
       }
@@ -355,7 +367,10 @@ export default function ChetanaV0Experience({
   }, [initialFile, presetMode]);
 
   useEffect(() => {
-    if (presetMode) setMode(presetMode);
+    if (presetMode) {
+      setMode(presetMode);
+      setInputSurface(presetMode === "text" ? "text" : "screenshot");
+    }
   }, [presetMode]);
 
   useEffect(() => {
@@ -363,11 +378,34 @@ export default function ChetanaV0Experience({
     const interval = window.setInterval(() => {
       const startedAt = voiceStartedAtRef.current;
       if (startedAt) {
-        setVoiceElapsedMs(Date.now() - startedAt);
+        const elapsed = Date.now() - startedAt;
+        setVoiceElapsedMs(elapsed);
+        if (elapsed >= VOICE_MAX_DURATION_MS && mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
       }
     }, 250);
     return () => window.clearInterval(interval);
   }, [voiceState]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/v0/voice/status")
+      .then(async (response) => {
+        if (!response.ok) return false;
+        const data = (await response.json()) as V0VoiceRuntimeStatus;
+        return data.available;
+      })
+      .then((available) => {
+        if (active) setVoiceRuntimeAvailable(available);
+      })
+      .catch(() => {
+        if (active) setVoiceRuntimeAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -406,12 +444,8 @@ export default function ChetanaV0Experience({
   const quickContextText = selectedQuickContext.length
     ? `Quick context from user taps:\n${selectedQuickContext.map((option) => `- ${option.text}`).join("\n")}`
     : "";
-  const voiceContextText = voiceState === "recorded"
-    ? `Voice note captured locally for the user (${formatVoiceDuration(voiceDurationMs)}). Audio was not transcribed or uploaded. Use the screenshot, typed note, and tapped context above for this verdict.`
-    : "";
   const actionableScanText = [text.trim(), quickContextText].filter(Boolean).join("\n\n");
-  const scanTextForInput = [actionableScanText, actionableScanText || file ? voiceContextText : ""].filter(Boolean).join("\n\n");
-  const hasInput = Boolean(actionableScanText.trim() || file);
+  const hasInput = Boolean(actionableScanText.trim() || file || (voiceState === "recorded" && voiceBlobRef.current));
   const composerSafetyNudge = useMemo<ComposerSafetyNudge | null>(() => {
     const selected = new Set(quickContextIds);
     if (selected.has("money_sent")) {
@@ -463,7 +497,14 @@ export default function ChetanaV0Experience({
     file ? { label: "Screenshot", value: file.name } : null,
     selectedQuickContext.length ? { label: "Context", value: `${selectedQuickContext.length} tap${selectedQuickContext.length === 1 ? "" : "s"}` } : null,
     text.trim() ? { label: "Note", value: `${Math.min(text.trim().length, 999)} chars` } : null,
-    voiceState === "recorded" ? { label: "Voice", value: `${formatVoiceDuration(voiceDurationMs)} local only` } : null,
+    voiceState === "recorded"
+      ? {
+          label: "Voice",
+          value: voiceTranscript
+            ? `${formatVoiceDuration(voiceDurationMs)} transcribed locally`
+            : `${formatVoiceDuration(voiceDurationMs)} ready to check`,
+        }
+      : null,
   ].filter((item): item is { label: string; value: string } => Boolean(item));
   const resultEntitySections = useMemo(() => entitySections(result?.entities), [result?.entities]);
   const suspectLookupState = useMemo(() => {
@@ -609,9 +650,15 @@ export default function ChetanaV0Experience({
     setStatus(nextStatus);
   };
 
-  const selectMode = (nextMode: V0Mode) => {
-    setMode(nextMode);
-    if (nextMode === "text") {
+  const selectInputSurface = (nextSurface: InputSurface) => {
+    if (nextSurface !== "voice" && voiceState !== "idle") {
+      clearVoiceCapture();
+    }
+    setInputSurface(nextSurface);
+    if (nextSurface === "screenshot") {
+      setMode("screenshot");
+    } else {
+      setMode("text");
       setFile(null);
     }
     resetScanState();
@@ -630,6 +677,7 @@ export default function ChetanaV0Experience({
 
   const loadSample = () => {
     setMode("text");
+    setInputSurface("text");
     setText(SAMPLE_SCAM_TEXT);
     setFile(null);
     setQuickContextIds([]);
@@ -652,6 +700,7 @@ export default function ChetanaV0Experience({
       return;
     }
     setMode("screenshot");
+    setInputSurface("screenshot");
     setFile(nextFile);
     setDragActive(false);
     const label = source === "clipboard" ? "pasted" : source === "drop" ? "dropped" : "selected";
@@ -670,11 +719,13 @@ export default function ChetanaV0Experience({
     mediaRecorderRef.current = null;
     stopVoiceTracks();
     voiceChunksRef.current = [];
+    voiceBlobRef.current = null;
     voiceStartedAtRef.current = null;
     setVoiceState("idle");
     setVoiceDurationMs(0);
     setVoiceElapsedMs(0);
     setVoiceError(null);
+    setVoiceTranscript("");
     setVoiceBlobUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return null;
@@ -683,6 +734,13 @@ export default function ChetanaV0Experience({
 
   const startVoiceCapture = async () => {
     setVoiceError(null);
+    setInputSurface("voice");
+    setMode("text");
+    setFile(null);
+    if (voiceRuntimeAvailable === false) {
+      setVoiceError("Local voice checking is temporarily unavailable. Paste the message or use a screenshot.");
+      return;
+    }
     if (!voiceCaptureSupported()) {
       setVoiceError("Voice recording is not available in this browser. Tap what happened or paste the message.");
       return;
@@ -693,6 +751,8 @@ export default function ChetanaV0Experience({
       stopVoiceTracks();
       voiceStreamRef.current = stream;
       voiceChunksRef.current = [];
+      voiceBlobRef.current = null;
+      setVoiceTranscript("");
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       voiceStartedAtRef.current = Date.now();
@@ -713,14 +773,16 @@ export default function ChetanaV0Experience({
         const durationMs = startedAt ? Date.now() - startedAt : voiceElapsedMs;
         const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType || "audio/webm" });
         if (blob.size > 0) {
+          voiceBlobRef.current = blob;
           setVoiceBlobUrl((current) => {
             if (current) URL.revokeObjectURL(current);
             return URL.createObjectURL(blob);
           });
           setVoiceDurationMs(durationMs);
           setVoiceState("recorded");
-          setStatus("Voice captured. Tap what happened or add a screenshot before asking Chetana.");
+          setStatus("Voice captured. Tap Ask Chetana to transcribe and check it locally.");
         } else {
+          voiceBlobRef.current = null;
           setVoiceState("idle");
           setVoiceError("No voice was captured. Try again or tap what happened.");
         }
@@ -728,7 +790,7 @@ export default function ChetanaV0Experience({
         stopVoiceTracks();
       };
 
-      recorder.start();
+      recorder.start(250);
       setVoiceState("recording");
       setStatus("Listening. Stop when you are done.");
     } catch {
@@ -820,7 +882,7 @@ export default function ChetanaV0Experience({
     setLoading(true);
     resetScanState();
     const started = performance.now();
-    const effectiveMode: V0Mode = file || mode === "text" ? mode : "text";
+    const effectiveMode: V0Mode = file ? mode : "text";
 
     try {
       void trackV0Event({
@@ -831,15 +893,75 @@ export default function ChetanaV0Experience({
         language_hint: navigator.language.slice(0, 2),
         metadata: {
           quick_context_ids: quickContextIds,
-          voice_context: voiceState === "recorded" ? "local_audio_not_transcribed" : "none",
+          voice_context: voiceTranscript
+            ? "local_audio_transcribed"
+            : voiceState === "recorded"
+              ? "local_audio_transcription_requested"
+              : "none",
         },
       }).catch(() => {});
 
+      let localVoiceTranscript = voiceTranscript;
+      if (!localVoiceTranscript && voiceState === "recorded") {
+        const voiceBlob = voiceBlobRef.current;
+        if (!voiceBlob) {
+          throw new Error("Record the voice note again, then tap Ask Chetana.");
+        }
+        setStatus("Transcribing on Chetana's local speech runtime...");
+        const voiceForm = new FormData();
+        const voiceType = voiceBlob.type || "audio/webm";
+        const voiceExtension = voiceType.includes("mp4") ? "m4a" : voiceType.includes("ogg") ? "ogg" : "webm";
+        voiceForm.append(
+          "file",
+          new File([voiceBlob], `chetana-voice.${voiceExtension}`, { type: voiceType }),
+        );
+        voiceForm.append("consent_token", "local-voice-consent");
+        const voiceResp = await fetch("/api/v0/voice/transcribe", {
+          method: "POST",
+          body: voiceForm,
+        });
+        if (!voiceResp.ok) {
+          let voiceMessage = "Chetana could not transcribe that voice note. Try again closer to the microphone.";
+          try {
+            const failure = (await voiceResp.json()) as {
+              detail?: string | { code?: string; message?: string };
+            };
+            if (typeof failure.detail === "object" && failure.detail?.message) {
+              voiceMessage = failure.detail.message;
+            }
+          } catch {
+            // Use the bounded fallback message above.
+          }
+          throw new Error(voiceMessage);
+        }
+        const voiceData = (await voiceResp.json()) as V0VoiceTranscription;
+        localVoiceTranscript = voiceData.transcript.trim();
+        if (!localVoiceTranscript) {
+          throw new Error("No clear speech was found. Try again closer to the microphone.");
+        }
+        setVoiceTranscript(localVoiceTranscript);
+      }
+
+      const currentVoiceText = localVoiceTranscript
+        ? `Voice transcript from Chetana's local speech runtime:\n${localVoiceTranscript}`
+        : "";
+      const currentScanText = [actionableScanText, currentVoiceText].filter(Boolean).join("\n\n");
       setStatus(effectiveMode === "text" ? "Reading what you shared..." : "Extracting what is visible...");
-      const extractedInput = await extractScanInputForMode(effectiveMode, file, scanTextForInput);
+      let extractedInput = await extractScanInputForMode(effectiveMode, file, currentScanText);
+      if (localVoiceTranscript) {
+        extractedInput = {
+          ...extractedInput,
+          extraction: {
+            ...extractedInput.extraction,
+            quality_flags: Array.from(
+              new Set([...extractedInput.extraction.quality_flags, "local_voice_transcript"]),
+            ),
+          },
+        };
+      }
       const extracted = extractedInput.text;
       if (!extracted) {
-        throw new Error("Please paste the message or upload an image first.");
+        throw new Error("Paste the message, upload a screenshot, or record a voice note first.");
       }
       setLastExtractedInput(extractedInput);
 
@@ -1442,7 +1564,7 @@ export default function ChetanaV0Experience({
           </div>
           <div className="v0-hero-proof-list" aria-label="Chetana trust points">
             <span><Check size={14} /> Screenshot, paste, or tap what happened</span>
-            <span><Mic size={14} /> Voice note can stay local</span>
+            <span><Mic size={14} /> Voice checked on Chetana's own host</span>
             <span><Phone size={14} /> 1930 and cybercrime.gov.in when money moved</span>
             <span><Shield size={14} /> Advisory only, not a government service</span>
           </div>
@@ -1467,11 +1589,19 @@ export default function ChetanaV0Experience({
             <div className="v0-composer-head">
               <div>
                 <div className="v0-section-label">Ask Chetana</div>
-                <h2>{mode === "text" ? "Paste or tap" : "Screenshot or tap"}</h2>
+                <h2>
+                  {inputSurface === "text"
+                    ? "Paste or tap"
+                    : inputSurface === "voice"
+                      ? "Record or tap"
+                      : "Screenshot or tap"}
+                </h2>
                 <p className="v0-composer-copy">
-                  {mode === "text"
-                    ? "Paste the suspicious message, tap what happened, or record a local voice note."
-                    : "Use a screenshot from WhatsApp, SMS, email, QR, or payment proof. Tap context if you are in a hurry."}
+                  {inputSurface === "text"
+                    ? "Paste the suspicious message or tap what happened."
+                    : inputSurface === "voice"
+                      ? "Record up to 30 seconds from a suspicious call or voice note. Chetana checks the transcript, then deletes the raw audio."
+                      : "Use a screenshot from WhatsApp, SMS, email, QR, or payment proof. Tap context if you are in a hurry."}
                 </p>
               </div>
               <div className="v0-status">{status}</div>
@@ -1497,17 +1627,21 @@ export default function ChetanaV0Experience({
             </div>
 
             <div className="v0-simple-tabs" aria-label="Choose input type">
-              <button className={mode !== "text" ? "active" : ""} onClick={() => selectMode("screenshot")}>
+              <button className={inputSurface === "screenshot" ? "active" : ""} onClick={() => selectInputSurface("screenshot")}>
                 <ImageIcon size={16} />
                 Screenshot
               </button>
-              <button className={mode === "text" ? "active" : ""} onClick={() => selectMode("text")}>
+              <button className={inputSurface === "voice" ? "active" : ""} onClick={() => selectInputSurface("voice")}>
+                <Mic size={16} />
+                Voice
+              </button>
+              <button className={inputSurface === "text" ? "active" : ""} onClick={() => selectInputSurface("text")}>
                 <Type size={16} />
                 Text
               </button>
             </div>
 
-            {mode !== "text" && (
+            {inputSurface === "screenshot" && (
               <label className="v0-upload v0-upload-large">
                 <input
                   type="file"
@@ -1525,14 +1659,8 @@ export default function ChetanaV0Experience({
               </label>
             )}
 
-            <div className="v0-lazy-panel">
-              <div className="v0-lazy-copy">
-                <div className="v0-section-label">Fast path</div>
-                <strong>No perfect prompt needed.</strong>
-                <p>Tap one thing. Add a screenshot if you have one. Voice stays on this page and is not transcribed yet.</p>
-              </div>
-
-              <div className="v0-voice-row">
+            {inputSurface === "voice" && (
+              <div className="v0-voice-intake">
                 <button
                   className={voiceState === "recording" ? "v0-voice-button recording" : "v0-voice-button"}
                   onClick={() => {
@@ -1543,15 +1671,53 @@ export default function ChetanaV0Experience({
                       void startVoiceCapture();
                     }
                   }}
-                  disabled={loading}
+                  disabled={loading || voiceRuntimeAvailable === false}
                 >
                   {voiceState === "recording" ? <Square size={16} /> : <Mic size={16} />}
-                  {voiceState === "recording"
-                    ? `Stop ${formatVoiceDuration(voiceElapsedMs)}`
-                    : voiceState === "recorded"
-                      ? "Record again"
-                      : "Record voice"}
+                  {voiceRuntimeAvailable === false
+                    ? "Voice unavailable"
+                    : voiceState === "recording"
+                      ? `Stop ${formatVoiceDuration(voiceElapsedMs)}`
+                      : voiceState === "recorded"
+                        ? "Record again"
+                        : "Record voice"}
                 </button>
+                {voiceBlobUrl && (
+                  <div className="v0-voice-preview">
+                    <audio controls src={voiceBlobUrl} />
+                    <span>
+                      {formatVoiceDuration(voiceDurationMs)} {voiceTranscript ? "checked locally" : "ready to check"}
+                    </span>
+                    <button onClick={clearVoiceCapture} aria-label="Remove voice note">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <div className="v0-voice-privacy">
+                  <Shield size={14} />
+                  <span>No external AI provider receives the audio. Chetana keeps no raw voice recording.</span>
+                </div>
+                {voiceTranscript && (
+                  <div className="v0-voice-transcript" role="status">
+                    <strong>Chetana heard</strong>
+                    <p>{voiceTranscript}</p>
+                  </div>
+                )}
+                {voiceError && <div className="v0-voice-error">{voiceError}</div>}
+              </div>
+            )}
+
+            <div className="v0-lazy-panel">
+              <div className="v0-lazy-copy">
+                <div className="v0-section-label">Fast path</div>
+                <strong>No perfect prompt needed.</strong>
+                <p>
+                  Tap what happened or paste a screenshot. Chetana combines that context with your
+                  selected input before giving a verdict and safest next action.
+                </p>
+              </div>
+
+              <div className="v0-voice-row">
                 <button
                   className="v0-voice-button"
                   onClick={() => {
@@ -1562,17 +1728,7 @@ export default function ChetanaV0Experience({
                   <Copy size={16} />
                   Paste screenshot
                 </button>
-                {voiceBlobUrl && (
-                  <div className="v0-voice-preview">
-                    <audio controls src={voiceBlobUrl} />
-                    <span>{formatVoiceDuration(voiceDurationMs)} saved locally</span>
-                    <button onClick={clearVoiceCapture} aria-label="Remove voice note">
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
               </div>
-              {voiceError && <div className="v0-voice-error">{voiceError}</div>}
 
               <div className="v0-context-grid" aria-label="Tap what happened">
                 {QUICK_CONTEXT_OPTIONS.map((option) => {
@@ -1645,14 +1801,14 @@ export default function ChetanaV0Experience({
             )}
 
             <label className="v0-input-label">
-              {mode === "text" ? "Paste the message if you have it" : "Optional note"}
+              {inputSurface === "text" ? "Paste the message if you have it" : "Optional note"}
             </label>
             <textarea
               className="v0-textarea"
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder={DEFAULT_PROMPTS[mode]}
-              rows={mode === "text" ? 6 : 3}
+              placeholder={inputSurface === "voice" ? "Add anything the caller said that was unclear." : DEFAULT_PROMPTS[mode]}
+              rows={inputSurface === "text" ? 6 : 3}
             />
 
             <div className="v0-composer-foot">
@@ -2225,8 +2381,8 @@ export default function ChetanaV0Experience({
         {showHero && (
           <div className="v0-proof-strip" aria-label="Chetana proof points">
             <span>
-              <strong>Private by default</strong>
-              Voice stays local unless a future runtime explicitly changes that.
+              <strong>No external voice API</strong>
+              Raw voice is deleted after transcription on Chetana's own host.
             </span>
             <span>
               <strong>Official rails visible</strong>

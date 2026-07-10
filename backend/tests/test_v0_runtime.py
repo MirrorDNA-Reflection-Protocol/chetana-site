@@ -73,6 +73,47 @@ class V0TrustRuntimeTests(unittest.TestCase):
         self.assertFalse(scan.can_improve_scan)
         self.assertIsNone(scan.kavach_enrichment)
 
+    def test_hindi_voice_transcript_flags_credential_and_payment_pressure(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="बैंक अधिकारी ने OTP बताने और तुरंत UPI कलेक्ट रिक्वेस्ट मंजूर करने को कहा।",
+                language_hint="hi",
+                session_id="voice-test-session",
+            )
+        )
+
+        reason_codes = {reason.code for reason in scan.reasons}
+        self.assertEqual(scan.verdict, "high_risk")
+        self.assertIn("asks_for_credentials", reason_codes)
+        self.assertIn("asks_for_money", reason_codes)
+        self.assertIn("urgency_pressure", reason_codes)
+        self.assertIn("impersonates_authority", reason_codes)
+
+    def test_hindi_live_voice_inflection_flags_credential_request(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="आपका KYC आज बंध हो जाएगा। अपना OTP बताए और UPI से 500 रुपए अभी भेजिए।",
+                language_hint="hi",
+                session_id="voice-live-proof-session",
+            )
+        )
+
+        self.assertIn("asks_for_credentials", {reason.code for reason in scan.reasons})
+
+    def test_otp_safety_warning_is_not_misread_as_a_credential_request(self) -> None:
+        scan = analyze_scan(
+            V0ScanInput(
+                input_type="text",
+                text="Never share your OTP or PIN with anyone.",
+                language_hint="en",
+                session_id="voice-test-session",
+            )
+        )
+
+        self.assertNotIn("asks_for_credentials", {reason.code for reason in scan.reasons})
+
     def test_known_kavach_upi_match_upgrades_scan_to_high_risk(self) -> None:
         scan = analyze_scan(
             V0ScanInput(

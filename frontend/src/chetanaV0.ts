@@ -143,6 +143,38 @@ export interface V0ExtractedInput {
   extraction: V0ScanExtraction;
 }
 
+export interface V0VoiceRuntimeStatus {
+  available: boolean;
+  provider: "whisper.cpp";
+  model: string;
+  processing_location: "chetana_host";
+  external_ai_provider: false;
+  language_mode: "multilingual_auto_detect";
+  max_duration_seconds: number;
+  max_bytes: number;
+  retention: "raw_audio_deleted_after_transcription";
+  checks: Record<string, boolean>;
+}
+
+export interface V0VoiceTranscription {
+  transcription_id: string;
+  transcript: string;
+  language_code: string;
+  duration_seconds: number;
+  processing_ms: number;
+  runtime: {
+    provider: "whisper.cpp";
+    model: string;
+    location: "chetana_host";
+    external_ai_provider: false;
+  };
+  privacy: {
+    audio_retained: false;
+    transcript_persisted_by_transcriber: false;
+    temporary_files_deleted: true;
+  };
+}
+
 export interface V0EvidencePack {
   incident_id: string;
   timestamp_utc: string;

@@ -18,6 +18,7 @@ The goal is simple: turn suspicious content into a clear next step for a real pe
 
 - suspicious text from WhatsApp, SMS, email, Telegram, or social media
 - screenshots of suspicious messages
+- short voice notes transcribed on Chetana's own host, with raw audio deleted after transcription
 - QR or UPI payment requests
 - payment confirmation screenshots that may be fake
 
@@ -51,6 +52,8 @@ Public `v0` endpoints added in this build:
 
 ```bash
 POST /api/v0/scan
+GET  /api/v0/voice/status
+POST /api/v0/voice/transcribe
 POST /api/v0/evidence
 POST /api/v0/events
 POST /api/v0/trust/send-guard
@@ -96,6 +99,7 @@ curl -X POST https://chetana.activemirror.ai/api/v0/scan \
 - **Frontend:** Vite 5 + React 18 + TypeScript + Framer Motion
 - **Backend:** FastAPI + Python 3.11
 - **v0 runtime:** deterministic verdict engine plus local-first explanation, evidence, and event logging
+- **voice runtime:** bounded `whisper.cpp` large-v3-turbo q5 transcription; no external speech API
 - **analytics engine:** canonical rollups from `~/.mirrordna/chetana/v0/events.jsonl` with funnel, daily, verdict, scam-type, and language summaries
 - **Infra:** FastAPI serves the built frontend
 
@@ -134,6 +138,7 @@ The public chat route is rate-limited and does not allow caller-supplied model s
 git clone https://github.com/MirrorDNA-Reflection-Protocol/chetana-site.git
 cd chetana-site/frontend && npm install && npm run dev
 cd ../backend && pip install -r requirements.txt
+./scripts/install_voice_runtime.sh
 uvicorn app.main:app --port 8093
 ```
 

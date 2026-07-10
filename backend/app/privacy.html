@@ -145,7 +145,7 @@
         <div class="meta">
             <span><strong>Service:</strong> Chetana (chetana.activemirror.ai)</span>
             <span><strong>Operator:</strong> Active Mirror (activemirror.ai), operated by Paul Desai</span>
-            <span><strong>Effective Date:</strong> 17 March 2026</span>
+            <span><strong>Effective Date:</strong> 10 July 2026</span>
             <span><strong>Compliance:</strong> Digital Personal Data Protection Act, 2023 (DPDP Act) &middot; IT Act 2000 &middot; Consumer Protection Act 2019</span>
         </div>
 
@@ -170,8 +170,9 @@
             <ul style="margin-top: 0.5rem;">
                 <li>No accounts. No login. No sign-up.</li>
                 <li>Your scans are checked and <strong>not stored</strong>.</li>
-                <li>Your scam scans stay on <strong>local AI models on our servers</strong>. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
-                <li>We collect <strong>zero personal information</strong>.</li>
+                <li>Your scam scans stay on <strong>local models on our servers</strong>. Chat is local-first and may use bounded Anthropic or OpenAI fallback if local chat models do not respond.</li>
+                <li>Voice notes are sent only after you tap Ask Chetana, transcribed on our host, and the raw audio is deleted before the response returns.</li>
+                <li>We do not require an account or build a personal profile. A scan can still contain personal information that you choose to submit.</li>
                 <li>We track only anonymous scan counts (e.g., "400 scans today") for service health.</li>
                 <li>Your browser may keep private hashed thread hints so repeated UPI IDs, phone numbers, or links can be recognized on your device.</li>
             </ul>
@@ -189,7 +190,17 @@
             <li>No logs of individual scans are kept</li>
         </ul>
 
-        <h3>3.2 During Chat (Not Stored by Chetana)</h3>
+        <h3>3.2 During a Voice Check (Raw Audio Not Stored)</h3>
+        <p>When you record a short voice note and tap Ask Chetana:</p>
+        <ul>
+            <li>Your browser uploads the voice note to Chetana over HTTPS after that explicit action</li>
+            <li>The note is limited to 30 seconds and 8 MB, decoded in a private temporary directory, and transcribed by a local whisper.cpp model on Chetana's host</li>
+            <li>No external AI provider receives the audio</li>
+            <li>The raw audio and temporary files are deleted before the transcription response is returned</li>
+            <li>The transcript is checked like typed scan text and is not retained by the voice transcriber</li>
+        </ul>
+
+        <h3>3.3 During Chat (Not Stored by Chetana)</h3>
         <p>When you send a chat message for guidance:</p>
         <ul>
             <li>Chetana tries local allowlisted models first</li>
@@ -198,7 +209,7 @@
             <li>Chetana does not retain the chat content after the response is sent</li>
         </ul>
 
-        <h3>3.3 Anonymous Analytics (Aggregated Only)</h3>
+        <h3>3.4 Anonymous Analytics (Aggregated Only)</h3>
         <table>
             <thead>
                 <tr>
@@ -232,7 +243,7 @@
         </table>
         <p>These are aggregate counters only. They cannot be traced back to any individual user or scan.</p>
 
-        <h3>3.4 Local Browser Thread Hints (On Your Device)</h3>
+        <h3>3.5 Local Browser Thread Hints (On Your Device)</h3>
         <p>Chetana can remember whether a UPI ID, phone number, or link domain appeared in another scan on the same browser. This is done with SHA-256 hashes in your browser's localStorage. The server does not receive your thread history, thread IDs, or local identifier index.</p>
         <ul>
             <li>Raw scanned text is not saved in this thread store</li>
@@ -250,7 +261,7 @@
         <!-- 4 -->
         <h2>4. What We Do NOT Collect</h2>
         <div class="green-box">
-            <strong>We do not collect any of the following:</strong>
+            <strong>We do not request or retain the following as an account or profile:</strong>
             <ul style="margin-top: 0.5rem;">
                 <li>Names, email addresses, or phone numbers of users</li>
                 <li>Aadhaar numbers, PAN numbers, or any government ID</li>
@@ -259,7 +270,7 @@
                 <li>Device identifiers, IMEI, advertising IDs, or fingerprints</li>
                 <li>IP addresses (not logged)</li>
                 <li>Contacts, call logs, SMS history, or browsing history</li>
-                <li>Photos, videos, or biometric data</li>
+                <li>Photos, videos, voice recordings, or biometric profiles. Screenshots and voice notes you deliberately submit are processed transiently as described above.</li>
                 <li>User accounts, profiles, or login credentials (there are none)</li>
             </ul>
         </div>
@@ -272,12 +283,12 @@
         <h2>6. How Your Data Is Processed</h2>
         <p>When you submit something for scanning:</p>
         <ol>
-            <li>Your text reaches our server over an encrypted connection (HTTPS)</li>
+            <li>Your submitted text, screenshot, or consented voice note reaches our server over an encrypted connection (HTTPS)</li>
             <li>Our <strong>local AI models</strong> (Ollama, running on our own infrastructure) and pattern-matching rules analyze scam scans</li>
             <li>Chat uses a local-first allowlisted model ladder and only falls back to Anthropic or OpenAI if that operator setting is enabled and the local chat ladder does not respond</li>
             <li>A risk score and explanation are generated</li>
             <li>The result is sent back to you</li>
-            <li>The submitted text and result are <strong>discarded</strong> &mdash; not written to any database or log file</li>
+            <li>Submitted content and results are <strong>discarded</strong> &mdash; not written to an individual scan database or content log. Raw voice audio is deleted before the transcription response returns.</li>
         </ol>
         <p><strong>Core scam scan analysis stays on Chetana's own infrastructure.</strong> If chat fallback is active, the specific chat message may be sent to Anthropic or OpenAI for that reply. Gemini is excluded from Chetana chat.</p>
 
@@ -324,6 +335,7 @@
             </tbody>
         </table>
         <p>We do not use Google Analytics, Facebook Pixel, or any advertising or tracking service.</p>
+        <p><strong>Voice transcription does not use Anthropic, OpenAI, Google, Sarvam, or another external AI provider.</strong> It runs on Chetana's own host.</p>
 
         <!-- 9 -->
         <h2>9. Data Retention</h2>
@@ -342,6 +354,14 @@
                 <tr>
                     <td>Scan results</td>
                     <td><strong>Not retained.</strong> Discarded after response.</td>
+                </tr>
+                <tr>
+                    <td>Raw voice notes and temporary audio files</td>
+                    <td><strong>Not retained.</strong> Deleted before the transcription response returns.</td>
+                </tr>
+                <tr>
+                    <td>Voice transcript</td>
+                    <td><strong>Not retained by the transcriber.</strong> It is returned to your browser and processed as scan text.</td>
                 </tr>
                 <tr>
                     <td>Anonymous analytics</td>

@@ -668,7 +668,7 @@ main {
 
 .v0-simple-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 5px;
   border: 1px solid var(--line);
@@ -738,6 +738,24 @@ main {
   min-width: 0;
 }
 
+.v0-voice-intake {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(201,163,94,0.34);
+  border-radius: 8px;
+  background: rgba(201,163,94,0.07);
+}
+
+.v0-voice-intake > .v0-voice-button {
+  width: 100%;
+  min-height: 68px;
+  border-color: rgba(201,163,94,0.42);
+  background: rgba(201,163,94,0.12);
+  font-size: 1rem;
+}
+
 .v0-voice-button {
   display: inline-flex;
   align-items: center;
@@ -746,7 +764,7 @@ main {
   min-height: 42px;
   padding: 10px 14px;
   border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 999px;
+  border-radius: 7px;
   background: rgba(255,255,255,0.06);
   color: var(--text-bright);
   font-size: 0.9rem;
@@ -792,10 +810,48 @@ main {
   cursor: pointer;
 }
 
+.v0-voice-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.v0-voice-privacy svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #86efac;
+}
+
+.v0-voice-transcript {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid rgba(134,239,172,0.2);
+  border-radius: 8px;
+  background: rgba(22,101,52,0.1);
+}
+
+.v0-voice-transcript strong {
+  color: #bbf7d0;
+  font-size: 0.78rem;
+}
+
+.v0-voice-transcript p {
+  margin: 0;
+  color: var(--text-bright);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .v0-voice-error {
   padding: 10px 12px;
   border: 1px solid rgba(217,138,74,0.22);
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(217,138,74,0.08);
   color: #fecaca;
   font-size: 0.88rem;
@@ -2642,6 +2698,17 @@ main {
 
   .v0-shell-simple .v0-composer {
     padding: 12px;
+  }
+
+  .v0-simple-tabs {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .v0-simple-tabs button {
+    gap: 5px;
+    padding: 8px 4px;
+    font-size: 0.78rem;
   }
 
   .v0-simple-copy h1 {

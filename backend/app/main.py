@@ -95,6 +95,14 @@ from app.mistral_ocr import (  # noqa: E402
     extract_text_with_mistral_ocr,
     mistral_ocr_available,
 )
+from app.voice_runtime import (  # noqa: E402
+    VOICE_CONSENT_TOKEN,
+    VOICE_MAX_BYTES,
+    VoiceRuntimeError,
+    VoiceTranscription,
+    transcribe_voice,
+    voice_runtime_status,
+)
 from app.whatsapp_webhook import whatsapp_router  # noqa: E402
 
 KAVACH_URL = "http://127.0.0.1:8790"
@@ -2107,6 +2115,46 @@ async def v0_scan(req: V0ScanInput):
     return result.model_dump()
 
 
+@app.get("/api/v0/voice/status")
+async def v0_voice_status():
+    """Expose only the bounded, public-safe local voice runtime contract."""
+    return voice_runtime_status()
+
+
+async def _transcribe_voice_upload(
+    file: UploadFile,
+    consent_token: str,
+) -> VoiceTranscription:
+    if consent_token != VOICE_CONSENT_TOKEN:
+        raise HTTPException(status_code=400, detail="local_voice_consent_required")
+
+    content = await file.read(VOICE_MAX_BYTES + 1)
+    if len(content) > VOICE_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="voice_file_too_large")
+
+    block = _gate_upload(content, file.filename or "voice-note", file.content_type or "")
+    if block:
+        raise HTTPException(status_code=400, detail="voice_upload_blocked")
+
+    try:
+        return await transcribe_voice(content, file.content_type)
+    except VoiceRuntimeError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.detail},
+        ) from exc
+
+
+@app.post("/api/v0/voice/transcribe")
+async def v0_voice_transcribe(
+    file: UploadFile = File(...),
+    consent_token: str = Form(...),
+):
+    """Transcribe a short voice note locally, without retaining raw audio."""
+    result = await _transcribe_voice_upload(file, consent_token)
+    return result.to_dict()
+
+
 @app.post("/api/v0/scan/improve")
 async def v0_scan_improve(
     file: UploadFile = File(...),
@@ -3176,88 +3224,46 @@ async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en
     return resp.json()
 
 @app.post("/api/voice/analyze")
-async def proxy_voice_analyze(file: UploadFile = File(...), lang: str = Form("en")):
-    """Voice/audio analysis: Whisper transcription + scam pattern matching + Kavach proxy."""
-    content = await file.read()
-    block = _gate_upload(content, file.filename, file.content_type)
-    if block:
-        return block
-
-    transcript = ""
-    whisper_signals: list[str] = []
-    whisper_score = 0
-
-    # Step 1: Local Whisper transcription on M4
-    try:
-        import tempfile, os
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-        try:
-            import mlx_whisper
-            result = mlx_whisper.transcribe(tmp_path, language=lang if lang != "en" else None)
-            transcript = result.get("text", "").strip()
-        except Exception:
-            import whisper as openai_whisper
-            model = openai_whisper.load_model("tiny")
-            result = model.transcribe(tmp_path, language=lang if lang != "en" else None)
-            transcript = result.get("text", "").strip()
-        os.unlink(tmp_path)
-    except Exception as e:
-        logger.warning("Whisper transcription failed: %s", e)
-
-    # Step 2: Pattern match against known scam call scripts
-    if transcript and len(transcript) > 10:
-        transcript_lower = transcript.lower()
-        CALL_SCRIPTS = [
-            (r"(cbi|police|customs|narcotics).{0,30}(warrant|arrest|case|summon)", "Matches known digital arrest call script", 30),
-            (r"(your.{0,15}account|aapka.{0,15}account).{0,30}(block|suspend|freez|band)", "Account freeze threat pattern", 25),
-            (r"(share|send|batao|bhej).{0,15}(otp|pin|password|mpin)", "OTP/credential harvesting in call", 30),
-            (r"(transfer|send|bhej).{0,20}(money|paisa|amount|payment).{0,20}(now|immediately|turant|abhi)", "Urgent money demand in call", 25),
-            (r"(do not|mat).{0,15}(tell|inform|batao|bolo).{0,15}(anyone|family|police|kisi)", "Caller demanding secrecy", 20),
-            (r"(fine|penalty|challan|fee).{0,20}(pay|deposit|transfer)", "Fake fine/penalty demand", 20),
-            (r"(parcel|courier|package).{0,30}(drug|illegal|seize|confiscat)", "Customs parcel scam script", 25),
-            (r"(insurance|policy|lic).{0,20}(matured|bonus|lapsed).{0,20}(pay|fee|charge)", "Fake insurance call", 20),
-            (r"(lottery|prize|winner|jeet).{0,20}(won|mila|congratulat)", "Lottery/prize call", 25),
-            (r"(install|download).{0,15}(anydesk|teamviewer|quicksupport)", "Remote access app install request", 30),
-        ]
-        import re as _re
-        for pattern, signal, weight in CALL_SCRIPTS:
-            if _re.search(pattern, transcript_lower):
-                whisper_signals.append(signal)
-                whisper_score += weight
-        whisper_score = min(whisper_score, 100)
-
-    # Step 3: Also proxy to Kavach for its analysis
-    kavach_result = {}
-    try:
-        async with httpx.AsyncClient(timeout=MEDIA_PROXY_TIMEOUT) as client:
-            resp = await client.post(
-                f"{KAVACH_URL}/api/voice/analyze",
-                files={"file": (file.filename, content, file.content_type)},
-                data={"lang": lang},
-            )
-            kavach_result = resp.json()
-    except Exception:
-        pass
-
-    # Step 4: Merge results — take the higher risk
-    kavach_score = kavach_result.get("risk_score", kavach_result.get("score", 0))
-    final_score = max(whisper_score, kavach_score)
-    final_verdict = "SUSPICIOUS" if final_score >= 70 else "UNCLEAR" if final_score >= 40 else "LOW_RISK"
-    all_signals = whisper_signals + (kavach_result.get("signals", []) or kavach_result.get("red_flags", []) or [])
-
+async def proxy_voice_analyze(
+    file: UploadFile = File(...),
+    lang: str = Form("en"),
+    consent_token: str = Form(...),
+):
+    """Compatibility route backed by the canonical local voice and v0 scan runtimes."""
+    transcription = await _transcribe_voice_upload(file, consent_token)
+    result = analyze_v0_scan(
+        V0ScanInput(
+            input_type="text",
+            text=transcription.transcript,
+            language_hint=transcription.language_code or lang,
+            source_name=file.filename or "voice-note",
+            extraction={
+                "source": "manual",
+                "confidence": None,
+                "quality_flags": ["local_voice_transcript"],
+                "character_count": len(transcription.transcript),
+            },
+        )
+    )
+    result = await enrich_v0_verdict(result)
+    legacy_verdict = {
+        "high_risk": "SUSPICIOUS",
+        "caution": "UNCLEAR",
+        "needs_review": "UNCLEAR",
+        "low_signal": "LOW_SIGNAL",
+    }[result.verdict]
+    risk_score = {"high": 90, "medium": 55, "low": 20}[result.risk_level]
     return {
-        "verdict": final_verdict,
-        "risk_score": final_score,
-        "score": final_score,
-        "signals": all_signals,
-        "transcript": transcript[:2000] if transcript else None,
-        "transcript_length": len(transcript),
-        "whisper_score": whisper_score,
-        "kavach_score": kavach_score,
-        "explanation": f"Audio transcribed ({len(transcript)} chars) and checked against known scam call patterns." if transcript else "Could not transcribe audio.",
-        "action_eligibility": "report" if final_score >= 70 else "caution" if final_score >= 40 else "monitor",
+        "verdict": legacy_verdict,
+        "risk_score": risk_score,
+        "score": risk_score,
+        "signals": [reason.label for reason in result.reasons],
+        "transcript": transcription.transcript,
+        "transcript_length": len(transcription.transcript),
+        "explanation": result.guidance.lead,
+        "action_eligibility": "report" if result.verdict == "high_risk" else "caution",
+        "voice_runtime": transcription.to_dict(),
+        "chetana": result.model_dump(),
     }
 
 @app.post("/api/media/ocr")

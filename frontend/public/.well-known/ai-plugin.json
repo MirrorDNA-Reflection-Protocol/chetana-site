@@ -2,7 +2,7 @@
   "schema_version": "v1",
   "name_for_human": "Chetana Scam Checker",
   "name_for_model": "chetana_scam_checker",
-  "description_for_human": "A free scam checker for India. Paste a suspicious message or upload a screenshot to see the warning signs and safest next action.",
+  "description_for_human": "A free scam checker for India. Share a suspicious message, screenshot, or short voice note to see the warning signs and safest next action.",
   "description_for_model": "Chetana performs local-first, advisory scam-pattern checks on suspicious text, links, QR requests, payment proofs, and screenshot text. It returns one of four evidence states (high_risk, caution, needs_review, or low_signal), reasons, and the safest next action. It does not certify content as safe, verify UPI IDs or phone numbers against a comprehensive fraud database, or detect deepfakes. English is live; Hindi screenshot reading and translation-assisted checks are beta.",
   "auth": {
     "type": "none"

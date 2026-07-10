@@ -43,6 +43,7 @@ RecoveryUrgency = Literal["immediate", "priority", "monitor"]
 ReasonCode = Literal[
     "urgency_pressure",
     "asks_for_money",
+    "asks_for_credentials",
     "suspicious_return_claim",
     "impersonates_authority",
     "identity_mismatch",
@@ -339,6 +340,11 @@ REASON_META: dict[ReasonCode, dict[str, Any]] = {
         "weight": 18,
         "explanation": "It asks for payment, transfer, deposit, or an advance fee.",
     },
+    "asks_for_credentials": {
+        "label": "Asks for a secret code or credential",
+        "weight": 30,
+        "explanation": "It asks you to share or enter an OTP, PIN, password, CVV, or verification code.",
+    },
     "suspicious_return_claim": {
         "label": "Suspicious return claim",
         "weight": 26,
@@ -425,11 +431,20 @@ AMOUNT_RE = re.compile(r"(?:₹\s?\d[\d,]*|\bRs\.?\s?\d[\d,]*|\bINR\s?\d[\d,]*)"
 MERCHANT_RE = re.compile(r"\b(?:merchant|payee|receiver|beneficiary)[:\-]?\s*([A-Z][A-Za-z0-9 &.-]{2,})")
 PERSON_RE = re.compile(r"\b(?:mr|mrs|ms|dr)\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)")
 
-URGENCY_RE = re.compile(r"\b(urgent|immediately|now|today|last chance|within\s+\d+\s*(?:minutes?|hours?)|abhi|turant|fauran|jaldi)\b", re.IGNORECASE)
-MONEY_RE = re.compile(r"\b(pay|payment|transfer|send money|deposit|advance fee|processing fee|security deposit|upi|collect request|refund fee|scan and pay)\b", re.IGNORECASE)
+URGENCY_RE = re.compile(r"(?:\b(?:urgent|immediately|now|today|last chance|within\s+\d+\s*(?:minutes?|hours?)|abhi|turant|fauran|jaldi)\b|अभी|तुरंत|तुरंट|फौरन|जल्दी|आज)", re.IGNORECASE)
+MONEY_RE = re.compile(r"(?:\b(?:pay|payment|transfer|send money|deposit|advance fee|processing fee|security deposit|upi|collect request|refund fee|scan and pay)\b|भुगतान|पैसे|रुपये|ट्रांसफर|यूपीआई|कलेक्ट रिक्वेस्ट)", re.IGNORECASE)
+CREDENTIAL_REQUEST_RE = re.compile(
+    r"(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा).{0,32}(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड)"
+    r"|(?:otp|one[- ]time password|pin|mpin|password|cvv|verification code|ओटीपी|पिन|पासवर्ड).{0,32}(?:share|send|tell|give|enter|provide|read out|batao|bhejo|बताओ|बताने|बताइए|बताए|बताएं|बताना|बता दो|बता दीजिए|भेजो|भेजिए|भेजें|दर्ज|साझा)",
+    re.IGNORECASE,
+)
+CREDENTIAL_NEGATION_RE = re.compile(
+    r"(?:never|do\s+not|don't|dont|मत|नहीं)[^.!?]{0,24}$",
+    re.IGNORECASE,
+)
 RETURN_RE = re.compile(r"\b(guaranteed return|assured return|fixed return|double your money|daily profit|risk[- ]free profit)\b", re.IGNORECASE)
-AUTHORITY_RE = re.compile(r"\b(bank|sbi|hdfc|icici|axis|rbi|uidai|aadhaar|pan|kyc|police|cbi|crime branch|customs|income tax|court|government|govt|sarkar)\b", re.IGNORECASE)
-THREAT_RE = re.compile(r"\b(arrest|blocked|suspended|penalty|fine|legal action|case registered|jail|freeze)\b", re.IGNORECASE)
+AUTHORITY_RE = re.compile(r"(?:\b(?:bank|sbi|hdfc|icici|axis|rbi|uidai|aadhaar|pan|kyc|police|cbi|crime branch|customs|income tax|court|government|govt|sarkar)\b|बैंक|पुलिस|सीबीआई|कस्टम|सरकार|केवाईसी)", re.IGNORECASE)
+THREAT_RE = re.compile(r"(?:\b(?:arrest|blocked|suspended|penalty|fine|legal action|case registered|jail|freeze)\b|बंद|ब्लॉक|गिरफ्तार|जुर्माना|खाता)", re.IGNORECASE)
 OFFPLATFORM_RE = re.compile(r"\b(telegram|whatsapp me|personal number|private number|call me on another number|move to another app)\b", re.IGNORECASE)
 PARCEL_RE = re.compile(r"\b(parcel|courier|delivery|customs|shipment|reschedule|india post|bluedart|delhivery)\b", re.IGNORECASE)
 JOB_RE = re.compile(r"\b(job|recruitment|work from home|part time|salary|hr team|interview)\b", re.IGNORECASE)
@@ -441,6 +456,18 @@ REMOTE_ACCESS_RE = re.compile(
     r"\b(anydesk|teamviewer|quicksupport|screen ?share|remote access|assistive service|accessibility permission|download app|install app|install apk|apk link)\b",
     re.IGNORECASE,
 )
+
+
+def _requests_credentials(text: str) -> bool:
+    for match in CREDENTIAL_REQUEST_RE.finditer(text):
+        prefix = text[max(0, match.start() - 32):match.start()]
+        matched_text = match.group(0)
+        if CREDENTIAL_NEGATION_RE.search(prefix):
+            continue
+        if re.search(r"(?:मत|नहीं)", matched_text):
+            continue
+        return True
+    return False
 
 _V0_ROOT = Path.home() / ".mirrordna" / "chetana" / "v0"
 _V0_ROOT.mkdir(parents=True, exist_ok=True)
@@ -781,7 +808,12 @@ def _derive_incident_state(
         return "payment_attempted"
     if "asks_for_money" in reasons or payload.input_type == "qr_image" or entities.upi_ids:
         return "payment_requested"
-    if "impersonates_authority" in reasons or "threat_language" in reasons or "urgency_pressure" in reasons:
+    if (
+        "impersonates_authority" in reasons
+        or "threat_language" in reasons
+        or "urgency_pressure" in reasons
+        or "asks_for_credentials" in reasons
+    ):
         return "active_coercion"
     return "suspected"
 
@@ -934,6 +966,8 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         _add_reason(reasons, scorebox, "urgency_pressure")
     if MONEY_RE.search(text):
         _add_reason(reasons, scorebox, "asks_for_money")
+    if _requests_credentials(text):
+        _add_reason(reasons, scorebox, "asks_for_credentials")
     if RETURN_RE.search(text):
         _add_reason(reasons, scorebox, "suspicious_return_claim")
     if AUTHORITY_RE.search(text):
@@ -1015,6 +1049,10 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
     score = min(scorebox[0], 100)
     risky_combo = (
         ("impersonates_authority" in reasons and "asks_for_money" in reasons)
+        or (
+            "asks_for_credentials" in reasons
+            and ("impersonates_authority" in reasons or "urgency_pressure" in reasons)
+        )
         or "payment_screenshot_anomaly" in reasons
         or "suspicious_return_claim" in reasons
         or ("qr_payload_mismatch" in reasons and "asks_for_money" in reasons)
@@ -1048,6 +1086,7 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
             actions.append("save_evidence")
         if (
             "asks_for_money" in reasons
+            or "asks_for_credentials" in reasons
             or "impersonates_authority" in reasons
             or payload.input_type == "payment_screenshot"
             or (kavach_enrichment is not None and kavach_enrichment.risk_level == "high")
@@ -1059,7 +1098,11 @@ def analyze_scan(payload: V0ScanInput) -> V0Verdict:
         actions.extend(["verify_with_official_source", "scan_again_with_more_context"])
         if payload.input_type != "text":
             actions.append("save_evidence")
-        if "asks_for_money" in reasons or "impersonates_authority" in reasons:
+        if (
+            "asks_for_money" in reasons
+            or "asks_for_credentials" in reasons
+            or "impersonates_authority" in reasons
+        ):
             actions.append("share_with_family")
     elif verdict == "needs_review":
         actions.extend(["scan_again_with_more_context", "verify_with_official_source", "treat_as_unclear"])

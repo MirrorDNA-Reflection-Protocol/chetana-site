@@ -3937,12 +3937,10 @@ export function Footer({ onNavigate }: { onNavigate: (p: PageId) => void }) {
         </div>
         <div className="footer-bottom">
           <div className="footer-powered">
-            <span>Built by</span>
-            <a href="https://activemirror.ai" target="_blank" rel="noopener" className="powered-brand">ActiveMirror</a>
-            <span className="powered-sep">in</span>
+            <span>Built in</span>
             <span className="powered-brand">India</span>
           </div>
-          <div className="footer-copy">&copy; {new Date().getFullYear()} ActiveMirror. Advisory tool only.</div>
+          <div className="footer-copy">&copy; {new Date().getFullYear()} Chetana. Advisory tool only.</div>
         </div>
         <div className="footer-disclaimer">
           <Info size={11} /> Advisory tool only. Not affiliated with Government of India, RBI, UIDAI, CERT-IN, or any law enforcement agency. Automated verdicts are not legal determinations.

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Download, X } from "lucide-react";
 import { PageId } from "./types";
 import {
@@ -25,7 +24,6 @@ const INSTALL_DISMISSED_KEY = "chetana_install_prompt_dismissed_at";
 const INSTALL_DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SERVICE_WORKER_PATH = "/sw.js";
 
-const pageAnim = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -12 }, transition: { duration: 0.25 } };
 
 function isInstallSurfacePage(page: PageId): boolean {
   return page === "home" || page === "scan" || page === "consumer";
@@ -415,8 +413,7 @@ export default function App() {
         </div>
       )}
       <main>
-        <AnimatePresence mode="wait">
-          <motion.div key={page} {...pageAnim}>
+          <div key={page} className="page-root">
 
             {page === "home" && <>
               <ChetanaV0Experience
@@ -493,8 +490,7 @@ export default function App() {
             {page === "story" && <StoryPage />}
             {page === "family" && <FamilyPage />}
 
-          </motion.div>
-        </AnimatePresence>
+          </div>
       </main>
       {page !== "ops" && <Footer onNavigate={setPage} />}
 

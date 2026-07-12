@@ -1556,8 +1556,8 @@ export default function ChetanaV0Experience({
               </span>
               <strong>Chetana</strong>
             </div>
-            <h1>Fake hai kya?</h1>
-            <p>Screenshot bhejo. Chetana bata degi.</p>
+            <h1 lang="hi-Latn">Fake hai kya?</h1>
+            <p lang="hi-Latn">Screenshot bhejo. Chetana bata degi.</p>
             <div className="v0-app-privacy">
               No login. No complaint filed. Official next steps only.
             </div>
@@ -1626,16 +1626,16 @@ export default function ChetanaV0Experience({
               <button className="v0-quick-chip" onClick={loadSample}>Try a sample message</button>
             </div>
 
-            <div className="v0-simple-tabs" aria-label="Choose input type">
-              <button className={inputSurface === "screenshot" ? "active" : ""} onClick={() => selectInputSurface("screenshot")}>
+            <div className="v0-simple-tabs" role="tablist" aria-label="Choose input type">
+              <button role="tab" aria-selected={inputSurface === "screenshot"} className={inputSurface === "screenshot" ? "active" : ""} onClick={() => selectInputSurface("screenshot")}>
                 <ImageIcon size={16} />
                 Screenshot
               </button>
-              <button className={inputSurface === "voice" ? "active" : ""} onClick={() => selectInputSurface("voice")}>
+              <button role="tab" aria-selected={inputSurface === "voice"} className={inputSurface === "voice" ? "active" : ""} onClick={() => selectInputSurface("voice")}>
                 <Mic size={16} />
                 Voice
               </button>
-              <button className={inputSurface === "text" ? "active" : ""} onClick={() => selectInputSurface("text")}>
+              <button role="tab" aria-selected={inputSurface === "text"} className={inputSurface === "text" ? "active" : ""} onClick={() => selectInputSurface("text")}>
                 <Type size={16} />
                 Text
               </button>

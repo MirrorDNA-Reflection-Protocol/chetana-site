@@ -62,6 +62,12 @@ from app.v0_runtime import (  # noqa: E402
     log_event as log_v0_event,
 )
 from app.analytics import build_live_stats_snapshot, build_v0_analytics_summary  # noqa: E402
+from app.mirrorproof import (  # noqa: E402
+    MirrorProofVerifyRequest,
+    issuer_document as mirrorproof_issuer_document,
+    issue_assessment_receipt,
+    verify_assessment_receipt,
+)
 from app.field_harness import (  # noqa: E402
     FIELD_SOURCE_TAGS,
     campaign_url_for_source,
@@ -2325,7 +2331,38 @@ async def v0_action_route(req: V0ActionRouteRequest):
 async def v0_loop_receipt(req: V0LoopReceiptRequest):
     """Append a Chetana scam-check loop receipt for the completed scan."""
     receipt = build_v0_loop_receipt(req)
-    return {"loop_receipt": receipt.model_dump()}
+    try:
+        proof = issue_assessment_receipt(
+            verdict=req.verdict,
+            input_text=req.input_text,
+            loop_event_hash=receipt.event_hash or receipt.iteration_hash,
+            contract_hash=receipt.contract_hash,
+            action_route_hash=req.action_route.route_hash if req.action_route else None,
+        )
+        return {
+            "loop_receipt": receipt.model_dump(),
+            "mirrorproof_receipt": proof.model_dump(),
+            "mirrorproof_status": "signed",
+        }
+    except Exception as exc:  # pragma: no cover - fail-open keeps the safety result usable
+        logger.exception("mirrorproof_assessment_issue_failed", exc_info=exc)
+        return {
+            "loop_receipt": receipt.model_dump(),
+            "mirrorproof_receipt": None,
+            "mirrorproof_status": "unavailable",
+        }
+
+
+@app.get("/api/v0/mirrorproof/issuer")
+async def v0_mirrorproof_issuer():
+    """Expose the active Chetana receipt issuer and its explicit proof boundary."""
+    return mirrorproof_issuer_document()
+
+
+@app.post("/api/v0/mirrorproof/verify")
+async def v0_mirrorproof_verify(req: MirrorProofVerifyRequest):
+    """Verify receipt integrity, signature, and the configured Chetana issuer key."""
+    return verify_assessment_receipt(req.receipt).model_dump()
 
 
 @app.post("/api/v0/trust/send-guard")

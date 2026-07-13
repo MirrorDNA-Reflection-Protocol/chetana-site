@@ -14,6 +14,10 @@ def test_default_eval_suite_passes_gate_cases_and_experimental_language_probes()
     assert report["summary"]["gate_failed"] == 0
     assert report["summary"]["observation_cases"] == 2
     assert report["summary"]["observation_gaps"] == 0
+    assert report["metrics"]["scam_detection"]["cases"] == 5
+    assert report["metrics"]["benign_false_alarm"]["cases"] == 1
+    assert report["metrics"]["unreadable_abstention"]["cases"] == 1
+    assert report["assurance"]["field_efficacy_proven"] is False
 
 
 def test_eval_receipt_hashes_inputs_without_emitting_raw_text() -> None:

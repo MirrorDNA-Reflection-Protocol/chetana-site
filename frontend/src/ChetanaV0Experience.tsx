@@ -26,6 +26,7 @@ import {
   V0EvidencePack,
   V0EventName,
   V0LoopReceipt,
+  V0MirrorProofReceipt,
   V0TrustBundle,
   V0Verdict,
   actionCopy,
@@ -334,6 +335,8 @@ export default function ChetanaV0Experience({
   const [trustBundle, setTrustBundle] = useState<V0TrustBundle | null>(null);
   const [actionRoute, setActionRoute] = useState<V0ActionRoute | null>(null);
   const [loopReceipt, setLoopReceipt] = useState<V0LoopReceipt | null>(null);
+  const [mirrorProofReceipt, setMirrorProofReceipt] = useState<V0MirrorProofReceipt | null>(null);
+  const [mirrorProofCopied, setMirrorProofCopied] = useState(false);
   const [threadSignal, setThreadSignal] = useState<V0ThreatThreadSignal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
@@ -632,6 +635,8 @@ export default function ChetanaV0Experience({
     setTrustBundle(null);
     setActionRoute(null);
     setLoopReceipt(null);
+    setMirrorProofReceipt(null);
+    setMirrorProofCopied(false);
     setThreadSignal(null);
     setError(null);
     setImproveError(null);
@@ -870,8 +875,12 @@ export default function ChetanaV0Experience({
         }),
       });
       if (receiptResp.ok) {
-        const receiptData = (await receiptResp.json()) as { loop_receipt: V0LoopReceipt };
+        const receiptData = (await receiptResp.json()) as {
+          loop_receipt: V0LoopReceipt;
+          mirrorproof_receipt?: V0MirrorProofReceipt | null;
+        };
         setLoopReceipt(receiptData.loop_receipt);
+        setMirrorProofReceipt(receiptData.mirrorproof_receipt || null);
       }
     } catch {
       // The scam-check result stays useful if local receipt recording fails.
@@ -1240,6 +1249,13 @@ export default function ChetanaV0Experience({
       dedupeTtlMs: TAP_EVENT_TTL_MS,
       keepalive: true,
     }).catch(() => {});
+  };
+
+  const copyMirrorProof = async () => {
+    if (!mirrorProofReceipt) return;
+    await navigator.clipboard.writeText(JSON.stringify(mirrorProofReceipt, null, 2));
+    setMirrorProofCopied(true);
+    window.setTimeout(() => setMirrorProofCopied(false), 1800);
   };
 
   const shareOnWhatsApp = () => {
@@ -1889,8 +1905,8 @@ export default function ChetanaV0Experience({
               {loopReceipt && (
                 <div className={`v0-loop-receipt ${loopReceipt.status}`}>
                   <Shield size={14} />
-                  <span>Safety loop recorded</span>
-                  <small>{(loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
+                  <span>{mirrorProofReceipt ? "Assessment receipt signed" : "Safety loop recorded"}</span>
+                  <small>{(mirrorProofReceipt?.receipt_hash || loopReceipt.chain_head || loopReceipt.iteration_hash).slice(0, 10)}</small>
                 </div>
               )}
 
@@ -2304,6 +2320,41 @@ export default function ChetanaV0Experience({
                           <p className="v0-report-script">{trustBundle.recovery_packet.handoff_script}</p>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {mirrorProofReceipt && (
+                    <div className="v0-proof-details">
+                      <div>
+                        <div className="v0-section-label">MirrorProof</div>
+                        <strong>Signed assessment receipt</strong>
+                        <p>
+                          Proves receipt integrity and the Chetana issuer key. It does not prove the sender,
+                          message, or assessment is factually true.
+                        </p>
+                      </div>
+                      <div className="v0-proof-scope">
+                        <div>
+                          <strong>Checked</strong>
+                          <ul className="v0-mini-list">
+                            {mirrorProofReceipt.scope.checked.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        </div>
+                        <div>
+                          <strong>Not checked</strong>
+                          <ul className="v0-mini-list">
+                            {mirrorProofReceipt.scope.unchecked.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                      <div className="v0-inline-actions">
+                        <button type="button" onClick={copyMirrorProof}>
+                          <Copy size={14} /> {mirrorProofCopied ? "Receipt copied" : "Copy receipt"}
+                        </button>
+                        <a href="https://id.activemirror.ai/trust/" target="_blank" rel="noreferrer">
+                          <ExternalLink size={14} /> Open verifier
+                        </a>
+                      </div>
                     </div>
                   )}
 

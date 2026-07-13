@@ -1,0 +1,280 @@
+{
+  "schema_version": "chetana.eval.v1",
+  "generated_at_utc": "2026-07-13T06:57:44.406490+00:00",
+  "status": "pass",
+  "summary": {
+    "total_cases": 7,
+    "gate_cases": 5,
+    "gate_passed": 5,
+    "gate_failed": 0,
+    "observation_cases": 2,
+    "observation_gaps": 0
+  },
+  "metrics": {
+    "scam_detection": {
+      "cases": 5,
+      "detected_high_risk_or_caution": 5,
+      "recall_pct": 100.0,
+      "recall_wilson_95": {
+        "lower_pct": 56.6,
+        "upper_pct": 100.0
+      },
+      "protective_coverage_pct": 100.0
+    },
+    "benign_false_alarm": {
+      "cases": 1,
+      "high_risk_false_alarms": 0,
+      "rate_pct": 0.0,
+      "rate_wilson_95": {
+        "lower_pct": 0.0,
+        "upper_pct": 79.3
+      }
+    },
+    "unreadable_abstention": {
+      "cases": 1,
+      "correct_needs_review": 1,
+      "rate_pct": 100.0
+    },
+    "languages": {
+      "bn": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "en": {
+        "cases": 2,
+        "passed": 2,
+        "pass_rate_pct": 100.0
+      },
+      "hi": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "hi-Latn": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "ta": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "und": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      }
+    }
+  },
+  "assurance": {
+    "suite_class": "curated_regression_smoke",
+    "field_efficacy_proven": false,
+    "independent_holdout": false,
+    "limitations": [
+      "Small curated regression suites do not estimate population-level scam detection efficacy.",
+      "Confidence intervals are descriptive only when cases are not representative random samples.",
+      "A passing result does not prove prevented loss, sender authenticity, or production robustness."
+    ]
+  },
+  "privacy": {
+    "raw_text_in_receipt": false,
+    "input_identifier": "sha256"
+  },
+  "results": [
+    {
+      "case_id": "en_kyc_otp_upi_pressure",
+      "language": "en",
+      "input_type": "text",
+      "input_sha256": "1d415daa41946762ace76727d0893864f6c6bee09c95003c906b3b69d42dcd25",
+      "input_characters": 108,
+      "gate": true,
+      "ground_truth": "scam",
+      "provenance": {
+        "source_type": "curated_regression",
+        "adjudication": "Chetana deterministic safety contract",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "high_risk",
+        "risk_level": "high",
+        "reason_codes": [
+          "urgency_pressure",
+          "asks_for_money",
+          "asks_for_credentials",
+          "impersonates_authority",
+          "threat_language"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    },
+    {
+      "case_id": "hi_otp_upi_pressure",
+      "language": "hi",
+      "input_type": "text",
+      "input_sha256": "eddfc09e4765521aa2e7e88fe01310fe7b83e83406ef28594588e3eac309ae28",
+      "input_characters": 74,
+      "gate": true,
+      "ground_truth": "scam",
+      "provenance": {
+        "source_type": "curated_regression",
+        "adjudication": "Chetana deterministic safety contract",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "high_risk",
+        "risk_level": "high",
+        "reason_codes": [
+          "urgency_pressure",
+          "asks_for_money",
+          "asks_for_credentials",
+          "impersonates_authority"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    },
+    {
+      "case_id": "hinglish_kyc_pressure",
+      "language": "hi-Latn",
+      "input_type": "text",
+      "input_sha256": "11269235cfe781d87ac30df72c7017057689068af3dfb2fdd7741bf0558c039f",
+      "input_characters": 78,
+      "gate": true,
+      "ground_truth": "scam",
+      "provenance": {
+        "source_type": "curated_regression",
+        "adjudication": "Chetana deterministic safety contract",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "high_risk",
+        "risk_level": "high",
+        "reason_codes": [
+          "urgency_pressure",
+          "asks_for_money",
+          "asks_for_credentials",
+          "impersonates_authority"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    },
+    {
+      "case_id": "otp_safety_warning",
+      "language": "en",
+      "input_type": "text",
+      "input_sha256": "b8cb04ed8c9fc4d5617f696bf6c34d4e8e0937c7037276ff5ce13a1eed5d40c4",
+      "input_characters": 67,
+      "gate": true,
+      "ground_truth": "benign",
+      "provenance": {
+        "source_type": "curated_regression",
+        "adjudication": "false-positive recovery case",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "needs_review",
+        "risk_level": "medium",
+        "reason_codes": [
+          "impersonates_authority"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    },
+    {
+      "case_id": "unreadable_screenshot",
+      "language": "und",
+      "input_type": "screenshot",
+      "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "input_characters": 0,
+      "gate": true,
+      "ground_truth": "unreadable",
+      "provenance": {
+        "source_type": "curated_regression",
+        "adjudication": "low-signal truth contract",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "needs_review",
+        "risk_level": "medium",
+        "reason_codes": [
+          "unverifiable_contact"
+        ],
+        "runtime_source": "needs clearer screenshot",
+        "extraction_quality": "empty"
+      }
+    },
+    {
+      "case_id": "bn_bank_otp_pressure_experimental",
+      "language": "bn",
+      "input_type": "text",
+      "input_sha256": "26d157f3d5da6eda931508ec5e114490f768efcbe955709a137bc50b3b55a25f",
+      "input_characters": 62,
+      "gate": false,
+      "ground_truth": "scam",
+      "provenance": {
+        "source_type": "curated_observation",
+        "adjudication": "Bengali critical-pattern probe",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "high_risk",
+        "risk_level": "high",
+        "reason_codes": [
+          "urgency_pressure",
+          "asks_for_money",
+          "asks_for_credentials",
+          "impersonates_authority",
+          "threat_language"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    },
+    {
+      "case_id": "ta_bank_otp_pressure_experimental",
+      "language": "ta",
+      "input_type": "text",
+      "input_sha256": "249fb14afab4c15991fd030a74d0a2954f233076d260f66b0d4271e6577bf85f",
+      "input_characters": 69,
+      "gate": false,
+      "ground_truth": "scam",
+      "provenance": {
+        "source_type": "curated_observation",
+        "adjudication": "Tamil critical-pattern probe",
+        "license": "repo-owned"
+      },
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "verdict": "high_risk",
+        "risk_level": "high",
+        "reason_codes": [
+          "urgency_pressure",
+          "asks_for_money",
+          "asks_for_credentials",
+          "impersonates_authority",
+          "threat_language"
+        ],
+        "runtime_source": "local",
+        "extraction_quality": "strong"
+      }
+    }
+  ]
+}

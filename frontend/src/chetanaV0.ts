@@ -353,6 +353,54 @@ export interface V0LoopReceipt {
   chain_head?: string | null;
 }
 
+export interface V0MirrorProofReceipt {
+  schema_version: "mirrorproof.chetana.assessment.v0.1";
+  receipt_id: string;
+  issued_at_utc: string;
+  issuer: {
+    id: string;
+    key_id: string;
+    algorithm: "Ed25519";
+    public_key_base64url: string;
+    registry_url: string;
+  };
+  evidence: {
+    sha256: string;
+    input_type: string;
+    character_count: number;
+    raw_evidence_stored: false;
+  };
+  assessment: {
+    scan_id: string;
+    verdict: string;
+    risk_level: string;
+    confidence_band: string;
+    evidence_state: string;
+    scam_type: string;
+    reason_codes: string[];
+  };
+  provenance: {
+    runtime_source: string;
+    extraction_quality: string;
+    extraction_provider?: string | null;
+    ruleset: string;
+    content_credentials_status: "not_checked" | "no_manifest" | "valid" | "invalid" | "untrusted";
+    threat_intelligence: Array<Record<string, unknown>>;
+  };
+  scope: {
+    checked: string[];
+    unchecked: string[];
+    limitations: string[];
+  };
+  lineage: {
+    loop_event_hash: string;
+    action_route_hash?: string | null;
+    previous_proof_hash?: string | null;
+  };
+  receipt_hash: string;
+  signature_base64url: string;
+}
+
 export interface V0EventPayload {
   event_name: V0EventName;
   session_id: string;

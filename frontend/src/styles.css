@@ -1780,6 +1780,33 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
+.v0-proof-details {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(92,185,122,0.22);
+  border-radius: 8px;
+  background: rgba(92,185,122,0.05);
+}
+
+.v0-proof-details p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.v0-proof-scope {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 680px) {
+  .v0-proof-scope {
+    grid-template-columns: 1fr;
+  }
+}
+
 .v0-followthrough-card {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(300px, 1.4fr);

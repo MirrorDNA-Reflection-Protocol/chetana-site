@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,7 @@ class EvalCase:
     forbidden_verdicts: tuple[str, ...]
     expected_runtime_source: str | None
     gate: bool
+    ground_truth: str
     provenance: dict[str, str]
     extraction: dict[str, Any] | None = None
 
@@ -72,6 +74,7 @@ def parse_eval_case(payload: dict[str, Any], *, line_number: int) -> EvalCase:
             else None
         ),
         gate=bool(payload.get("gate", True)),
+        ground_truth=str(payload.get("ground_truth") or "unclassified")[:32],
         provenance={str(key)[:48]: str(value)[:200] for key, value in provenance.items()},
         extraction=extraction,
     )
@@ -127,6 +130,7 @@ def _evaluate_case(case: EvalCase) -> dict[str, Any]:
         "input_sha256": hashlib.sha256(case.text.encode("utf-8")).hexdigest(),
         "input_characters": len(case.text),
         "gate": case.gate,
+        "ground_truth": case.ground_truth,
         "provenance": case.provenance,
         "passed": not failures,
         "failures": failures,
@@ -137,6 +141,69 @@ def _evaluate_case(case: EvalCase) -> dict[str, Any]:
             "runtime_source": verdict.runtime_source,
             "extraction_quality": verdict.extraction_quality,
         },
+    }
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    if denominator == 0:
+        return None
+    return round((numerator / denominator) * 100, 1)
+
+
+def _wilson_95(numerator: int, denominator: int) -> dict[str, float] | None:
+    if denominator == 0:
+        return None
+    z = 1.959963984540054
+    observed = numerator / denominator
+    scale = 1 + (z * z / denominator)
+    center = (observed + z * z / (2 * denominator)) / scale
+    margin = (
+        z
+        * math.sqrt((observed * (1 - observed) / denominator) + (z * z / (4 * denominator * denominator)))
+        / scale
+    )
+    return {
+        "lower_pct": round(max(0.0, center - margin) * 100, 1),
+        "upper_pct": round(min(1.0, center + margin) * 100, 1),
+    }
+
+
+def _metric_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
+    scam = [result for result in results if result["ground_truth"] == "scam"]
+    benign = [result for result in results if result["ground_truth"] == "benign"]
+    unreadable = [result for result in results if result["ground_truth"] == "unreadable"]
+    detected_scams = [result for result in scam if result["observed"]["verdict"] in {"high_risk", "caution"}]
+    protected_scams = [result for result in scam if result["observed"]["verdict"] != "low_signal"]
+    benign_high_risk = [result for result in benign if result["observed"]["verdict"] == "high_risk"]
+    correct_abstentions = [result for result in unreadable if result["observed"]["verdict"] == "needs_review"]
+    language_slices: dict[str, dict[str, int | float | None]] = {}
+    for language in sorted({result["language"] for result in results}):
+        cohort = [result for result in results if result["language"] == language]
+        language_slices[language] = {
+            "cases": len(cohort),
+            "passed": sum(1 for result in cohort if result["passed"]),
+            "pass_rate_pct": _rate(sum(1 for result in cohort if result["passed"]), len(cohort)),
+        }
+    return {
+        "scam_detection": {
+            "cases": len(scam),
+            "detected_high_risk_or_caution": len(detected_scams),
+            "recall_pct": _rate(len(detected_scams), len(scam)),
+            "recall_wilson_95": _wilson_95(len(detected_scams), len(scam)),
+            "protective_coverage_pct": _rate(len(protected_scams), len(scam)),
+        },
+        "benign_false_alarm": {
+            "cases": len(benign),
+            "high_risk_false_alarms": len(benign_high_risk),
+            "rate_pct": _rate(len(benign_high_risk), len(benign)),
+            "rate_wilson_95": _wilson_95(len(benign_high_risk), len(benign)),
+        },
+        "unreadable_abstention": {
+            "cases": len(unreadable),
+            "correct_needs_review": len(correct_abstentions),
+            "rate_pct": _rate(len(correct_abstentions), len(unreadable)),
+        },
+        "languages": language_slices,
     }
 
 
@@ -157,6 +224,17 @@ def run_eval_suite(cases: list[EvalCase]) -> dict[str, Any]:
             "gate_failed": len(gate_failures),
             "observation_cases": len(observations),
             "observation_gaps": len(observation_gaps),
+        },
+        "metrics": _metric_summary(results),
+        "assurance": {
+            "suite_class": "curated_regression_smoke",
+            "field_efficacy_proven": False,
+            "independent_holdout": False,
+            "limitations": [
+                "Small curated regression suites do not estimate population-level scam detection efficacy.",
+                "Confidence intervals are descriptive only when cases are not representative random samples.",
+                "A passing result does not prove prevented loss, sender authenticity, or production robustness.",
+            ],
         },
         "privacy": {
             "raw_text_in_receipt": False,

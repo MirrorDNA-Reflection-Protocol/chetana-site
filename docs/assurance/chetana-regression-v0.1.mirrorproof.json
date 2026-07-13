@@ -1,0 +1,92 @@
+{
+  "schema_version": "mirrorproof.chetana.benchmark.v0.1",
+  "statement_id": "mpb_e4be17efc4394c3db55695a09f410627",
+  "issued_at_utc": "2026-07-13T06:57:44.407523+00:00",
+  "issuer": {
+    "id": "https://id.activemirror.ai/issuers/chetana/v1.json",
+    "key_id": "did:web:id.activemirror.ai#chetana-2026-01",
+    "algorithm": "Ed25519",
+    "public_key_base64url": "lO6PfesIRBJ7ajj_wFglBi3nusCltG0MeNrLEOAAmbs",
+    "registry_url": "https://id.activemirror.ai/issuers/chetana/v1.json"
+  },
+  "suite_sha256": "46494e3136baead5ee2ca4d22111b9cbaf248c2131112ae2036dc49bdf48abe8",
+  "report_sha256": "dd078134f6bfbc26a91c59c809411bb4600779dfe86111e11a4c6bbe9535c199",
+  "summary": {
+    "total_cases": 7,
+    "gate_cases": 5,
+    "gate_passed": 5,
+    "gate_failed": 0,
+    "observation_cases": 2,
+    "observation_gaps": 0
+  },
+  "metrics": {
+    "scam_detection": {
+      "cases": 5,
+      "detected_high_risk_or_caution": 5,
+      "recall_pct": 100.0,
+      "recall_wilson_95": {
+        "lower_pct": 56.6,
+        "upper_pct": 100.0
+      },
+      "protective_coverage_pct": 100.0
+    },
+    "benign_false_alarm": {
+      "cases": 1,
+      "high_risk_false_alarms": 0,
+      "rate_pct": 0.0,
+      "rate_wilson_95": {
+        "lower_pct": 0.0,
+        "upper_pct": 79.3
+      }
+    },
+    "unreadable_abstention": {
+      "cases": 1,
+      "correct_needs_review": 1,
+      "rate_pct": 100.0
+    },
+    "languages": {
+      "bn": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "en": {
+        "cases": 2,
+        "passed": 2,
+        "pass_rate_pct": 100.0
+      },
+      "hi": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "hi-Latn": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "ta": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      },
+      "und": {
+        "cases": 1,
+        "passed": 1,
+        "pass_rate_pct": 100.0
+      }
+    }
+  },
+  "checked_scope": [
+    "suite file digest",
+    "deterministic evaluation output digest",
+    "reported case counts and metrics"
+  ],
+  "unchecked_scope": [
+    "representativeness beyond the named suite",
+    "independent adjudication unless named in case provenance",
+    "field efficacy or prevented financial loss"
+  ],
+  "statement_hash": "c7d2f94f1291cbb571e0191efbb8fa398327798f70ac2d0e1f941972485a1004",
+  "signature_base64url": "hXbQQO3F1ZZLsVTneMWbhMAr3DVE2ydPF_ZMY6qmKnhK0uziPPJnQTV8aUetEX3B0S2DeWlaxkJbfcjX62rqBg"
+}

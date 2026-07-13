@@ -25,7 +25,10 @@ def test_loop_receipt_endpoint_records_scan_loop(monkeypatch, tmp_path) -> None:
     )
 
     assert response.status_code == 200
-    receipt = response.json()["loop_receipt"]
+    payload = response.json()
+    receipt = payload["loop_receipt"]
+    assert payload["mirrorproof_status"] == "signed"
+    assert payload["mirrorproof_receipt"]["lineage"]["loop_event_hash"] == receipt["event_hash"]
     assert receipt["type"] == "chetana_scam_checker_loop_iteration"
     assert receipt["status"] == "pass"
     assert receipt["scan_id"] == verdict.scan_id

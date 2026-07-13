@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.analytics import build_v0_analytics_summary
 from app.api_keys import require_api_key
 import app.main as main_module
+import app.partner_desk as partner_desk_module
 from app.main import app
 
 
@@ -145,8 +146,11 @@ class MainLocalContractTests(unittest.TestCase):
 
     def test_partner_inquiry_endpoint_records_local_lead(self) -> None:
         original_log = main_module.PARTNER_INQUIRIES_LOG
+        original_desk_root = partner_desk_module.PARTNER_DESK_ROOT
         with tempfile.TemporaryDirectory() as tmpdir:
             main_module.PARTNER_INQUIRIES_LOG = Path(tmpdir) / "partners" / "inquiries.jsonl"
+            partner_desk_module.PARTNER_DESK_ROOT = Path(tmpdir) / "partners" / "desk"
+            main_module._PARTNER_REQUEST_LOG.clear()
             try:
                 resp = self.client.post(
                     "/api/v1/partners/inquiries",
@@ -158,6 +162,7 @@ class MainLocalContractTests(unittest.TestCase):
                         "pilot_type": "bank_psp",
                         "message": "Run a branch-cluster pilot.",
                         "source_path": "/partners",
+                        "consent_token": "I_CONSENT_TO_ACTIVE_MIRROR_PARTNER_FOLLOW_UP_V1",
                     },
                 )
                 self.assertEqual(resp.status_code, 200)
@@ -168,12 +173,16 @@ class MainLocalContractTests(unittest.TestCase):
                 lines = main_module.PARTNER_INQUIRIES_LOG.read_text(encoding="utf-8").splitlines()
                 self.assertEqual(len(lines), 1)
                 payload = json.loads(lines[0])
-                self.assertEqual(payload["organization"], "Example Bank")
-                self.assertEqual(payload["email"], "pilot.owner@example.com")
-                self.assertEqual(payload["storage_boundary"], "local_jsonl_no_external_crm")
+                self.assertNotIn("organization", payload)
+                self.assertNotIn("email", payload)
+                self.assertFalse(payload["contains_personal_data"])
+                self.assertEqual(payload["conversation_storage"], "encrypted_local")
                 self.assertEqual(payload["status"], "new")
+                self.assertIn("partner_desk", data)
+                self.assertFalse(data["partner_desk"]["desk"]["outbound_email_sent"])
             finally:
                 main_module.PARTNER_INQUIRIES_LOG = original_log
+                partner_desk_module.PARTNER_DESK_ROOT = original_desk_root
 
     def test_feedback_event_endpoint_accepts_bucketed_result_feedback(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

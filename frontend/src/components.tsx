@@ -29,6 +29,24 @@ const DEFAULT_PARTNER_INQUIRY = {
   pilot_type: "bank_psp",
   message: "",
   website: "",
+  contact_consent: false,
+};
+type PartnerDeskReply = {
+  identity: string;
+  reply: string;
+  questions: string[];
+  status: string;
+  requires_human_approval: boolean;
+  blocked_reason: string | null;
+  authority_boundary: string;
+  outbound_email_sent: boolean;
+  outbound_email_status: string;
+};
+type PartnerDeskSession = {
+  conversation_id: string;
+  retention_expires_at_utc: string;
+  storage_boundary: string;
+  desk: PartnerDeskReply;
 };
 const fadeIn = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5 } };
 const fadeInDelay = (d: number) => ({ initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d } });
@@ -36,6 +54,14 @@ const PASTE_LANGUAGE_PROMPTS = [
   { language: "English", text: "just paste it" },
   { language: "हिन्दी", text: "बस पेस्ट करो" },
 ];
+
+function renderBoldText(text: string) {
+  return text.split(/(\*\*.*?\*\*)/g).filter(Boolean).map((part, index) => (
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={index}>{part.slice(2, -2)}</strong>
+      : <span key={index}>{part}</span>
+  ));
+}
 
 /* ── Background Mesh — single radial glow, no noise ──────────── */
 export function BackgroundMesh() {
@@ -1030,10 +1056,9 @@ function TrustWrapCard({ scanResult, fullText }: { scanResult: NonNullable<ChatM
         <div className="trust-wrap-detail">
           {fullText.split("\n").map((line, i) => {
             if (!line.trim()) return null;
-            const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m: string, p: string) => `<strong>${p}</strong>`);
             const isBullet = line.trim().startsWith("\u2022");
-            return <p key={i} className={isBullet ? "tool-bullet" : ""} dangerouslySetInnerHTML={{ __html: isBullet ? bold.replace("\u2022", "") : bold }} />;
+            const displayLine = isBullet ? line.replace("\u2022", "") : line;
+            return <p key={i} className={isBullet ? "tool-bullet" : ""}>{renderBoldText(displayLine)}</p>;
           })}
           {signals.length > 3 && (
             <div className="trust-wrap-all-signals">
@@ -2756,9 +2781,7 @@ export function ScanWidget({ onRequireProof, inline, onCouncilUpdate, initialInp
                     {msg.file && <div className="sw-file-badge"><Paperclip size={11} /> {msg.file}</div>}
                     <div className="sw-text">{msg.text.split("\n").map((line, i) => {
                       if (!line.trim()) return null;
-                      const sanitized = line.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                      const bold = sanitized.replace(/\*\*(.*?)\*\*/g, (_m, p) => `<strong>${p}</strong>`);
-                      return <p key={i} dangerouslySetInnerHTML={{ __html: bold }} />;
+                      return <p key={i}>{renderBoldText(line)}</p>;
                     })}</div>
                     {msg.suggestions && (
                       <div className="sw-chips">
@@ -3463,11 +3486,14 @@ export function FamilyPage() {
 
 /* ── Institutional Partner Page ──────────────────────────────── */
 export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
-  const contactHref = "mailto:paul@activemirror.ai?subject=Chetana%20institutional%20pilot&body=We%20would%20like%20to%20discuss%20a%20Chetana%20pilot%20or%20sponsorship.";
   const [inquiry, setInquiry] = useState(DEFAULT_PARTNER_INQUIRY);
   const [inquiryState, setInquiryState] = useState<"idle" | "submitting" | "sent" | "error">("idle");
   const [inquiryStatus, setInquiryStatus] = useState("");
-  const updateInquiry = (key: keyof typeof DEFAULT_PARTNER_INQUIRY, value: string) => {
+  const [deskSession, setDeskSession] = useState<PartnerDeskSession | null>(null);
+  const [deskMessage, setDeskMessage] = useState("");
+  const [deskBusy, setDeskBusy] = useState(false);
+  const [deskStatus, setDeskStatus] = useState("");
+  const updateInquiry = (key: keyof typeof DEFAULT_PARTNER_INQUIRY, value: string | boolean) => {
     setInquiry((current) => ({ ...current, [key]: value }));
     if (inquiryState !== "idle") {
       setInquiryState("idle");
@@ -3481,19 +3507,72 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
     try {
       const response = await fetch(`${API}/api/v1/partners/inquiries`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...inquiry, source_path: "/partners" }),
+        body: JSON.stringify({
+          ...inquiry,
+          contact_consent: undefined,
+          source_path: "/partners",
+          consent_token: inquiry.contact_consent
+            ? "I_CONSENT_TO_ACTIVE_MIRROR_PARTNER_FOLLOW_UP_V1"
+            : undefined,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data?.ok !== true) {
         throw new Error(data?.detail || "Could not record the request.");
       }
+      if (!data.partner_desk) throw new Error("Partner Desk did not open a conversation.");
+      setDeskSession(data.partner_desk as PartnerDeskSession);
       setInquiryState("sent");
-      setInquiryStatus("Pilot request received. We will follow up from Active Mirror.");
+      setInquiryStatus("Pilot request received. Continue with the Partner Desk below.");
       setInquiry(DEFAULT_PARTNER_INQUIRY);
     } catch (error) {
       setInquiryState("error");
       setInquiryStatus(error instanceof Error ? error.message : "Could not record the request. Email is still available.");
+    }
+  };
+  const sendDeskMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!deskSession || deskBusy || deskMessage.trim().length < 4) return;
+    setDeskBusy(true);
+    setDeskStatus("Preparing a bounded response...");
+    try {
+      const response = await fetch(`${API}/api/v1/partners/conversations/${deskSession.conversation_id}/messages`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: deskMessage }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.desk) throw new Error(data?.detail || "The Partner Desk could not continue.");
+      setDeskSession((current) => current ? { ...current, desk: data.desk as PartnerDeskReply } : current);
+      setDeskMessage("");
+      setDeskStatus("Response recorded in the encrypted conversation.");
+    } catch (error) {
+      setDeskStatus(error instanceof Error ? error.message : "The Partner Desk could not continue.");
+    } finally {
+      setDeskBusy(false);
+    }
+  };
+  const deleteDeskConversation = async () => {
+    if (!deskSession || deskBusy) return;
+    setDeskBusy(true);
+    setDeskStatus("Deleting the encrypted conversation...");
+    try {
+      const response = await fetch(`${API}/api/v1/partners/conversations/${deskSession.conversation_id}/delete`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("The conversation could not be deleted.");
+      setDeskSession(null);
+      setDeskMessage("");
+      setDeskStatus("Encrypted partner conversation deleted.");
+    } catch (error) {
+      setDeskStatus(error instanceof Error ? error.message : "The conversation could not be deleted.");
+    } finally {
+      setDeskBusy(false);
     }
   };
   const reasons = [
@@ -3740,14 +3819,26 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
               autoComplete="off"
             />
           </label>
+          <label className="partner-contact-consent">
+            <input
+              type="checkbox"
+              checked={inquiry.contact_consent}
+              onChange={(event) => updateInquiry("contact_consent", event.target.checked)}
+              required
+            />
+            <span>
+              I agree that Active Mirror may use these business contact details to respond to and qualify this inquiry.
+              I will not submit scam evidence, credentials, government IDs, account details, or confidential material. See the <a href="/privacy" target="_blank" rel="noreferrer">privacy notice</a>.
+            </span>
+          </label>
           <div className="partner-form-actions">
-            <button className="partner-primary" type="submit" disabled={inquiryState === "submitting"}>
+            <button className="partner-primary" type="submit" disabled={inquiryState === "submitting" || !inquiry.contact_consent}>
               <Send size={17} />
-              {inquiryState === "submitting" ? "Sending..." : "Request pilot contact"}
+              {inquiryState === "submitting" ? "Opening desk..." : "Open secure Partner Desk"}
             </button>
-            <a className="partner-secondary" href={contactHref}>
-              <MessageCircle size={17} />
-              Email instead
+            <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
+              <ShieldCheck size={17} />
+              Review evidence
             </a>
           </div>
           <div className={`partner-form-status ${inquiryState}`} aria-live="polite">
@@ -3755,6 +3846,59 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           </div>
         </form>
       </div>
+
+      {(deskSession || deskStatus) && (
+        <div className="partner-desk-panel" id="partner-desk" aria-live="polite">
+          <div className="partner-desk-head">
+            <div className="partner-card-icon"><Bot size={18} /></div>
+            <div>
+              <div className="kicker">AI-assisted, authority-limited</div>
+              <h2>{deskSession?.desk.identity || "Chetana Partner Desk"}</h2>
+            </div>
+            {deskSession && (
+              <span className={`partner-desk-state ${deskSession.desk.requires_human_approval ? "hold" : "active"}`}>
+                {deskSession.desk.requires_human_approval ? "Approval hold" : "Qualifying"}
+              </span>
+            )}
+          </div>
+          {deskSession && (
+            <>
+              <p className="partner-desk-reply">{deskSession.desk.reply}</p>
+              {deskSession.desk.questions.length > 0 && (
+                <div className="partner-desk-questions">
+                  {deskSession.desk.questions.map((question) => <p key={question}>{question}</p>)}
+                </div>
+              )}
+              <p className="partner-desk-boundary"><Lock size={15} /> {deskSession.desk.authority_boundary}</p>
+              <form className="partner-desk-compose" onSubmit={sendDeskMessage}>
+                <label className="partner-field">
+                  <span>Continue asynchronously</span>
+                  <textarea
+                    value={deskMessage}
+                    onChange={(event) => setDeskMessage(event.target.value)}
+                    minLength={4}
+                    maxLength={2000}
+                    rows={4}
+                    placeholder="Audience, geography, channel, success measure, timeline, or a written question."
+                    required
+                  />
+                </label>
+                <div className="partner-form-actions">
+                  <button className="partner-primary" type="submit" disabled={deskBusy || deskMessage.trim().length < 4}>
+                    <Send size={17} />
+                    {deskBusy ? "Working..." : "Send to Partner Desk"}
+                  </button>
+                  <button className="partner-secondary partner-desk-delete" type="button" onClick={deleteDeskConversation} disabled={deskBusy}>
+                    <X size={17} />
+                    Delete conversation
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+          {deskStatus && <div className="partner-form-status">{deskStatus}</div>}
+        </div>
+      )}
 
       <div className="partner-proof-grid">
         {proofTiles.map((tile) => (
@@ -3796,9 +3940,9 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
               <BarChart3 size={17} />
               30-day pilot
             </a>
-            <a className="partner-secondary" href={contactHref}>
+            <a className="partner-secondary" href="#pilot-inquiry">
               <MessageCircle size={17} />
-              Email pilot request
+              Open Partner Desk
             </a>
             <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
               <Share2 size={17} />

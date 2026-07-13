@@ -307,7 +307,7 @@
         <h2>7. Cookies and Local Storage</h2>
         <p>The Chetana website:</p>
         <ul>
-            <li>Does <strong>not use cookies</strong></li>
+            <li>Uses two <strong>strictly necessary, HttpOnly session cookies</strong> only when an institutional user opens the Partner Desk. They hold random continuation and deletion capabilities, are scoped to that conversation's API path, are not readable by page JavaScript, and expire when the browser session ends.</li>
             <li>Does <strong>not use tracking pixels</strong></li>
             <li>May use <strong>localStorage</strong> in your browser for app preferences, install or consent state, local scan counters, and local hashed thread hints. This data stays on your device and is never sent to us.</li>
         </ul>
@@ -393,6 +393,10 @@
                     <td>Kept indefinitely. Aggregate counters only, no PII.</td>
                 </tr>
                 <tr>
+                    <td>Explicitly opened institutional Partner Desk conversation</td>
+                    <td>Encrypted locally for at most 180 days. The contact can delete it immediately with the separate deletion control. Sponsor analytics receive no contact details or message content.</td>
+                </tr>
+                <tr>
                     <td>App preferences, local counters, and hashed thread hints (localStorage)</td>
                     <td>Stays on your device. You can clear it anytime.</td>
                 </tr>
@@ -404,14 +408,14 @@
         <p>As a Data Principal under the Digital Personal Data Protection Act, 2023, you have the following rights:</p>
 
         <h3>10.1 Right to Access (Section 11)</h3>
-        <p>You can ask us what data we hold about you. Since we do not store scan data or personal information, the answer in most cases will be: <strong>nothing</strong>.</p>
+        <p>You can ask us what data we hold about you. Consumer scan content is not retained. An institutional Partner Desk conversation is the explicit exception described in Section 9.</p>
         <p>To make a request, email <a href="mailto:paul@activemirror.ai">paul@activemirror.ai</a>.</p>
 
         <h3>10.2 Right to Erasure (Section 13)</h3>
-        <p>You can request deletion of any data we hold about you. Since scan data is not stored, there is generally nothing to delete. If you have used the Telegram bot and want your Telegram-side conversation removed, you can delete the chat on Telegram directly.</p>
+        <p>You can request deletion of any data we hold about you. Partner Desk conversations include an immediate deletion control. Since scan data is not stored, there is generally no consumer scan record to delete. If you have used the Telegram bot and want your Telegram-side conversation removed, you can delete the chat on Telegram directly.</p>
 
         <h3>10.3 Right to Withdraw Consent</h3>
-        <p>You consent to processing by submitting a scan. You can withdraw at any time by simply not using the service. No data persists after you stop.</p>
+        <p>You consent to transient scan processing by submitting a scan and can withdraw by not using the service. Partner Desk contact processing requires a separate explicit checkbox and can be withdrawn through its deletion control or the contact route below.</p>
 
         <h3>10.4 Right to Correction (Section 12)</h3>
         <p>If any data we hold about you is incorrect, contact us at <a href="mailto:paul@activemirror.ai">paul@activemirror.ai</a> and we will correct it.</p>

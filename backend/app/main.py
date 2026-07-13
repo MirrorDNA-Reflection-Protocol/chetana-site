@@ -78,6 +78,18 @@ from app.research_intake import (  # noqa: E402
     delete_research_candidate,
     purge_expired_candidates,
 )
+from app.partner_desk import (  # noqa: E402
+    PartnerDeleteRequest,
+    PartnerDeskError,
+    PartnerInquiryRequest,
+    PartnerMessageRequest,
+    PartnerPublicMessageRequest,
+    continue_partner_conversation,
+    delete_partner_conversation,
+    public_conversation_payload,
+    purge_expired_partner_conversations,
+    start_partner_conversation,
+)
 from app.field_harness import (  # noqa: E402
     FIELD_SOURCE_TAGS,
     campaign_url_for_source,
@@ -237,6 +249,7 @@ app.add_middleware(
     ],
     allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["Content-Type"],
+    allow_credentials=True,
 )
 
 # Security headers middleware
@@ -272,28 +285,13 @@ _CHAT_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
 _RESEARCH_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
 _RESEARCH_WINDOW_S = 60 * 60
 _RESEARCH_MAX_REQUESTS = 5
+_PARTNER_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
+_PARTNER_WINDOW_S = 60 * 60
+_PARTNER_MAX_REQUESTS = 12
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
 CHETANA_SOURCE_TAGS = {item["source"]: item["label"] for item in FIELD_SOURCE_TAGS}
-
-
-class PartnerInquiryRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=120)
-    organization: str = Field(..., min_length=2, max_length=160)
-    role: str = Field(default="", max_length=120)
-    email: str = Field(..., min_length=5, max_length=180)
-    pilot_type: Literal[
-        "bank_psp",
-        "government_public_program",
-        "csr_digital_safety",
-        "telecom_fraud",
-        "merchant_network",
-        "other",
-    ] = "bank_psp"
-    message: str = Field(default="", max_length=2000)
-    source_path: str = Field(default="/partners", max_length=160)
-    website: str = Field(default="", max_length=160)
 
 
 def _partner_now_utc() -> str:
@@ -382,6 +380,7 @@ async def get_client() -> httpx.AsyncClient:
 async def _research_retention_loop() -> None:
     while True:
         purge_expired_candidates()
+        purge_expired_partner_conversations()
         await asyncio.sleep(60 * 60)
 
 
@@ -2424,12 +2423,90 @@ async def v0_trust_bundle(req: V0TrustRuntimeRequest):
     return {"trust_bundle": bundle.model_dump()}
 
 
+def _partner_request_key(request: Request) -> str:
+    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()[:64]
+    if request.client and request.client.host:
+        return request.client.host[:64]
+    return "unknown"
+
+
+def _check_partner_rate_limit(request: Request) -> None:
+    now = time.monotonic()
+    bucket = _PARTNER_REQUEST_LOG[_partner_request_key(request)]
+    cutoff = now - _PARTNER_WINDOW_S
+    while bucket and bucket[0] < cutoff:
+        bucket.popleft()
+    if len(bucket) >= _PARTNER_MAX_REQUESTS:
+        raise HTTPException(status_code=429, detail="Partner Desk request limit reached. Try again later.")
+    bucket.append(now)
+
+
+def _partner_error(exc: PartnerDeskError) -> HTTPException:
+    if exc.code in {"conversation_token_invalid", "deletion_token_invalid"}:
+        return HTTPException(status_code=403, detail=exc.code)
+    if exc.code in {"conversation_message_limit_reached", "conversation_size_limit_reached"}:
+        return HTTPException(status_code=429, detail=exc.code)
+    if exc.code == "conversation_integrity_failed":
+        return HTTPException(status_code=409, detail=exc.code)
+    return HTTPException(status_code=404, detail=exc.code)
+
+
+def _partner_cookie_secure(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    return forwarded_proto == "https" or request.url.scheme == "https"
+
+
+def _require_partner_same_origin(request: Request) -> None:
+    if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
+        raise HTTPException(status_code=403, detail="cross_site_partner_request_blocked")
+    origin = request.headers.get("origin")
+    allowed_origins = {
+        CHETANA_PUBLIC_ORIGIN,
+        "https://activemirror.ai",
+        "http://localhost:5173",
+        "http://localhost:8093",
+        "http://localhost:8096",
+        "http://127.0.0.1:8096",
+    }
+    if origin and origin.rstrip("/") not in allowed_origins:
+        raise HTTPException(status_code=403, detail="partner_origin_not_allowed")
+
+
+def _set_partner_capability_cookies(
+    response: Response,
+    request: Request,
+    conversation_id: str,
+    conversation_token: str,
+    deletion_token: str,
+) -> None:
+    cookie_path = f"/api/v1/partners/conversations/{conversation_id}"
+    options = {
+        "path": cookie_path,
+        "secure": _partner_cookie_secure(request),
+        "httponly": True,
+        "samesite": "strict",
+    }
+    response.set_cookie("chetana_partner_session", conversation_token, **options)
+    response.set_cookie("chetana_partner_delete", deletion_token, **options)
+
+
+def _clear_partner_capability_cookies(response: Response, conversation_id: str) -> None:
+    cookie_path = f"/api/v1/partners/conversations/{conversation_id}"
+    response.delete_cookie("chetana_partner_session", path=cookie_path, httponly=True, samesite="strict")
+    response.delete_cookie("chetana_partner_delete", path=cookie_path, httponly=True, samesite="strict")
+
+
 @app.post("/api/v1/partners/inquiries")
-async def partner_inquiry(req: PartnerInquiryRequest):
-    """Record a local institutional pilot inquiry without adding an external CRM dependency."""
+async def partner_inquiry(req: PartnerInquiryRequest, request: Request, response: Response):
+    """Start a consented, encrypted, AI-disclosed institutional qualification conversation."""
     received_at = _partner_now_utc()
     if _compact_partner_text(req.website, 160):
         return {"ok": True, "inquiry_id": None, "received_at_utc": received_at}
+
+    _require_partner_same_origin(request)
+    _check_partner_rate_limit(request)
 
     email = _compact_partner_text(req.email, 180).lower()
     if not _PARTNER_EMAIL_RE.fullmatch(email):
@@ -2441,21 +2518,86 @@ async def partner_inquiry(req: PartnerInquiryRequest):
         raise HTTPException(status_code=422, detail="Name and organization are required.")
 
     inquiry_id = f"chetana-partner-{uuid4().hex[:12]}"
+    try:
+        conversation = start_partner_conversation(req)
+    except PartnerDeskError as exc:
+        raise _partner_error(exc) from exc
     payload = {
         "inquiry_id": inquiry_id,
         "received_at_utc": received_at,
-        "name": name,
-        "organization": organization,
-        "role": _compact_partner_text(req.role, 120),
-        "email": email,
         "pilot_type": req.pilot_type,
-        "message": _compact_partner_text(req.message, 2000),
-        "source_path": _compact_partner_text(req.source_path, 160) or "/partners",
-        "storage_boundary": "local_jsonl_no_external_crm",
+        "source_path": (
+            _compact_partner_text(req.source_path, 160)
+            if _compact_partner_text(req.source_path, 160).startswith("/partners")
+            else "/partners"
+        ),
+        "contains_personal_data": False,
+        "conversation_storage": "encrypted_local",
+        "ai_assisted": True,
         "status": "new",
     }
     _append_partner_inquiry(payload)
-    return {"ok": True, "inquiry_id": inquiry_id, "received_at_utc": received_at}
+    _set_partner_capability_cookies(
+        response,
+        request,
+        conversation["conversation_id"],
+        conversation["conversation_token"],
+        conversation["deletion_token"],
+    )
+    return {
+        "ok": True,
+        "inquiry_id": inquiry_id,
+        "received_at_utc": received_at,
+        "partner_desk": public_conversation_payload(conversation),
+    }
+
+
+@app.post("/api/v1/partners/conversations/{conversation_id}/messages")
+async def partner_conversation_message(
+    conversation_id: str,
+    req: PartnerPublicMessageRequest,
+    request: Request,
+):
+    _require_partner_same_origin(request)
+    _check_partner_rate_limit(request)
+    token = request.cookies.get("chetana_partner_session", "")
+    if not token:
+        raise HTTPException(status_code=403, detail="conversation_session_missing")
+    try:
+        return continue_partner_conversation(
+            conversation_id,
+            PartnerMessageRequest(conversation_token=token, message=req.message),
+        )
+    except PartnerDeskError as exc:
+        raise _partner_error(exc) from exc
+
+
+@app.post("/api/v1/partners/conversations/{conversation_id}/delete")
+async def partner_conversation_delete(
+    conversation_id: str,
+    request: Request,
+    response: Response,
+):
+    _require_partner_same_origin(request)
+    _check_partner_rate_limit(request)
+    token = request.cookies.get("chetana_partner_delete", "")
+    if not token:
+        raise HTTPException(status_code=403, detail="conversation_deletion_capability_missing")
+    try:
+        result = delete_partner_conversation(
+            conversation_id,
+            PartnerDeleteRequest(deletion_token=token),
+        )
+        _clear_partner_capability_cookies(response, conversation_id)
+        return result
+    except PartnerDeskError as exc:
+        raise _partner_error(exc) from exc
+
+
+@app.get("/api/v1/partners/desk-policy")
+async def partner_desk_policy():
+    policy_path = Path(__file__).resolve().parents[2] / "docs" / "partners" / "partner_desk_policy_v1.json"
+    return json.loads(policy_path.read_text(encoding="utf-8"))
 
 
 def _research_request_key(request: Request) -> str:
@@ -3161,6 +3303,19 @@ async def privacy_policy():
     <li>Your browser may keep SHA-256 hashes of UPI IDs, phone numbers, and link domains for local repeated-scan warnings. Chetana's server does not receive your thread history or local identifier index.</li>
   </ul>
 
+  <h2>Institutional Partner Desk</h2>
+  <p>The Partner Desk is separate from consumer scam scanning. When an institutional contact explicitly opens a Partner Desk conversation, Chetana stores the submitted business name, organisation, role, email address, pilot message, consent record, and later written replies in an encrypted local conversation.</p>
+  <ul>
+    <li>The desk clearly identifies itself as AI-assisted and does not impersonate Paul or another person.</li>
+    <li>Conversation content is encrypted at rest. Random continuation and deletion capabilities are held in separate, route-scoped HttpOnly session cookies that page JavaScript cannot read.</li>
+    <li>Inactive conversations expire after at most 180 days. A user can delete the conversation immediately from the same browser session.</li>
+    <li>PilotTrace receives only non-personal aggregate metadata such as pilot lane, source, and status.</li>
+    <li>Do not submit scam evidence, attachments, credentials, government identifiers, account or card details, or confidential procurement material.</li>
+    <li>The desk cannot accept contracts, quote final pricing, promise outcomes, access partner systems, or agree to legal, procurement, security-review, integration, or data-processing terms.</li>
+    <li>Outbound partner email is disabled until an authenticated Active Mirror partner mailbox is configured and verified.</li>
+  </ul>
+  <p>These two strictly necessary Partner Desk cookies expire when the browser session ends. Chetana does not use them for advertising, profiling, or cross-site tracking.</p>
+
   <h2>Telemetry</h2>
   <p>We collect aggregate, non-identifiable usage metrics (e.g., scan counts by type and language) to understand how Chetana is used and improve it. No personal identifiers are included.</p>
 
@@ -3178,6 +3333,10 @@ async def privacy_policy():
 
   <h2>Third-party services</h2>
   <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Explicit screenshot improvement may send that screenshot to Mistral OCR. Explicit domain checks send only the normalized hostname to the IANA-designated RDAP registry. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI. Chetana does not retain these request or response payloads.</p>
+  <p>The Partner Desk policy engine is deterministic and local. Partner conversation content is not sent to an external model or CRM.</p>
+
+  <h2>Partner contact rights</h2>
+  <p>Partner contacts may withdraw the inquiry by using the conversation deletion control or by contacting <a href="mailto:trust@activemirror.ai">trust@activemirror.ai</a>. We will correct or erase retained partner contact information unless retention is required by applicable law. The consent applies only to responding to and qualifying that inquiry; it is not consent for unrelated marketing, automated calls, or bulk messages.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>

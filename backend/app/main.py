@@ -109,6 +109,13 @@ from app.field_harness import (  # noqa: E402
     source_label,
 )
 from app.pilottrace import build_pilottrace_report, render_pilottrace_html  # noqa: E402
+from app.institutional import (  # noqa: E402
+    build_observatory_payload,
+    load_institutional_contract,
+    render_observatory_html,
+    render_pilot_html,
+    render_trust_room_html,
+)
 from app.llm_router import build_llm_status, generate_chat_reply, ollama_model_available  # noqa: E402
 from app.gamechanger.rules import (  # noqa: E402
     analyze_request as analyze_gamechanger_request,
@@ -2107,6 +2114,40 @@ async def partner_pilottrace(days: int = Query(default=14, ge=1, le=90)):
     return report.model_dump()
 
 
+@app.get("/api/v1/observatory")
+async def observatory_data(days: int = Query(default=30, ge=1, le=90)):
+    """Return official context separately from Chetana-observed aggregates."""
+    contract = load_institutional_contract()
+    summary = build_v0_analytics_summary(trailing_days=days)
+    report = build_pilottrace_report(summary, partner_inquiries_path=PARTNER_INQUIRIES_LOG)
+    return build_observatory_payload(contract, report.model_dump())
+
+
+@app.get("/api/v1/partners/30-day-pilot")
+async def partner_pilot_contract():
+    """Return the fixed scope, measures, exclusions, and stop conditions."""
+    contract = load_institutional_contract()
+    return {
+        "schema_version": contract["schema_version"],
+        "published_at": contract["published_at"],
+        "pilot": contract["pilot"],
+    }
+
+
+@app.get("/api/v1/institutional/trust-room")
+async def institutional_trust_room_data():
+    """Return the institutional posture and live assurance verification."""
+    contract = load_institutional_contract()
+    assurance = load_assurance_payload()
+    return {
+        "schema_version": contract["schema_version"],
+        "published_at": contract["published_at"],
+        "trust_room": contract["trust_room"],
+        "assurance_verification": assurance["verification"],
+        "assurance_proof_boundary": assurance["proof_boundary"],
+    }
+
+
 @app.get("/api/v1/partners/field-harness")
 async def partner_field_harness():
     """Return the source-tagged field deployment contract for Chetana pilots."""
@@ -2879,6 +2920,8 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chetana.activemirror.ai/observatory</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/trust-room</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/assurance</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
 </urlset>"""
     return PlainTextResponse(xml, media_type="application/xml")
@@ -3051,106 +3094,31 @@ If money moved, call 1930.</pre>
 
 @app.get("/partners/30-day-pilot", include_in_schema=False)
 async def partners_30_day_pilot():
+    contract = load_institutional_contract()
     return HTMLResponse(
-        content=f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chetana 30-Day Fraud Pause Pilot</title>
-  <meta name="description" content="30-day Chetana pilot for banks, government programs, CSR sponsors, telecom anti-fraud teams, fintechs, and merchant networks.">
-  <style>
-    :root {{ color-scheme: light; --ink:#111827; --muted:#4b5563; --line:#d1d5db; --soft:#f8fafc; --accent:#047857; --gold:#a16207; }}
-    * {{ box-sizing:border-box; }}
-    body {{ margin:0; background:#fff; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.55; }}
-    main {{ width:100%; max-width:1040px; margin:0 auto; padding:34px 22px 44px; }}
-    a {{ color:var(--accent); font-weight:800; overflow-wrap:anywhere; }}
-    h1 {{ max-width:860px; margin:10px 0 12px; font-size:clamp(2.25rem, 6vw, 4.8rem); line-height:.96; letter-spacing:0; }}
-    h2 {{ margin:0 0 10px; font-size:1.18rem; }}
-    p {{ margin:0; color:var(--muted); }}
-    .top {{ display:flex; justify-content:space-between; gap:16px; align-items:flex-start; padding-bottom:18px; border-bottom:2px solid var(--ink); }}
-    .label {{ color:var(--gold); font-size:.74rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }}
-    .lead {{ max-width:760px; font-size:1.1rem; }}
-    .cta {{ display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 24px; }}
-    .cta a {{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 14px; border-radius:8px; text-decoration:none; }}
-    .primary {{ background:var(--accent); color:#fff; }}
-    .secondary {{ border:1px solid var(--line); color:var(--ink); }}
-    .grid {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:20px 0; }}
-    .card, .box, .step {{ border:1px solid var(--line); border-radius:8px; background:#fff; padding:16px; }}
-    .card {{ min-height:150px; background:var(--soft); }}
-    .card strong, .step strong {{ display:block; margin-bottom:8px; color:var(--ink); }}
-    .split {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }}
-    .steps {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }}
-    .step span {{ display:block; margin-bottom:8px; color:var(--gold); font-size:.72rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }}
-    ul {{ margin:.25rem 0 0; padding-left:1.1rem; color:var(--muted); }}
-    .foot {{ margin-top:22px; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem; }}
-    @media (max-width:820px) {{ .top, .split {{ display:grid; grid-template-columns:1fr; }} .grid, .steps {{ grid-template-columns:1fr; }} }}
-    @media print {{ .cta {{ display:none; }} main {{ padding:18px; }} a {{ color:var(--ink); }} }}
-  </style>
-</head>
-<body>
-  <main>
-    <div class="top">
-      <div>
-        <div class="label">Chetana by Active Mirror</div>
-        <strong>30-day fraud pause pilot</strong>
-      </div>
-      <p>Use with <a href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">the India kit</a>.</p>
-    </div>
-
-    <h1>Make one audience stop before fraud loss.</h1>
-    <p class="lead">A 30-day pilot gives a bank, public program, CSR sponsor, telecom anti-fraud team, fintech, or merchant network a measurable Chetana campaign without asking users to create accounts or share private scam content with the sponsor.</p>
-    <div class="cta">
-      <a class="primary" href="{CHETANA_PUBLIC_ORIGIN}/partners#pilot-inquiry">Request pilot contact</a>
-      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/india-kit">Open India kit</a>
-      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/field-harness">Open field harness</a>
-      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/pilottrace">View PilotTrace</a>
-      <a class="secondary" href="{CHETANA_PUBLIC_ORIGIN}/partners/packet">Open packet</a>
-    </div>
-
-    <section class="grid">
-      <div class="card"><strong>User action</strong><p>Screenshot, paste, voice note, or one tap. Ask Chetana before paying, approving UPI, sharing OTP, installing APK, or releasing goods.</p></div>
-      <div class="card"><strong>Distribution</strong><p>Use source-tagged QR links for bank branches, WhatsApp groups, CSR posters, colleges, ward offices, and merchant counters.</p></div>
-      <div class="card"><strong>Research signal</strong><p>Measure source tag, verdict, input type, feedback bucket, official-rail tap, share, packet copy, and privacy-control use.</p></div>
-      <div class="card"><strong>Privacy boundary</strong><p>No sponsor raw scan text, screenshots, phone numbers, UPI IDs, URLs, or user-profile database.</p></div>
-    </section>
-
-    <section class="split">
-      <div class="box">
-        <div class="label">Harness loop</div>
-        <h2>Users and data, without trust damage</h2>
-        <ul>
-          <li>Source-tagged link brings a user to the scam checker.</li>
-          <li>User receives verdict, safest next action, and official rails.</li>
-          <li>User can give one-tap feedback if Chetana missed or over-warned.</li>
-          <li>PilotTrace reports aggregate outcomes to sponsors.</li>
-          <li>Research examples require explicit consent.</li>
-        </ul>
-      </div>
-      <div class="box">
-        <div class="label">Why a sponsor cares</div>
-        <h2>It gives them proof before procurement</h2>
-        <p>Instead of buying an abstract AI product, the sponsor sees whether real users scanned, paused, followed official rails, shared warnings, copied case packets, and complained when Chetana was wrong.</p>
-      </div>
-    </section>
-
-    <section>
-      <div class="label">30-day plan</div>
-      <div class="steps">
-        <div class="step"><span>Week 1</span><strong>Launch</strong><p>Choose one audience, publish QR/WhatsApp links, and freeze source tags.</p></div>
-        <div class="step"><span>Week 2</span><strong>Observe</strong><p>Review scans, high-risk pauses, feedback buckets, and official rail taps.</p></div>
-        <div class="step"><span>Week 3</span><strong>Tune</strong><p>Improve campaign copy, local language examples, and recovery handoff wording.</p></div>
-        <div class="step"><span>Week 4</span><strong>Decide</strong><p>Deliver sponsor-safe PilotTrace proof and choose sponsorship, CSR, or integration path.</p></div>
-      </div>
-    </section>
-
-    <div class="foot">
-      Chetana is independent and is not a government, RBI, NPCI, I4C, CERT-In, police, or bank service. It is an advisory scam-check tool that keeps official recovery rails visible.
-    </div>
-  </main>
-</body>
-</html>""",
+        content=render_pilot_html(contract),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/observatory", include_in_schema=False)
+@app.get("/observatory/", include_in_schema=False)
+async def observatory_page(days: int = Query(default=30, ge=1, le=90)):
+    contract = load_institutional_contract()
+    summary = build_v0_analytics_summary(trailing_days=days)
+    report = build_pilottrace_report(summary, partner_inquiries_path=PARTNER_INQUIRIES_LOG)
+    payload = build_observatory_payload(contract, report.model_dump())
+    return HTMLResponse(content=render_observatory_html(payload), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/partners/trust-room", include_in_schema=False)
+@app.get("/partners/trust-room/", include_in_schema=False)
+async def partners_trust_room():
+    contract = load_institutional_contract()
+    assurance = load_assurance_payload()
+    return HTMLResponse(
+        content=render_trust_room_html(contract, assurance),
+        headers={"Cache-Control": "public, max-age=300"},
     )
 
 

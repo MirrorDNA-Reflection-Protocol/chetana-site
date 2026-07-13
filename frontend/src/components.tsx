@@ -3706,6 +3706,14 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <ShieldCheck size={17} />
             Safety Lab
           </a>
+          <a className="partner-secondary" href="/observatory" target="_blank" rel="noreferrer">
+            <BarChart3 size={17} />
+            India Observatory
+          </a>
+          <a className="partner-secondary" href="/partners/trust-room" target="_blank" rel="noreferrer">
+            <Lock size={17} />
+            Trust Room
+          </a>
           <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
             <Share2 size={17} />
             Outreach kit
@@ -3955,6 +3963,14 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
               <ShieldCheck size={17} />
               Open Safety Lab
+            </a>
+            <a className="partner-secondary" href="/observatory" target="_blank" rel="noreferrer">
+              <BarChart3 size={17} />
+              India Observatory
+            </a>
+            <a className="partner-secondary" href="/partners/trust-room" target="_blank" rel="noreferrer">
+              <Lock size={17} />
+              Open Trust Room
             </a>
           </div>
         </div>

@@ -110,7 +110,7 @@ def render_assurance_html(payload: dict[str, Any]) -> str:
     </section>
     <section class="band grid">
       <div><h2>Language slices</h2><table><thead><tr><th>Language</th><th>Cases</th><th>Observed pass</th></tr></thead><tbody>{language_rows}</tbody></table></div>
-      <div><h2>Institutional use</h2><p>Banks, government programs, CSR teams, and researchers can use the pilot packet and field harness to run a bounded evaluation with aggregate outcomes and no sponsor-visible raw scam content by default.</p><div class="actions"><a class="primary" href="/partners/packet">Open pilot packet</a><a href="/partners/field-harness">Field harness</a><a href="/api/v1/assurance">Machine-readable evidence</a><a href="/api/v1/assurance/research-contract">Research contract</a><a href="https://id.activemirror.ai/trust/">Receipt verifier</a></div></div>
+      <div><h2>Institutional use</h2><p>Banks, government programs, CSR teams, and researchers can use the fixed pilot and field harness to run a bounded evaluation with aggregate outcomes and no sponsor-visible raw scam content by default.</p><div class="actions"><a class="primary" href="/partners/30-day-pilot">Open 30-day pilot</a><a href="/observatory">India Observatory</a><a href="/partners/trust-room">Trust Room</a><a href="/partners/field-harness">Field harness</a><a href="/api/v1/assurance">Machine-readable evidence</a><a href="/api/v1/assurance/research-contract">Research contract</a><a href="https://id.activemirror.ai/trust/">Receipt verifier</a></div></div>
     </section>
   </main>
 </body>

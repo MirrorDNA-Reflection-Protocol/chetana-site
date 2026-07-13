@@ -1,0 +1,172 @@
+{
+  "schema_version": "chetana.institutional.v1",
+  "published_at": "2026-07-13",
+  "evidence_classes": {
+    "official": "A dated statement from an Indian government or regulator source. It describes the source's scope, not Chetana's performance.",
+    "observed": "A privacy-safe aggregate produced from Chetana's own event ledger. Empty means no qualifying observations, not zero fraud.",
+    "pilot_derived": "A result measured inside a named, source-tagged Chetana pilot. No pilot-derived result is published until the pilot exists.",
+    "pending_evidence": "A material claim that Chetana has not established and will not imply."
+  },
+  "observatory": {
+    "title": "India Scam Readiness Observatory",
+    "description": "A source-labelled view of India's reported cyber-fraud pressure, official response rails, and what Chetana has or has not measured.",
+    "method": "No composite score is published. Figures from different reporting systems, periods, and definitions are kept separate.",
+    "official_metrics": [
+      {
+        "id": "ncrp_incidents_2024",
+        "label": "Cybercrime incidents registered on NCRP",
+        "display": "22.68 lakh",
+        "value": 2268346,
+        "unit": "incidents",
+        "period": "calendar year 2024",
+        "geography": "India",
+        "evidence_class": "official",
+        "source_title": "Lok Sabha Unstarred Question 432, 2 December 2025",
+        "source_url": "https://www.mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/LS02122025/432.pdf",
+        "caveat": "Portal incidents are reports, not convictions, unique victims, or Chetana-detected scams."
+      },
+      {
+        "id": "citizen_loss_2024",
+        "label": "Citizen cyber-fraud losses reported",
+        "display": "Rs 22,845.73 crore",
+        "value": 22845.73,
+        "unit": "INR crore",
+        "period": "calendar year 2024",
+        "geography": "India",
+        "evidence_class": "official",
+        "source_title": "Lok Sabha Unstarred Question 432, 2 December 2025",
+        "source_url": "https://www.mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/LS02122025/432.pdf",
+        "caveat": "This is amount reported through NCRP and CFCFRMS, not an estimate of every loss in India."
+      },
+      {
+        "id": "cfcfrms_saved_2025_10",
+        "label": "Amount saved through CFCFRMS",
+        "display": "> Rs 7,130 crore",
+        "value": 7130,
+        "unit": "INR crore, lower bound",
+        "period": "cumulative to 31 October 2025",
+        "geography": "India",
+        "evidence_class": "official",
+        "source_title": "Ministry of Home Affairs: Cyber Security and Financial Fraud Combat",
+        "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2205201&lang=1&reg=1",
+        "caveat": "The ministry reports this across more than 23.02 lakh complaints. It is not attributable to Chetana."
+      },
+      {
+        "id": "rbi_card_internet_frauds_2024_25",
+        "label": "Bank-reported card/internet fraud cases",
+        "display": "13,516",
+        "value": 13516,
+        "unit": "fraud cases",
+        "period": "financial year 2024-25",
+        "geography": "India, RBI-regulated reporting scope",
+        "evidence_class": "official",
+        "source_title": "RBI Annual Report 2024-25, Table VI.3",
+        "source_url": "https://www.rbi.org.in/scripts/AnnualReportPublications.aspx?Id=1436",
+        "caveat": "RBI says the data cover frauds of Rs 1 lakh and above reported in the period; cases may have occurred earlier. The Rs 520 crore amount involved is not necessarily consumer loss or fully diverted."
+      },
+      {
+        "id": "chakshu_numbers_2025_08",
+        "label": "Mobile numbers flagged through Chakshu and deactivated",
+        "display": "> 29 lakh",
+        "value": 2900000,
+        "unit": "mobile numbers, lower bound",
+        "period": "reported 9 August 2025",
+        "geography": "India",
+        "evidence_class": "official",
+        "source_title": "Department of Telecommunications: Sanchar Saathi update",
+        "source_url": "https://www.pib.gov.in/Pressreleaseshare.aspx?PRID=2154606&lang=2&reg=48",
+        "caveat": "This is a DoT programme outcome, not a count of unique scammers or a Chetana data source."
+      },
+      {
+        "id": "haryana_ncrp_context_2025_02",
+        "label": "Haryana NCRP cyber-fraud incidents",
+        "display": "2.12 lakh",
+        "value": 212001,
+        "unit": "incidents",
+        "period": "cumulative since inception to 28 February 2025",
+        "geography": "Haryana",
+        "evidence_class": "official",
+        "source_title": "Rajya Sabha Unstarred Question 1513, 12 March 2025",
+        "source_url": "https://mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/RS12032025/1513.pdf",
+        "caveat": "This cumulative, non-normalised figure is pilot context only. It must not be used as a state ranking or current incidence rate."
+      }
+    ],
+    "pending_claims": [
+      "Chetana has not established population-level detection accuracy.",
+      "Chetana has not established prevented financial loss or recovery attributable to the product.",
+      "Chetana has no privileged access to I4C, CFCFRMS, FRI, RBI, bank, police, telecom, or government suspect data.",
+      "Chetana has not completed an independent field evaluation."
+    ]
+  },
+  "pilot": {
+    "name": "30-day Digital Kavach Pilot",
+    "status": "ready_to_scope",
+    "promise": "Help one defined audience pause, inspect, and reach the correct official rail before or immediately after a suspected scam.",
+    "fixed_scope": [
+      "One named audience in one geography, branch cluster, campus, workforce, or merchant network.",
+      "One agreed set of source-tagged QR, link, poster, or WhatsApp entry points.",
+      "Chetana's existing screenshot, text, voice, QR, UPI, and payment-proof checking surfaces.",
+      "Sponsor-safe aggregate PilotTrace reporting; no sponsor-visible raw scam content by default.",
+      "A final written continue, change, or stop decision packet."
+    ],
+    "timeline": [
+      {"days": "1-5", "name": "Contract", "detail": "Freeze audience, source tags, owner, privacy boundary, escalation rails, and acceptance measures."},
+      {"days": "6-12", "name": "Launch", "detail": "Publish the agreed entry points and verify every QR, link, language, and reporting path."},
+      {"days": "13-23", "name": "Observe", "detail": "Review aggregate use, quality rows, feedback buckets, high-risk pauses, and official-rail taps."},
+      {"days": "24-30", "name": "Decide", "detail": "Deliver PilotTrace, limitations, incidents, lessons, and a written scale, revise, or stop recommendation."}
+    ],
+    "measures": [
+      "qualifying scans and unique sessions",
+      "high-risk pauses",
+      "follow-through sessions and official-rail taps",
+      "feedback, false-safe complaints, and false-alarm reports",
+      "case or evidence packets saved",
+      "invalid, duplicate, synthetic, and out-of-window rows",
+      "privacy controls used"
+    ],
+    "not_included": [
+      "A guaranteed reduction in fraud loss, recovery rate, or complaint volume.",
+      "Production access to a bank, government, police, telecom, or payment system.",
+      "Raw screenshots, messages, phone numbers, UPI IDs, URLs, identities, or user profiles delivered to the sponsor.",
+      "A regulator, government, bank, RBI, NPCI, I4C, CERT-In, or police endorsement.",
+      "Pricing, procurement, DPA, SLA, warranty, liability, or integration terms without authorised written approval."
+    ],
+    "stop_conditions": [
+      "A material privacy or security boundary is breached.",
+      "Campaign copy implies endorsement, guaranteed protection, or unsupported efficacy.",
+      "Official recovery routes are unavailable or materially misrepresented.",
+      "The sponsor requests raw user content without a separately reviewed consent and research contract.",
+      "Evidence quality is too weak to support a decision."
+    ]
+  },
+  "trust_room": {
+    "status": "implemented_baseline_with_open_blocks",
+    "plain_position": "Chetana is an independent advisory scam checker. It is not a bank, government service, law-enforcement system, regulated fraud registry, or substitute for official reporting.",
+    "implemented": [
+      "Local-first deterministic risk contract with no safe verdict and a low-signal abstention path.",
+      "Source-tagged field links and sponsor-safe aggregate PilotTrace reports.",
+      "Signed, publicly verifiable regression-suite integrity receipts with explicit proof limits.",
+      "No sponsor-visible raw scam text, screenshots, phone numbers, UPI IDs, URLs, or user profiles by default.",
+      "Encrypted, bounded Partner Desk conversations with deletion, retention, integrity, and approval gates.",
+      "Official 1930, NCRP, Chakshu, RBI CMS, SEBI, UIDAI, consumer, emergency, and domain-specific help rails."
+    ],
+    "open_blocks": [
+      "No ISO 27001, SOC 2, CERT-In empanelled audit, independent penetration test, or independent field validation is claimed.",
+      "No Indian lawyer has approved the pilot contract, procurement posture, advertising, DPA, SLA, or liability terms.",
+      "Authenticated outbound email from Active Mirror is not configured; operator email alerts remain queued.",
+      "Host compromise, disaster recovery, key escrow, multi-node availability, and formal incident-response operations have not been independently audited.",
+      "No privileged government, bank, telecom, police, or payment-network intelligence integration is live."
+    ],
+    "artifacts": [
+      {"label": "Safety Lab", "url": "/assurance", "purpose": "Signed regression evidence and proof boundary"},
+      {"label": "Machine-readable assurance", "url": "/api/v1/assurance", "purpose": "Current report, signature, verification result, and limits"},
+      {"label": "Research contract", "url": "/api/v1/assurance/research-contract", "purpose": "Consent, retention, and adjudication boundary"},
+      {"label": "Field harness", "url": "/partners/field-harness", "purpose": "Source-tag and sponsor-safe measurement contract"},
+      {"label": "PilotTrace", "url": "/partners/pilottrace", "purpose": "Observed aggregate activity and data-quality rows"},
+      {"label": "Privacy", "url": "/privacy", "purpose": "Consumer-facing data boundary"},
+      {"label": "Security contact", "url": "/.well-known/security.txt", "purpose": "Vulnerability reporting route"},
+      {"label": "MirrorProof verifier", "url": "https://id.activemirror.ai/trust/", "purpose": "Independent receipt verification surface"}
+    ],
+    "contact": "paul@activemirror.ai"
+  }
+}

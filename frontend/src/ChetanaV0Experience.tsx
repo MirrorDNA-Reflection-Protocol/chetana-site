@@ -180,6 +180,12 @@ type RecoveryActionOptions = {
 };
 type MoneyMovedAnswer = "yes" | "no" | null;
 type ResultFeedbackType = "missed_scam" | "too_cautious" | "scammed_after_scan" | "useful";
+type ResearchCandidateReceipt = {
+  candidate_id: string;
+  deletion_token: string;
+  redaction_count: number;
+  retention_expires_at_utc: string;
+};
 type CasePacketRow = {
   label: string;
   value: string;
@@ -351,6 +357,10 @@ export default function ChetanaV0Experience({
   const [moneyMovedAnswer, setMoneyMovedAnswer] = useState<MoneyMovedAnswer>(null);
   const [resultFeedback, setResultFeedback] = useState<ResultFeedbackType | null>(null);
   const [resultFeedbackStatus, setResultFeedbackStatus] = useState<string | null>(null);
+  const [researchConsent, setResearchConsent] = useState(false);
+  const [researchSubmitting, setResearchSubmitting] = useState(false);
+  const [researchReceipt, setResearchReceipt] = useState<ResearchCandidateReceipt | null>(null);
+  const [researchStatus, setResearchStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialInput) {
@@ -652,6 +662,10 @@ export default function ChetanaV0Experience({
     setMoneyMovedAnswer(null);
     setResultFeedback(null);
     setResultFeedbackStatus(null);
+    setResearchConsent(false);
+    setResearchSubmitting(false);
+    setResearchReceipt(null);
+    setResearchStatus(null);
     setStatus(nextStatus);
   };
 
@@ -1451,6 +1465,66 @@ export default function ChetanaV0Experience({
     }
   };
 
+  const donateResearchCandidate = async () => {
+    if (
+      !result ||
+      !lastExtractedInput?.text ||
+      !resultFeedback ||
+      resultFeedback === "useful" ||
+      !researchConsent ||
+      researchSubmitting
+    ) return;
+    setResearchSubmitting(true);
+    setResearchStatus("Removing common identifiers before quarantine...");
+    try {
+      const response = await fetch("/api/v1/research/candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scan_id: result.scan_id,
+          feedback_type: resultFeedback,
+          input_type: result.input_type,
+          language_hint: result.language_hint || navigator.language.slice(0, 2),
+          text: lastExtractedInput.text,
+          consent_token: "I_CONSENT_TO_CHETANA_RESEARCH_DATA_DONATION_V1",
+        }),
+      });
+      if (!response.ok) throw new Error("donation_failed");
+      const receipt = (await response.json()) as ResearchCandidateReceipt;
+      setResearchReceipt(receipt);
+      setResearchStatus(
+        `Donated after ${receipt.redaction_count} automatic redaction${receipt.redaction_count === 1 ? "" : "s"}. Quarantined until two reviewers agree.`,
+      );
+    } catch {
+      setResearchStatus("Chetana could not save this research example. Nothing was donated.");
+    } finally {
+      setResearchSubmitting(false);
+    }
+  };
+
+  const deleteResearchCandidate = async () => {
+    if (!researchReceipt || researchSubmitting) return;
+    setResearchSubmitting(true);
+    try {
+      const response = await fetch("/api/v1/research/candidates/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_id: researchReceipt.candidate_id,
+          deletion_token: researchReceipt.deletion_token,
+        }),
+      });
+      if (!response.ok) throw new Error("deletion_failed");
+      setResearchReceipt(null);
+      setResearchConsent(false);
+      setResearchStatus("Research example deleted.");
+    } catch {
+      setResearchStatus("Chetana could not delete the example right now. Try again before leaving this page.");
+    } finally {
+      setResearchSubmitting(false);
+    }
+  };
+
   const trackReportAction = (surface: string, options: RecoveryActionOptions = {}) => {
     if (!result) return;
     const defaults = RECOVERY_SURFACE_DEFAULTS[surface] || {};
@@ -1984,6 +2058,50 @@ export default function ChetanaV0Experience({
                   ))}
                 </div>
               </div>
+
+              {resultFeedback && resultFeedback !== "useful" && lastExtractedInput?.text && (
+                <div className="v0-research-donation">
+                  <div>
+                    <div className="v0-section-label">Optional research donation</div>
+                    <strong>Help improve the cases Chetana gets wrong</strong>
+                    <p>
+                      Ordinary feedback sent no message text. This separate opt-in sends extracted text for automatic identifier redaction, then holds it in quarantine for at most 90 days. It cannot enter the benchmark until two reviewers agree.
+                    </p>
+                    <p className="v0-research-warning">Automatic redaction may miss names. Do not donate examples containing names, passwords, full IDs, card details, or private account information.</p>
+                    {researchStatus && <small aria-live="polite">{researchStatus}</small>}
+                  </div>
+                  {!researchReceipt ? (
+                    <div className="v0-research-controls">
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={researchConsent}
+                          onChange={(event) => setResearchConsent(event.target.checked)}
+                        />
+                        I understand and consent to donating this redacted example for Chetana research.
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => { void donateResearchCandidate(); }}
+                        disabled={!researchConsent || researchSubmitting}
+                      >
+                        <Shield size={15} />
+                        {researchSubmitting ? "Preparing..." : "Donate redacted example"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="v0-research-delete"
+                      onClick={() => { void deleteResearchCandidate(); }}
+                      disabled={researchSubmitting}
+                    >
+                      <X size={15} />
+                      {researchSubmitting ? "Deleting..." : "Delete my donation"}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {actionRoute && (
                 <div className={`v0-action-route ${actionRoute.primary_action.urgency}`}>

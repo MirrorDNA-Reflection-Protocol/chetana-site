@@ -1,0 +1,36 @@
+{
+  "schema_version": "chetana.research_candidate_contract.v0.1",
+  "purpose": "Convert explicitly consented correction examples into quarantined research candidates without treating user feedback as ground truth.",
+  "intake": {
+    "requires_explicit_consent": true,
+    "accepted_feedback_types": ["missed_scam", "too_cautious", "scammed_after_scan"],
+    "raw_text_stored": false,
+    "stored_content": ["sanitized_text", "sanitized_text_sha256", "language_hint", "input_type", "feedback_type"],
+    "retention_days": 90,
+    "deletion_supported": true
+  },
+  "promotion_gate": {
+    "minimum_independent_reviewers": 2,
+    "requires_label_consensus": true,
+    "requires_source_provenance": true,
+    "requires_pii_review": true,
+    "requires_duplicate_check": true,
+    "requires_license_or_consent_record": true,
+    "user_feedback_is_ground_truth": false,
+    "automatic_promotion_allowed": false
+  },
+  "required_adjudication_labels": [
+    "ground_truth",
+    "scam_type",
+    "severity",
+    "language",
+    "evidence_quality",
+    "reviewer_ids",
+    "adjudicated_at_utc"
+  ],
+  "prohibited_claims": [
+    "independently validated before independent review",
+    "representative of Indian users without sampling evidence",
+    "prevented loss without outcome evidence"
+  ]
+}

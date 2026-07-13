@@ -1992,6 +1992,77 @@ main {
   opacity: 1;
 }
 
+.v0-research-donation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.72fr);
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid rgba(60, 130, 102, 0.38);
+  background: rgba(21, 75, 57, 0.12);
+}
+
+.v0-research-donation strong,
+.v0-research-donation p,
+.v0-research-donation small {
+  display: block;
+}
+
+.v0-research-donation p {
+  margin: 7px 0 0;
+  color: var(--text-secondary);
+}
+
+.v0-research-donation .v0-research-warning {
+  color: #e2b66d;
+  font-size: 0.82rem;
+}
+
+.v0-research-donation small {
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+
+.v0-research-controls {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.v0-research-controls label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.v0-research-controls input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #3fbd8c;
+}
+
+.v0-research-controls button,
+.v0-research-delete {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.v0-research-delete {
+  align-self: start;
+}
+
+@media (max-width: 720px) {
+  .v0-research-donation {
+    grid-template-columns: 1fr;
+  }
+}
+
 .v0-action-route {
   display: grid;
   gap: 14px;

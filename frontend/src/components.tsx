@@ -3623,6 +3623,10 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
             <BarChart3 size={17} />
             30-day pilot
           </a>
+          <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
+            <ShieldCheck size={17} />
+            Safety Lab
+          </a>
           <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
             <Share2 size={17} />
             Outreach kit
@@ -3804,6 +3808,10 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
               <BarChart3 size={17} />
               View PilotTrace report
             </a>
+            <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
+              <ShieldCheck size={17} />
+              Open Safety Lab
+            </a>
           </div>
         </div>
         <div className="partner-case-packet" aria-label="Sample Chetana case packet">
@@ -3881,6 +3889,10 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
           <a className="partner-secondary" href="/api/v1/partners/pilottrace" target="_blank" rel="noreferrer">
             <FileText size={17} />
             Open JSON proof
+          </a>
+          <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
+            <ShieldCheck size={17} />
+            Safety Lab
           </a>
         </div>
       </div>

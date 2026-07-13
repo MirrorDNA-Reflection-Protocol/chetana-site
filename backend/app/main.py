@@ -7,7 +7,9 @@ Kavach remains available for thin identifier checks and feeds.
 """
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager, suppress
 import html as html_lib
 import httpx
 import json
@@ -67,6 +69,14 @@ from app.mirrorproof import (  # noqa: E402
     issuer_document as mirrorproof_issuer_document,
     issue_assessment_receipt,
     verify_assessment_receipt,
+)
+from app.assurance import load_assurance_payload, load_research_contract, render_assurance_html  # noqa: E402
+from app.research_intake import (  # noqa: E402
+    ResearchCandidateRequest,
+    ResearchDeletionRequest,
+    accept_research_candidate,
+    delete_research_candidate,
+    purge_expired_candidates,
 )
 from app.field_harness import (  # noqa: E402
     FIELD_SOURCE_TAGS,
@@ -163,6 +173,23 @@ async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
         logger.debug("Telegram notify failed: %s", e)
         return False
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    global _client, _research_retention_task
+    _research_retention_task = asyncio.create_task(_research_retention_loop())
+    try:
+        yield
+    finally:
+        if _research_retention_task:
+            _research_retention_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await _research_retention_task
+            _research_retention_task = None
+        if _client and not _client.is_closed:
+            await _client.aclose()
+
+
 app = FastAPI(
     title="Chetana API",
     description="Advisory API for checking suspicious messages, QR requests, and payment proofs, with clear next steps for users in India.",
@@ -170,6 +197,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=_lifespan,
 )
 
 # ── P0 Incident Mode router ───────────────────────────────────────────────────
@@ -237,9 +265,13 @@ frontend_dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
 # ── Shared async HTTP client ──────────────────────────────────────────
 
 _client: httpx.AsyncClient | None = None
+_research_retention_task: asyncio.Task[None] | None = None
 _CHAT_WINDOW_S = int(os.getenv("CHETANA_CHAT_WINDOW_S", "60"))
 _CHAT_MAX_REQUESTS = int(os.getenv("CHETANA_CHAT_MAX_REQUESTS", "12"))
 _CHAT_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
+_RESEARCH_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
+_RESEARCH_WINDOW_S = 60 * 60
+_RESEARCH_MAX_REQUESTS = 5
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
@@ -347,11 +379,10 @@ async def get_client() -> httpx.AsyncClient:
     return _client
 
 
-@app.on_event("shutdown")
-async def _close_client():
-    global _client
-    if _client and not _client.is_closed:
-        await _client.aclose()
+async def _research_retention_loop() -> None:
+    while True:
+        purge_expired_candidates()
+        await asyncio.sleep(60 * 60)
 
 
 @app.get("/api/translate/budget")
@@ -2427,6 +2458,56 @@ async def partner_inquiry(req: PartnerInquiryRequest):
     return {"ok": True, "inquiry_id": inquiry_id, "received_at_utc": received_at}
 
 
+def _research_request_key(request: Request) -> str:
+    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()[:64]
+    if request.client and request.client.host:
+        return request.client.host[:64]
+    return "unknown"
+
+
+def _check_research_rate_limit(request: Request) -> None:
+    now = time.monotonic()
+    bucket = _RESEARCH_REQUEST_LOG[_research_request_key(request)]
+    cutoff = now - _RESEARCH_WINDOW_S
+    while bucket and bucket[0] < cutoff:
+        bucket.popleft()
+    if len(bucket) >= _RESEARCH_MAX_REQUESTS:
+        raise HTTPException(status_code=429, detail="Research donation limit reached. Try again later.")
+    bucket.append(now)
+
+
+@app.post("/api/v1/research/candidates")
+async def research_candidate(req: ResearchCandidateRequest, request: Request):
+    """Accept an explicitly consented, sanitized correction candidate for later adjudication."""
+    _check_research_rate_limit(request)
+    return accept_research_candidate(req).model_dump()
+
+
+@app.post("/api/v1/research/candidates/delete")
+async def research_candidate_delete(req: ResearchDeletionRequest):
+    """Delete the stored sanitized candidate using its one-time deletion secret."""
+    result = delete_research_candidate(req)
+    if not result.deleted and result.reason == "deletion_token_invalid":
+        raise HTTPException(status_code=403, detail="Deletion token is invalid.")
+    if not result.deleted:
+        raise HTTPException(status_code=404, detail="Research candidate was not found.")
+    return result.model_dump()
+
+
+@app.get("/api/v1/assurance")
+async def assurance_evidence():
+    """Return the current signed benchmark and its live verification result."""
+    return load_assurance_payload()
+
+
+@app.get("/api/v1/assurance/research-contract")
+async def assurance_research_contract():
+    """Publish the consent, retention, and adjudication gate for donated corrections."""
+    return load_research_contract()
+
+
 # ── Discovery / SEO routes (before catch-all) ────────────────────────
 from fastapi.responses import PlainTextResponse, FileResponse as _FileResponse
 
@@ -2454,6 +2535,7 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/pilottrace</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
+  <url><loc>https://chetana.activemirror.ai/assurance</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
 </urlset>"""
     return PlainTextResponse(xml, media_type="application/xml")
 
@@ -2465,6 +2547,16 @@ async def security_txt():
         "Policy: https://chetana.activemirror.ai/privacy\n"
         "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
         media_type="text/plain"
+    )
+
+
+@app.get("/assurance", include_in_schema=False)
+@app.get("/assurance/", include_in_schema=False)
+async def assurance_page():
+    payload = load_assurance_payload()
+    return HTMLResponse(
+        content=render_assurance_html(payload),
+        headers={"Cache-Control": "public, max-age=300"},
     )
 
 

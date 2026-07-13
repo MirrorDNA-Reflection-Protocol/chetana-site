@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Any, Literal, Optional
@@ -84,12 +84,20 @@ from app.partner_desk import (  # noqa: E402
     PartnerInquiryRequest,
     PartnerMessageRequest,
     PartnerPublicMessageRequest,
+    build_partner_decision_packet,
     continue_partner_conversation,
+    conversation_integrity_status,
     delete_partner_conversation,
+    list_partner_decision_packets,
+    list_pending_partner_alerts,
+    partner_notification_status,
     public_conversation_payload,
     purge_expired_partner_conversations,
+    record_operator_review,
+    record_partner_notification,
     start_partner_conversation,
 )
+from app.partner_operations import OPERATOR_EMAIL, render_partner_decision_inbox  # noqa: E402
 from app.field_harness import (  # noqa: E402
     FIELD_SOURCE_TAGS,
     campaign_url_for_source,
@@ -164,6 +172,61 @@ def _load_telegram_config() -> tuple[str, str]:
 
 
 _TG_TOKEN, _TG_CHAT_ID = _load_telegram_config()
+
+
+def _load_partner_email_config() -> tuple[str, str]:
+    key = os.getenv("RESEND_API_KEY", "")
+    sender = os.getenv("CHETANA_PARTNER_EMAIL_FROM", "")
+    secrets_path = Path.home() / ".mirrordna" / "secrets.env"
+    if secrets_path.exists() and (not key or not sender):
+        for line in secrets_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip().removeprefix("export ").strip()
+            if stripped.startswith("RESEND_API_KEY=") and not key:
+                key = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+            elif stripped.startswith("CHETANA_PARTNER_EMAIL_FROM=") and not sender:
+                sender = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+    if sender and not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@activemirror\.ai", sender):
+        logger.warning("Partner alert sender rejected because it is outside activemirror.ai")
+        sender = ""
+    return key, sender
+
+
+def _partner_email_transport_status() -> str:
+    key, sender = _load_partner_email_config()
+    return "authenticated_transport_configured" if key and sender else "queued_no_authenticated_transport"
+
+
+async def _notify_partner_email(conversation_id: str, pilot_type: str) -> bool:
+    key, sender = _load_partner_email_config()
+    if not key or not sender:
+        return False
+    body = (
+        "Chetana Partner Desk has an authority-limited decision request.\n\n"
+        f"Conversation: {conversation_id}\n"
+        f"Pilot lane: {pilot_type}\n"
+        "Open the loopback-only decision inbox on the Chetana host:\n"
+        "http://127.0.0.1:8093/operator/partner-desk\n\n"
+        "This alert contains no prospect identity or message text and does not approve or send any terms."
+    )
+    try:
+        client = await get_client()
+        response = await client.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "from": sender,
+                "to": [OPERATOR_EMAIL],
+                "subject": f"Chetana decision required: {pilot_type}",
+                "text": body,
+            },
+            timeout=8.0,
+        )
+        if response.status_code < 300:
+            return True
+        logger.warning("Partner operator email failed with status %s", response.status_code)
+    except Exception as exc:
+        logger.warning("Partner operator email transport failed: %s", type(exc).__name__)
+    return False
 
 
 async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
@@ -399,6 +462,11 @@ async def _research_retention_loop() -> None:
     while True:
         purge_expired_candidates()
         purge_expired_partner_conversations()
+        for pending_alert in list_pending_partner_alerts():
+            await _deliver_partner_approval_alert(
+                str(pending_alert["conversation_id"]),
+                str(pending_alert["trigger_event_id"]),
+            )
         await asyncio.sleep(60 * 60)
 
 
@@ -2516,6 +2584,77 @@ def _clear_partner_capability_cookies(response: Response, conversation_id: str) 
     response.delete_cookie("chetana_partner_delete", path=cookie_path, httponly=True, samesite="strict")
 
 
+async def _deliver_partner_approval_alert(conversation_id: str, trigger_event_id: str) -> None:
+    try:
+        summary = conversation_integrity_status(conversation_id)
+        pilot_type = summary["pilot_type"]
+        telegram_status = partner_notification_status(
+            conversation_id,
+            trigger_event_id=trigger_event_id,
+            channel="telegram",
+        )
+        if telegram_status != "sent":
+            telegram_sent = await _notify_telegram(
+                "Chetana Partner Desk: authority-limited decision required.\n"
+                f"Lane: `{pilot_type}`\n"
+                f"Conversation: `{conversation_id}`\n"
+                "Open the loopback-only decision inbox on the Chetana host. "
+                "No name, email, organisation, or message text is included."
+            )
+            record_partner_notification(
+                conversation_id,
+                trigger_event_id=trigger_event_id,
+                channel="telegram",
+                status="sent" if telegram_sent else "failed_or_unconfigured",
+                target=_TG_CHAT_ID or "unconfigured",
+            )
+
+        email_status = partner_notification_status(
+            conversation_id,
+            trigger_event_id=trigger_event_id,
+            channel="email",
+        )
+        email_transport = _partner_email_transport_status()
+        if email_status != "sent" and not (
+            email_status == "queued_no_authenticated_transport"
+            and email_transport == "queued_no_authenticated_transport"
+        ):
+            email_sent = await _notify_partner_email(conversation_id, pilot_type)
+            record_partner_notification(
+                conversation_id,
+                trigger_event_id=trigger_event_id,
+                channel="email",
+                status=(
+                    "sent"
+                    if email_sent
+                    else "queued_no_authenticated_transport"
+                    if email_transport == "queued_no_authenticated_transport"
+                    else "failed_or_unconfigured"
+                ),
+                target=OPERATOR_EMAIL,
+            )
+    except Exception as exc:
+        logger.error("Partner approval alert failed closed: %s", type(exc).__name__)
+
+
+def _require_local_partner_operator(request: Request) -> None:
+    forwarded = any(
+        request.headers.get(name)
+        for name in ("cf-connecting-ip", "cf-ray", "forwarded", "x-forwarded-for", "x-real-ip")
+    )
+    host = request.client.host if request.client else ""
+    if forwarded or host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(status_code=404, detail="Not found")
+    origin = request.headers.get("origin")
+    if origin and origin.rstrip("/") not in {
+        "http://127.0.0.1:8093",
+        "http://127.0.0.1:8096",
+        "http://localhost:8093",
+        "http://localhost:8096",
+    }:
+        raise HTTPException(status_code=403, detail="operator_origin_not_allowed")
+
+
 @app.post("/api/v1/partners/inquiries")
 async def partner_inquiry(req: PartnerInquiryRequest, request: Request, response: Response):
     """Start a consented, encrypted, AI-disclosed institutional qualification conversation."""
@@ -2562,6 +2701,11 @@ async def partner_inquiry(req: PartnerInquiryRequest, request: Request, response
         conversation["conversation_token"],
         conversation["deletion_token"],
     )
+    if conversation.get("_approval_trigger_event_id"):
+        await _deliver_partner_approval_alert(
+            conversation["conversation_id"],
+            conversation["_approval_trigger_event_id"],
+        )
     return {
         "ok": True,
         "inquiry_id": inquiry_id,
@@ -2582,10 +2726,14 @@ async def partner_conversation_message(
     if not token:
         raise HTTPException(status_code=403, detail="conversation_session_missing")
     try:
-        return continue_partner_conversation(
+        result = continue_partner_conversation(
             conversation_id,
             PartnerMessageRequest(conversation_token=token, message=req.message),
         )
+        trigger_event_id = result.pop("_approval_trigger_event_id", None)
+        if trigger_event_id:
+            await _deliver_partner_approval_alert(conversation_id, trigger_event_id)
+        return result
     except PartnerDeskError as exc:
         raise _partner_error(exc) from exc
 
@@ -2616,6 +2764,42 @@ async def partner_conversation_delete(
 async def partner_desk_policy():
     policy_path = Path(__file__).resolve().parents[2] / "docs" / "partners" / "partner_desk_policy_v1.json"
     return json.loads(policy_path.read_text(encoding="utf-8"))
+
+
+@app.get("/operator/partner-desk", include_in_schema=False)
+async def partner_operator_inbox(request: Request):
+    _require_local_partner_operator(request)
+    return HTMLResponse(
+        render_partner_decision_inbox(
+            list_partner_decision_packets(),
+            email_transport=_partner_email_transport_status(),
+        ),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/operator/partner-desk/{conversation_id}.json", include_in_schema=False)
+async def partner_operator_packet(conversation_id: str, request: Request):
+    _require_local_partner_operator(request)
+    try:
+        packet = build_partner_decision_packet(conversation_id)
+    except PartnerDeskError as exc:
+        raise _partner_error(exc) from exc
+    return JSONResponse(packet, headers={"Cache-Control": "no-store, max-age=0"})
+
+
+@app.post("/operator/partner-desk/{conversation_id}/review", include_in_schema=False)
+async def partner_operator_review(
+    conversation_id: str,
+    request: Request,
+    state: Literal["reviewed_no_commitment", "closed_no_commitment"] = Form(...),
+):
+    _require_local_partner_operator(request)
+    try:
+        record_operator_review(conversation_id, state=state)
+    except PartnerDeskError as exc:
+        raise _partner_error(exc) from exc
+    return RedirectResponse("/operator/partner-desk", status_code=303)
 
 
 def _research_request_key(request: Request) -> str:
@@ -2702,7 +2886,7 @@ async def sitemap_xml():
 @app.get("/.well-known/security.txt", include_in_schema=False)
 async def security_txt():
     return PlainTextResponse(
-        "Contact: mailto:trust@activemirror.ai\n"
+        "Contact: mailto:paul@activemirror.ai\n"
         "Preferred-Languages: en, hi\n"
         "Policy: https://chetana.activemirror.ai/privacy\n"
         "Canonical: https://chetana.activemirror.ai/.well-known/security.txt\n",
@@ -3352,9 +3536,10 @@ async def privacy_policy():
   <h2>Third-party services</h2>
   <p>We use ordinary web infrastructure such as hosting, TLS, and optional platform channels like Telegram. Explicit screenshot improvement may send that screenshot to Mistral OCR. Explicit domain checks send only the normalized hostname to the IANA-designated RDAP registry. If operator-enabled chat fallback is active, the specific chat message for that reply may be processed by Anthropic or OpenAI. Chetana does not retain these request or response payloads.</p>
   <p>The Partner Desk policy engine is deterministic and local. Partner conversation content is not sent to an external model or CRM.</p>
+  <p>When a request needs authorised review, Chetana may send the operator a pilot lane and pseudonymous conversation ID through a configured Telegram channel or authenticated Active Mirror email sender. These alerts exclude the contact's name, email address, organisation, and message text. Email alerts to paul@activemirror.ai remain queued when authenticated transport is unavailable.</p>
 
   <h2>Partner contact rights</h2>
-  <p>Partner contacts may withdraw the inquiry by using the conversation deletion control or by contacting <a href="mailto:trust@activemirror.ai">trust@activemirror.ai</a>. We will correct or erase retained partner contact information unless retention is required by applicable law. The consent applies only to responding to and qualifying that inquiry; it is not consent for unrelated marketing, automated calls, or bulk messages.</p>
+  <p>Partner contacts may withdraw the inquiry by using the conversation deletion control or by contacting <a href="mailto:paul@activemirror.ai">paul@activemirror.ai</a>. We will correct or erase retained partner contact information unless retention is required by applicable law. The consent applies only to responding to and qualifying that inquiry; it is not consent for unrelated marketing, automated calls, or bulk messages.</p>
 
   <h2>Children</h2>
   <p>Chetana is not directed at children under 13. We do not knowingly collect data from children.</p>
@@ -3363,7 +3548,7 @@ async def privacy_policy():
   <p>We may update this policy. Significant changes will be noted at <a href="https://chetana.activemirror.ai/privacy">chetana.activemirror.ai/privacy</a>.</p>
 
   <h2>Contact</h2>
-  <p>Questions: <a href="mailto:trust@activemirror.ai">trust@activemirror.ai</a></p>
+  <p>Questions: <a href="mailto:paul@activemirror.ai">paul@activemirror.ai</a></p>
 
   <footer>
     Last updated: July 2026 · Chetana is a product of ActiveMirror / MirrorDNA · Made in India

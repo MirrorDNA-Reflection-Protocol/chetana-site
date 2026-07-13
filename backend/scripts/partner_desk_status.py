@@ -29,9 +29,19 @@ def main() -> int:
         "status": "pass" if not failures else "fail",
         "conversation_count": len(summaries),
         "approval_queue_count": sum(bool(item["approval_required"]) for item in summaries),
+        "approval_unreviewed_count": sum(item["operator_state"] == "needs_review" for item in summaries),
+        "email_alert_queued_count": sum(
+            item["notification_status"].get("email") == "queued_no_authenticated_transport"
+            for item in summaries
+        ),
+        "telegram_alert_unavailable_count": sum(
+            item["notification_status"].get("telegram") == "failed_or_unconfigured"
+            for item in summaries
+        ),
         "conversations": summaries,
         "integrity_failures": failures,
-        "personal_data_in_output": False,
+        "direct_contact_data_in_output": False,
+        "pseudonymous_conversation_ids_in_output": True,
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if not failures else 1

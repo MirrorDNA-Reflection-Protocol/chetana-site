@@ -116,7 +116,7 @@ def public_conversation_payload(conversation: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in conversation.items()
-        if key not in {"conversation_token", "deletion_token"}
+        if key not in {"conversation_token", "deletion_token"} and not key.startswith("_")
     }
 
 
@@ -160,7 +160,11 @@ def _load_events(path: Path, cipher: Fernet) -> list[tuple[dict[str, Any], dict[
         raise PartnerDeskError("conversation_not_found")
     records: list[tuple[dict[str, Any], dict[str, Any]]] = []
     previous_hash = "0" * 64
-    for expected_sequence, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    with path.open("r", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_SH)
+        lines = handle.read().splitlines()
+        fcntl.flock(handle, fcntl.LOCK_UN)
+    for expected_sequence, line in enumerate(lines, start=1):
         try:
             envelope = json.loads(line)
             claimed_hash = envelope.pop("event_hash")
@@ -367,7 +371,7 @@ def start_partner_conversation(
         "desk_reply": reply,
     }
     path = _conversation_path(conversation_id, root)
-    _append_event(path, _fernet(root), "conversation_started", payload)
+    started_event = _append_event(path, _fernet(root), "conversation_started", payload)
     return {
         "conversation_id": conversation_id,
         "conversation_token": conversation_token,
@@ -375,6 +379,9 @@ def start_partner_conversation(
         "retention_expires_at_utc": payload["expires_at_utc"],
         "storage_boundary": "encrypted_local_conversation_aggregate_pilot_metrics_only",
         "desk": reply,
+        "_approval_trigger_event_id": (
+            started_event["event_id"] if reply["requires_human_approval"] else None
+        ),
     }
 
 
@@ -409,9 +416,212 @@ def continue_partner_conversation(
         "classification": reply["status"],
         "blocked_reason": reply["blocked_reason"],
     }
-    _append_event(path, cipher, "prospect_message", prospect_payload)
+    prospect_event = _append_event(path, cipher, "prospect_message", prospect_payload)
     _append_event(path, cipher, "desk_response", {"desk_reply": reply})
-    return {"conversation_id": conversation_id, "desk": reply}
+    return {
+        "conversation_id": conversation_id,
+        "desk": reply,
+        "_approval_trigger_event_id": (
+            prospect_event["event_id"] if reply["requires_human_approval"] else None
+        ),
+    }
+
+
+def record_partner_notification(
+    conversation_id: str,
+    *,
+    trigger_event_id: str,
+    channel: Literal["telegram", "email"],
+    status: Literal["sent", "failed_or_unconfigured", "queued_no_authenticated_transport"],
+    target: str,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    path = _conversation_path(conversation_id, root)
+    cipher = _fernet(root)
+    records = _load_events(path, cipher)
+    if not any(envelope["event_id"] == trigger_event_id for envelope, _ in records):
+        raise PartnerDeskError("notification_trigger_not_found")
+    for envelope, payload in reversed(records):
+        if (
+            envelope["event_type"] == "operator_notification"
+            and payload.get("trigger_event_id") == trigger_event_id
+            and payload.get("channel") == channel
+            and payload.get("status") == "sent"
+        ):
+            return {"recorded": False, "already_sent": True, "status": "sent"}
+    event = _append_event(
+        path,
+        cipher,
+        "operator_notification",
+        {
+            "trigger_event_id": trigger_event_id,
+            "channel": channel,
+            "status": status,
+            "target_sha256": _digest(target.strip().lower()),
+            "contains_direct_contact_data": False,
+            "contains_pseudonymous_conversation_id": True,
+        },
+    )
+    return {"recorded": True, "already_sent": False, "status": status, "event_id": event["event_id"]}
+
+
+def partner_notification_status(
+    conversation_id: str,
+    *,
+    trigger_event_id: str,
+    channel: Literal["telegram", "email"],
+    root: Path | None = None,
+) -> str | None:
+    path = _conversation_path(conversation_id, root)
+    records = _load_events(path, _fernet(root))
+    for envelope, payload in reversed(records):
+        if (
+            envelope["event_type"] == "operator_notification"
+            and payload.get("trigger_event_id") == trigger_event_id
+            and payload.get("channel") == channel
+        ):
+            return str(payload.get("status"))
+    return None
+
+
+def record_operator_review(
+    conversation_id: str,
+    *,
+    state: Literal["reviewed_no_commitment", "closed_no_commitment"],
+    root: Path | None = None,
+) -> dict[str, Any]:
+    path = _conversation_path(conversation_id, root)
+    cipher = _fernet(root)
+    _load_events(path, cipher)
+    event = _append_event(
+        path,
+        cipher,
+        "operator_review",
+        {
+            "state": state,
+            "authority_boundary": "internal_workflow_state_only_no_partner_reply_no_commercial_commitment",
+        },
+    )
+    return {"recorded": True, "state": state, "event_id": event["event_id"]}
+
+
+def build_partner_decision_packet(
+    conversation_id: str,
+    *,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    path = _conversation_path(conversation_id, root)
+    records = _load_events(path, _fernet(root))
+    first_envelope, started = records[0]
+    decision_requests: list[str] = []
+    scope_messages: list[str] = []
+    initial_message = started.get("initial_message")
+    initial_status = started.get("desk_reply", {}).get("status")
+    if initial_message:
+        (decision_requests if initial_status == "approval_required" else scope_messages).append(initial_message)
+    notifications: list[dict[str, Any]] = []
+    operator_state = "needs_review" if started.get("desk_reply", {}).get("requires_human_approval") else "qualifying"
+    for envelope, payload in records[1:]:
+        if envelope["event_type"] == "prospect_message" and payload.get("message"):
+            target = decision_requests if payload.get("classification") == "approval_required" else scope_messages
+            target.append(payload["message"])
+        elif envelope["event_type"] == "operator_notification":
+            notifications.append(
+                {
+                    "channel": payload.get("channel"),
+                    "status": payload.get("status"),
+                    "trigger_event_id": payload.get("trigger_event_id"),
+                    "recorded_at_utc": envelope["recorded_at_utc"],
+                }
+            )
+        elif envelope["event_type"] == "operator_review":
+            operator_state = payload.get("state", operator_state)
+    if decision_requests and operator_state == "qualifying":
+        operator_state = "needs_review"
+    packet = {
+        "schema_version": "chetana.partner_decision_packet.v1",
+        "conversation_id": conversation_id,
+        "assembled_from_event_hash": records[-1][0]["event_hash"],
+        "assembled_at_utc": records[-1][0]["recorded_at_utc"],
+        "created_at_utc": started["created_at_utc"],
+        "expires_at_utc": started["expires_at_utc"],
+        "pilot_type": started["pilot_type"],
+        "source_path": started["source_path"],
+        "contact": started["contact"],
+        "operator_state": operator_state,
+        "decision_requests": decision_requests,
+        "scope_messages": scope_messages,
+        "notifications": notifications,
+        "risk_flags": [
+            "contains_personal_data_operator_only",
+            "request_is_non_binding_until_authorised_written_approval",
+            "do_not_forward_raw_packet_to_external_services",
+        ],
+        "authority_boundary": (
+            "This packet supports internal review only. It is not acceptance, pricing, a contract, "
+            "a procurement response, a legal opinion, or a partner communication."
+        ),
+        "contains_personal_data": True,
+        "initial_event_id": first_envelope["event_id"],
+    }
+    packet["packet_sha256"] = _digest(_canonical(packet).decode("utf-8"))
+    return packet
+
+
+def list_partner_decision_packets(*, root: Path | None = None) -> list[dict[str, Any]]:
+    _, conversations, _ = _paths(root)
+    if not conversations.exists():
+        return []
+    packets: list[dict[str, Any]] = []
+    for path in sorted(conversations.glob("cpd_*.jsonl")):
+        try:
+            packets.append(build_partner_decision_packet(path.stem, root=root))
+        except PartnerDeskError:
+            continue
+    return sorted(packets, key=lambda item: item["created_at_utc"], reverse=True)
+
+
+def list_pending_partner_alerts(*, root: Path | None = None) -> list[dict[str, str | None]]:
+    _, conversations, _ = _paths(root)
+    if not conversations.exists():
+        return []
+    pending: list[dict[str, str | None]] = []
+    for path in sorted(conversations.glob("cpd_*.jsonl")):
+        try:
+            records = _load_events(path, _fernet(root))
+        except PartnerDeskError:
+            continue
+        started = records[0][1]
+        triggers: list[str] = []
+        if started.get("desk_reply", {}).get("requires_human_approval"):
+            triggers.append(records[0][0]["event_id"])
+        triggers.extend(
+            envelope["event_id"]
+            for envelope, payload in records
+            if envelope["event_type"] == "prospect_message"
+            and payload.get("classification") == "approval_required"
+        )
+        for trigger_event_id in triggers:
+            telegram = None
+            email = None
+            for envelope, payload in records:
+                if envelope["event_type"] != "operator_notification" or payload.get("trigger_event_id") != trigger_event_id:
+                    continue
+                if payload.get("channel") == "telegram":
+                    telegram = payload.get("status")
+                elif payload.get("channel") == "email":
+                    email = payload.get("status")
+            if telegram != "sent" or email != "sent":
+                pending.append(
+                    {
+                        "conversation_id": path.stem,
+                        "trigger_event_id": trigger_event_id,
+                        "pilot_type": started["pilot_type"],
+                        "telegram_status": telegram,
+                        "email_status": email,
+                    }
+                )
+    return pending
 
 
 def delete_partner_conversation(
@@ -466,13 +676,23 @@ def conversation_integrity_status(conversation_id: str, *, root: Path | None = N
     path = _conversation_path(conversation_id, root)
     records = _load_events(path, _fernet(root))
     started = records[0][1]
+    approval_required = bool(started.get("desk_reply", {}).get("requires_human_approval")) or any(
+        payload.get("classification") == "approval_required" for _, payload in records
+    )
+    operator_state = "needs_review" if approval_required else "qualifying"
+    notifications: dict[str, str] = {}
+    for envelope, payload in records:
+        if envelope["event_type"] == "operator_notification":
+            notifications[str(payload.get("channel"))] = str(payload.get("status"))
+        elif envelope["event_type"] == "operator_review":
+            operator_state = str(payload.get("state", operator_state))
     return {
         "conversation_id": conversation_id,
         "integrity_valid": True,
         "event_count": len(records),
         "pilot_type": started["pilot_type"],
         "expires_at_utc": started["expires_at_utc"],
-        "approval_required": bool(started.get("desk_reply", {}).get("requires_human_approval")) or any(
-            payload.get("classification") == "approval_required" for _, payload in records
-        ),
+        "approval_required": approval_required,
+        "operator_state": operator_state,
+        "notification_status": notifications,
     }

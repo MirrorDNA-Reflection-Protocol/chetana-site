@@ -31,6 +31,8 @@ Primary sources:
 
 This release does not send cold email, SMS, automated voice calls, bulk messages, or WhatsApp outreach. A reply to an explicitly submitted inquiry is limited to that purpose. Before SMS, voice, or bulk commercial messaging is enabled, Active Mirror must complete the applicable TRAI sender, consent, preference, header, template, and telemarketer controls under TCCCPR.
 
+Internal approval alerts are distinct from prospect communications. They route only a pilot lane and pseudonymous conversation ID to the configured operator channel; they exclude the prospect's name, email, organisation, and message text. Email alerts are addressed to `paul@activemirror.ai` but remain queued until an authenticated Active Mirror sender is configured.
+
 Primary source: https://trai.gov.in/tcccpr
 
 ## AI And Representation

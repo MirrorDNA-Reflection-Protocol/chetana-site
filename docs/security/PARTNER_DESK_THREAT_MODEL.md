@@ -5,7 +5,7 @@ Reviewed: 2026-07-13
 
 ## Scope
 
-The Partner Desk accepts institutional enquiries at `/partners`, stores a bounded encrypted conversation, and returns deterministic qualification responses. It does not currently send email, accept attachments, call external tools, use an external CRM, or let a model commit Active Mirror.
+The Partner Desk accepts institutional enquiries at `/partners`, stores a bounded encrypted conversation, and returns deterministic qualification responses. It does not send prospect email, accept attachments, call model tools, use an external CRM, or let a model commit Active Mirror. Approval-class requests create an internal decision packet and metadata-only operator alerts.
 
 ## Assets
 
@@ -23,8 +23,10 @@ The Partner Desk accepts institutional enquiries at `/partners`, stores a bounde
 4. Browser continuation and deletion capabilities are held in route-scoped `HttpOnly`, `SameSite=Strict` session cookies. They are not returned in JSON or readable by page JavaScript.
 5. Partner write routes reject cross-site Fetch Metadata and unrecognised `Origin` values before processing.
 6. Non-personal aggregate inquiry events to PilotTrace.
-7. Future email or CRM transport, which remains disabled until separately authenticated and reviewed.
-8. Commitment-class requests to an authorised human decision; the desk cannot cross this boundary.
+7. Decrypted decision packets to a loopback-only operator inbox. Forwarded/public requests fail closed with `404`.
+8. A pseudonymous conversation ID and pilot lane to the configured Telegram operator channel and, once authenticated, `paul@activemirror.ai`. Names, emails, organisations, and message text do not cross this boundary.
+9. Future prospect email or CRM transport, which remains disabled until separately authenticated and reviewed.
+10. Commitment-class requests to an authorised human decision; the desk cannot cross this boundary.
 
 ## Required Invariants
 
@@ -35,7 +37,8 @@ The Partner Desk accepts institutional enquiries at `/partners`, stores a bounde
 - Plaintext partner content is absent from PilotTrace and conversation files.
 - Conversation event integrity fails closed when the hash chain is altered.
 - Final pricing, contracts, procurement terms, DPA/SLA terms, production integration, access to partner systems, and outcome promises require authorised approval.
-- No cold SMS, voice campaign, bulk message, attachment processing, or outbound email occurs from this component.
+- No cold SMS, voice campaign, bulk message, attachment processing, or prospect email occurs from this component.
+- Operator review states cannot send a reply, approve terms, or create commercial authority.
 - Inactive conversation files expire after 180 days; deletion removes the encrypted conversation immediately.
 
 ## Threats And Controls
@@ -52,9 +55,12 @@ The Partner Desk accepts institutional enquiries at `/partners`, stores a bounde
 | Spam and resource abuse | Honeypot, per-IP request window, message and character caps | In-memory limits reset on process restart and are not a distributed DDoS control |
 | Cross-origin abuse | Restricted credentialed CORS, strict same-site cookies, Fetch Metadata and Origin checks | Initial enquiry remains intentionally public to non-browser clients; rate limiting and honeypot remain the abuse controls |
 | Same-origin script injection | React text-node rendering for untrusted scan/model text; enforcing CSP blocks objects, foreign frames, foreign scripts, and cross-site forms | Existing inline boot/schema scripts require `unsafe-inline`; removing that exception requires nonce or hash plumbing |
+| Operator packet disclosure | Inbox and JSON packets require a direct loopback client with no forwarding headers; output is `no-store`; public canary expects `404` | Malware or another process running as the host user can reach loopback and decrypt the same-user key |
+| Alert-channel data leakage | Alerts contain only pilot lane and a pseudonymous conversation ID; target is hashed in the receipt | The pseudonymous ID is still linkable metadata and Telegram/Resend become processors for that alert metadata when enabled |
+| Duplicate or missed alert | Trigger event IDs, sent-state idempotence, encrypted receipts, immediate delivery and hourly retry | Email remains queued until authenticated transport exists; host downtime delays all retries |
 | Data over-retention | Hourly expiry worker, explicit deletion token | A stopped service cannot run the worker; startup runs the same purge before its first hourly sleep |
 | Legal/procurement manipulation | No gifts, influence, tender acceptance, signature, or terms authority | Human review and qualified Indian counsel remain necessary for commitments |
-| Email spoofing or domain abuse | Outbound email disabled; domain SPF and reject-policy DMARC observed | DKIM and mailbox identity were not verified in this implementation |
+| Email spoofing or domain abuse | Prospect email disabled; operator email sends only with an authenticated Resend key and an `@activemirror.ai` sender | No authenticated sender is currently configured, so alerts to `paul@activemirror.ai` remain queued |
 
 ## Incident Response
 
@@ -66,7 +72,7 @@ The Partner Desk accepts institutional enquiries at `/partners`, stores a bounde
 
 ## Residual Launch Blocks
 
-- Authenticated `partners@activemirror.ai` mailbox and outbound transport are not configured.
+- Authenticated Active Mirror sender and outbound transport are not configured; operator alerts to `paul@activemirror.ai` remain queued.
 - DKIM alignment and mailbox receive/send behavior are not verified.
 - No Indian lawyer has reviewed the public policy, pilot contract, procurement posture, advertising copy, or cross-border engagement terms.
 - Host compromise, disaster recovery, key escrow, and multi-node availability have not been independently audited.

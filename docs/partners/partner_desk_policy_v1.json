@@ -8,6 +8,8 @@
   "channel_policy": {
     "inbound_web": "enabled",
     "outbound_email": "blocked_pending_authenticated_partner_mailbox",
+    "operator_alert_email": "queued_to_paul_at_activemirror_ai_pending_authenticated_sender",
+    "operator_alert_telegram": "enabled_when_locally_configured_metadata_only",
     "cold_email": "blocked_pending_legal_policy_and_operator_approval",
     "sms": "blocked_pending_tcccpr_controls",
     "voice_calls": "blocked_pending_tcccpr_controls",
@@ -40,7 +42,9 @@
     "browser_capabilities": "route_scoped_httponly_samesite_strict_session_cookies",
     "sponsor_aggregate_contains_personal_data": false,
     "external_model_processing": false,
-    "external_crm": false
+    "external_crm": false,
+    "operator_inbox": "loopback_only_contains_personal_data",
+    "operator_alerts": "pseudonymous_conversation_id_and_pilot_lane_no_direct_contact_or_message_text"
   },
   "approval_classes": [
     "pricing",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,10 +20,14 @@ from app.partner_desk import (
     _conversation_path,
     _fernet,
     _load_events,
+    build_partner_decision_packet,
     continue_partner_conversation,
     conversation_integrity_status,
     delete_partner_conversation,
+    partner_notification_status,
     purge_expired_partner_conversations,
+    record_operator_review,
+    record_partner_notification,
     start_partner_conversation,
 )
 
@@ -150,6 +155,69 @@ def test_tampered_chain_fails_closed(tmp_path: Path) -> None:
         conversation_integrity_status(started["conversation_id"], root=tmp_path)
 
 
+def test_decision_packet_notification_receipts_and_review_are_chained(tmp_path: Path) -> None:
+    started = start_partner_conversation(_inquiry("Please quote pricing and accept our SLA."), root=tmp_path)
+    trigger = started["_approval_trigger_event_id"]
+    assert trigger
+
+    first = record_partner_notification(
+        started["conversation_id"],
+        trigger_event_id=trigger,
+        channel="email",
+        status="sent",
+        target="paul@activemirror.ai",
+        root=tmp_path,
+    )
+    duplicate = record_partner_notification(
+        started["conversation_id"],
+        trigger_event_id=trigger,
+        channel="email",
+        status="sent",
+        target="paul@activemirror.ai",
+        root=tmp_path,
+    )
+    review = record_operator_review(
+        started["conversation_id"],
+        state="reviewed_no_commitment",
+        root=tmp_path,
+    )
+    packet = build_partner_decision_packet(started["conversation_id"], root=tmp_path)
+
+    assert first["recorded"] is True
+    assert duplicate == {"recorded": False, "already_sent": True, "status": "sent"}
+    assert review["state"] == "reviewed_no_commitment"
+    assert partner_notification_status(
+        started["conversation_id"],
+        trigger_event_id=trigger,
+        channel="email",
+        root=tmp_path,
+    ) == "sent"
+    assert packet["contact"]["email"] == "pilot.owner@example.com"
+    assert packet["decision_requests"] == ["Please quote pricing and accept our SLA."]
+    assert packet["operator_state"] == "reviewed_no_commitment"
+    assert packet["contains_personal_data"] is True
+    assert len(packet["packet_sha256"]) == 64
+
+
+def test_notification_receipt_contains_no_direct_contact_data(tmp_path: Path) -> None:
+    started = start_partner_conversation(_inquiry("Please send a contract."), root=tmp_path)
+    record_partner_notification(
+        started["conversation_id"],
+        trigger_event_id=started["_approval_trigger_event_id"],
+        channel="email",
+        status="queued_no_authenticated_transport",
+        target="paul@activemirror.ai",
+        root=tmp_path,
+    )
+    events = _load_events(_conversation_path(started["conversation_id"], tmp_path), _fernet(tmp_path))
+    receipt = next(payload for envelope, payload in events if envelope["event_type"] == "operator_notification")
+
+    assert receipt["contains_direct_contact_data"] is False
+    assert receipt["contains_pseudonymous_conversation_id"] is True
+    assert "paul@activemirror.ai" not in json.dumps(receipt)
+    assert "Pilot Owner" not in json.dumps(receipt)
+
+
 def test_partner_api_conversation_lifecycle(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(partner_desk, "PARTNER_DESK_ROOT", tmp_path / "desk")
     monkeypatch.setattr(main_module, "PARTNER_INQUIRIES_LOG", tmp_path / "partner_aggregates.jsonl")
@@ -214,6 +282,115 @@ def test_partner_api_rejects_missing_cookie_and_cross_site_request(monkeypatch, 
     assert cross_site.status_code == 403
 
 
+def test_partner_api_records_privacy_safe_approval_alerts(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(partner_desk, "PARTNER_DESK_ROOT", tmp_path / "desk")
+    monkeypatch.setattr(main_module, "PARTNER_INQUIRIES_LOG", tmp_path / "partner_aggregates.jsonl")
+    monkeypatch.setattr(main_module, "_load_partner_email_config", lambda: ("", ""))
+    main_module._PARTNER_REQUEST_LOG.clear()
+
+    async def telegram_sent(_text: str, chat_id: str | None = None) -> bool:
+        return True
+
+    monkeypatch.setattr(main_module, "_notify_telegram", telegram_sent)
+    response = TestClient(app).post(
+        "/api/v1/partners/inquiries",
+        json=_inquiry("Please quote pricing and accept our NDA.").model_dump(),
+    )
+    desk = response.json()["partner_desk"]
+    packet = build_partner_decision_packet(desk["conversation_id"], root=tmp_path / "desk")
+    asyncio.run(main_module._deliver_partner_approval_alert(desk["conversation_id"], packet["initial_event_id"]))
+    packet_after_retry = build_partner_decision_packet(desk["conversation_id"], root=tmp_path / "desk")
+
+    assert response.status_code == 200
+    assert not any(key.startswith("_") for key in desk)
+    assert {item["channel"]: item["status"] for item in packet["notifications"]} == {
+        "telegram": "sent",
+        "email": "queued_no_authenticated_transport",
+    }
+    assert "Pilot Owner" not in json.dumps(packet["notifications"])
+    assert "pilot.owner@example.com" not in json.dumps(packet["notifications"])
+    assert len(packet_after_retry["notifications"]) == 2
+
+
+class _LoopbackClient:
+    def __init__(self, target):
+        self.target = target
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            scope = dict(scope, client=("127.0.0.1", 43123))
+        await self.target(scope, receive, send)
+
+
+def test_operator_inbox_is_loopback_only_and_review_is_non_binding(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(partner_desk, "PARTNER_DESK_ROOT", tmp_path / "desk")
+    started = start_partner_conversation(_inquiry("Please send final pricing."), root=tmp_path / "desk")
+
+    public = TestClient(app).get("/operator/partner-desk", headers={"cf-connecting-ip": "203.0.113.10"})
+    local_client = TestClient(_LoopbackClient(app), base_url="http://127.0.0.1:8093")
+    local = local_client.get("/operator/partner-desk")
+    packet_response = local_client.get(f"/operator/partner-desk/{started['conversation_id']}.json")
+    reviewed = local_client.post(
+        f"/operator/partner-desk/{started['conversation_id']}/review",
+        headers={"origin": "http://127.0.0.1:8093"},
+        data={"state": "reviewed_no_commitment"},
+    )
+    packet = build_partner_decision_packet(started["conversation_id"], root=tmp_path / "desk")
+
+    assert public.status_code == 404
+    assert local.status_code == 200
+    assert "Example Bank" in local.text
+    assert "paul@activemirror.ai" in local.text
+    assert packet_response.status_code == 200
+    assert packet_response.headers["cache-control"] == "no-store, max-age=0"
+    assert packet_response.json()["contains_personal_data"] is True
+    assert reviewed.status_code == 200
+    assert packet["operator_state"] == "reviewed_no_commitment"
+    assert "no_partner_reply_no_commercial_commitment" in json.dumps(
+        _load_events(_conversation_path(started["conversation_id"], tmp_path / "desk"), _fernet(tmp_path / "desk"))
+    )
+
+
+def test_operator_email_is_fixed_metadata_only(monkeypatch) -> None:
+    captured: dict = {}
+
+    class _Response:
+        status_code = 202
+
+    class _Client:
+        async def post(self, url, **kwargs):
+            captured.update({"url": url, **kwargs})
+            return _Response()
+
+    async def fake_client():
+        return _Client()
+
+    monkeypatch.setattr(main_module, "_load_partner_email_config", lambda: ("test-key", "alerts@activemirror.ai"))
+    monkeypatch.setattr(main_module, "get_client", fake_client)
+
+    sent = asyncio.run(main_module._notify_partner_email("cpd_" + "a" * 32, "bank_psp"))
+    payload = captured["json"]
+
+    assert sent is True
+    assert payload["to"] == ["paul@activemirror.ai"]
+    assert payload["from"] == "alerts@activemirror.ai"
+    assert "bank_psp" in payload["text"]
+    assert "name" not in payload["text"].lower()
+    assert "email" not in payload["text"].lower()
+    assert "organisation" not in payload["text"].lower()
+
+
+def test_operator_email_rejects_untrusted_sender(monkeypatch) -> None:
+    monkeypatch.setenv("RESEND_API_KEY", "test-key")
+    monkeypatch.setenv("CHETANA_PARTNER_EMAIL_FROM", "attacker@example.com\nalerts@activemirror.ai")
+
+    key, sender = main_module._load_partner_email_config()
+
+    assert key == "test-key"
+    assert sender == ""
+    assert main_module._partner_email_transport_status() == "queued_no_authenticated_transport"
+
+
 def test_partner_api_requires_explicit_contact_consent() -> None:
     main_module._PARTNER_REQUEST_LOG.clear()
     payload = _inquiry().model_dump()
@@ -236,6 +413,7 @@ def test_partner_policy_and_privacy_boundary_are_public() -> None:
     assert privacy.status_code == 200
     assert "Institutional Partner Desk" in privacy.text
     assert "at most 180 days" in privacy.text
+    assert "mailto:paul@activemirror.ai" in privacy.text
 
 
 def test_partner_surface_has_enforcing_browser_security_policy() -> None:

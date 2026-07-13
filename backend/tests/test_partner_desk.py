@@ -236,3 +236,14 @@ def test_partner_policy_and_privacy_boundary_are_public() -> None:
     assert privacy.status_code == 200
     assert "Institutional Partner Desk" in privacy.text
     assert "at most 180 days" in privacy.text
+
+
+def test_partner_surface_has_enforcing_browser_security_policy() -> None:
+    response = TestClient(app).get("/partners")
+    csp = response.headers["content-security-policy"]
+
+    assert response.status_code == 200
+    assert "frame-ancestors 'none'" in csp
+    assert "object-src 'none'" in csp
+    assert "form-action 'self'" in csp
+    assert "worker-src 'self' blob:" in csp

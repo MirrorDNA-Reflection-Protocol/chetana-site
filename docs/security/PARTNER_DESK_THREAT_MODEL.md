@@ -51,6 +51,7 @@ The Partner Desk accepts institutional enquiries at `/partners`, stores a bounde
 | Record tampering | Chained SHA-256 event envelopes, fail-closed verification | An attacker controlling both key and files can rewrite the chain |
 | Spam and resource abuse | Honeypot, per-IP request window, message and character caps | In-memory limits reset on process restart and are not a distributed DDoS control |
 | Cross-origin abuse | Restricted credentialed CORS, strict same-site cookies, Fetch Metadata and Origin checks | Initial enquiry remains intentionally public to non-browser clients; rate limiting and honeypot remain the abuse controls |
+| Same-origin script injection | React text-node rendering for untrusted scan/model text; enforcing CSP blocks objects, foreign frames, foreign scripts, and cross-site forms | Existing inline boot/schema scripts require `unsafe-inline`; removing that exception requires nonce or hash plumbing |
 | Data over-retention | Hourly expiry worker, explicit deletion token | A stopped service cannot run the worker; startup runs the same purge before its first hourly sleep |
 | Legal/procurement manipulation | No gifts, influence, tender acceptance, signature, or terms authority | Human review and qualified Indian counsel remain necessary for commitments |
 | Email spoofing or domain abuse | Outbound email disabled; domain SPF and reject-policy DMARC observed | DKIM and mailbox identity were not verified in this implementation |

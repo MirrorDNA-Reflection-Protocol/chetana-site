@@ -184,7 +184,7 @@ def accept_research_candidate(
         redaction_count=redaction_count,
         retention_expires_at_utc=payload["retention_expires_at_utc"],
         deletion_token=deletion_token,
-        storage_boundary="sanitized_text_only_raw_digest_90_day_retention",
+        storage_boundary="sanitized_text_only_sanitized_digest_90_day_retention",
     )
 
 

@@ -41,6 +41,7 @@ def test_research_candidate_stores_sanitized_text_not_raw(tmp_path: Path) -> Non
     stored = json.loads(log.read_text(encoding="utf-8").strip())
 
     assert receipt.status == "quarantined_pending_review"
+    assert receipt.storage_boundary == "sanitized_text_only_sanitized_digest_90_day_retention"
     assert receipt.redaction_count >= 4
     assert stored["raw_text_stored"] is False
     assert "raw_text_sha256" not in stored

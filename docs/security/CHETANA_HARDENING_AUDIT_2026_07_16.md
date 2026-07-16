@@ -61,11 +61,51 @@ The backend listened on `0.0.0.0` although the Cloudflare tunnel already targets
 
 Repair: the canonical Active Mirror body manifest now binds Chetana to `127.0.0.1` only.
 
+### Public operator alerting
+
+The legacy `/api/alert` route could send arbitrary Telegram messages when operator credentials were configured.
+
+Repair: the route is loopback-only, hidden from OpenAPI, and returns `404` to public requests.
+
+### Raw scam content in notifications
+
+Legacy high-risk scan and chat paths copied a user-text snippet into Telegram alerts.
+
+Repair: automatic alerts contain derived risk metadata only and state that raw content was omitted. User-submitted scan text is no longer sent through that notification path.
+
+Automatic scan alerts are disabled by default. They require an explicit `CHETANA_SCAN_ALERTS_ENABLED=true` operator decision; Partner Desk alerts remain separately governed and contain no prospect message text.
+
+### MirrorProof caller-controlled assessments
+
+The loop-receipt endpoint accepted and signed a caller-supplied verdict, trust bundle, and action route without recomputing the assessment from the submitted text.
+
+Repair: the server recomputes the deterministic verdict, compares all material assessment fields and reason codes, rejects mismatches with `409`, discards caller-supplied proof components, rebuilds the action route, and signs only the server-recomputed assessment.
+
+### Anonymous write abuse and telemetry bounds
+
+Public event, receipt, OCR, media, voice, translation, incident, and scan routes had inconsistent or missing request budgets. Legacy telemetry accepted weakly bounded JSON.
+
+Repair: per-client route budgets, a 9 MiB API request ceiling, strict telemetry and translation schemas, bounded identifiers and metadata, and fail-closed `429` responses with `Retry-After`.
+
+### Retired witness proxy
+
+The public witness route proxied arbitrary paths to a missing loopback service and returned a misleading success-shaped error.
+
+Repair: the proxy is removed. The compatibility route returns `410` and points to the active MirrorProof verifier.
+
+### Browser-to-localhost permission
+
+The production CSP allowed pages to connect to `http://localhost:8093`.
+
+Repair: production `connect-src` is now same-origin only. Vite development continues to use its own local proxy configuration.
+
 ## Verification
 
-- Backend: 129 tests passed, 2 subtests passed
+- Backend: 134 tests passed, 2 subtests passed
 - Frontend: 3 tests passed; production build passed
 - Dependencies: `npm audit --omit=dev` reported 0 vulnerabilities; `pip check` reported no broken requirements
+- Python advisories: upgraded FastAPI to `0.139.1`, Starlette to `1.3.1`, and Pydantic to `2.13.4`; `pip-audit` then reported no known vulnerabilities
+- Python static analysis: Bandit reported no medium- or high-severity findings; remaining results were 14 low-severity warnings or consent-token false positives
 - Static checks: changed Python compiled; `git diff --check` passed
 - Secret scan: Git history retains 15 findings, including the removed historical TriMind default and generated bundle false positives. Current source has no validated credential; one ignored built xterm bundle produces a generic-key false positive.
 

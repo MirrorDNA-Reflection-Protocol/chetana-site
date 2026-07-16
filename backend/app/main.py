@@ -12,6 +12,7 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager, suppress
 import html as html_lib
 import httpx
+import ipaddress
 import json
 import logging
 import os
@@ -24,7 +25,7 @@ from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Literal, Optional
 from pathlib import Path
 from urllib.parse import quote
@@ -179,6 +180,7 @@ def _load_telegram_config() -> tuple[str, str]:
 
 
 _TG_TOKEN, _TG_CHAT_ID = _load_telegram_config()
+_SCAN_ALERTS_ENABLED = os.getenv("CHETANA_SCAN_ALERTS_ENABLED", "false").strip().lower() == "true"
 
 
 def _load_partner_email_config() -> tuple[str, str]:
@@ -256,6 +258,28 @@ async def _notify_telegram(text: str, chat_id: str | None = None) -> bool:
         return False
 
 
+def _high_risk_alert(
+    *,
+    channel: str,
+    score: int | float,
+    scam_type: str = "unknown",
+    surface: str = "unknown",
+    signals: list[str] | None = None,
+) -> str:
+    clean = lambda value: re.sub(r"[^A-Za-z0-9 _./:-]+", "", str(value))[:80] or "unknown"
+    lines = [
+        "HIGH RISK Chetana scan",
+        f"Channel: {clean(channel)}",
+        f"Score: {max(0, min(100, int(score)))}/100",
+        f"Type: {clean(scam_type)}",
+        f"Surface: {clean(surface)}",
+    ]
+    if signals:
+        lines.append("Signals: " + ", ".join(clean(item) for item in signals[:3]))
+    lines.append("Raw user content omitted by privacy policy.")
+    return "\n".join(lines)
+
+
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     global _client, _research_retention_task
@@ -296,17 +320,17 @@ app.include_router(b2b_router)
 # ── WhatsApp Bot (direct Meta Cloud API) ────────────────────────────────
 app.include_router(whatsapp_router)
 
-# ── Witness Chain (public transparency) ───────────────────────────────────
-# Proxies to the local witness verifier at :8950. No auth — transparency endpoint.
-@app.get("/api/witness/{path:path}")
+# ── Retired Witness Chain compatibility route ────────────────────────────
+@app.get("/api/witness/{path:path}", include_in_schema=False)
 async def witness_proxy(path: str):
-    """Public witness chain verifier — tamper-evident AI audit trail."""
-    client = await get_client()
-    try:
-        resp = await client.get(f"http://localhost:8950/{path}", timeout=10.0)
-        return resp.json()
-    except Exception:
-        return {"error": "Witness chain verifier unavailable"}
+    """Fail closed for the retired verifier instead of proxying arbitrary local paths."""
+    return JSONResponse(
+        status_code=410,
+        content={
+            "error": "witness_verifier_retired",
+            "replacement": "/api/v0/mirrorproof/verify",
+        },
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -337,7 +361,7 @@ async def add_security_headers(request: Request, call_next):
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
             "font-src 'self' data:",
-            "connect-src 'self' http://localhost:8093",
+            "connect-src 'self'",
             "worker-src 'self' blob:",
             "media-src 'self' blob:",
             "frame-src https://www.youtube.com",
@@ -378,10 +402,95 @@ _PARTNER_WINDOW_S = 60 * 60
 _PARTNER_MAX_REQUESTS = 12
 UPLOAD_MAX_BYTES = int(os.getenv("CHETANA_UPLOAD_MAX_BYTES", str(8 * 1024 * 1024)))
 FIREWALL_TEXT_MAX_CHARS = 20_000
+API_MAX_BODY_BYTES = int(os.getenv("CHETANA_API_MAX_BODY_BYTES", str(9 * 1024 * 1024)))
+_PUBLIC_API_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
+_PUBLIC_API_CLIENT_LIMIT = 10_000
+_PUBLIC_API_RATE_LIMITS: dict[str, tuple[int, int]] = {
+    "/api/analytics/event": (60, 120),
+    "/api/v0/events": (60, 120),
+    "/api/v0/loop/receipt": (60, 60),
+    "/api/v0/scan/improve": (60, 12),
+    "/api/v0/voice/transcribe": (60, 20),
+    "/api/media/analyze": (60, 12),
+    "/api/media/ocr": (60, 12),
+    "/api/media/card": (60, 12),
+    "/api/voice/analyze": (60, 20),
+    "/api/translate": (60, 30),
+    "/api/evidence/bundle": (60, 30),
+    "/api/v0/intelligence/domain": (60, 30),
+    "/api/upi/check": (60, 60),
+    "/api/phone/check": (60, 60),
+    "/api/apk/check": (60, 30),
+    "/api/oracle/verify": (60, 20),
+    "/api/link/check": (60, 30),
+}
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
 CHETANA_SOURCE_TAGS = {item["source"]: item["label"] for item in FIELD_SOURCE_TAGS}
+
+
+def _public_client_key(request: Request) -> str:
+    peer = request.client.host if request.client else "unknown"
+    if peer in {"127.0.0.1", "::1", "localhost"}:
+        candidate = request.headers.get("cf-connecting-ip", "").strip()
+        try:
+            return str(ipaddress.ip_address(candidate)) if candidate else peer
+        except ValueError:
+            return peer
+    try:
+        return str(ipaddress.ip_address(peer))
+    except ValueError:
+        return peer[:64]
+
+
+def _public_api_rate_policy(path: str) -> tuple[int, int] | None:
+    if path in _PUBLIC_API_RATE_LIMITS:
+        return _PUBLIC_API_RATE_LIMITS[path]
+    if path.startswith("/api/incident/"):
+        return 60, 30
+    if path in {"/api/scan", "/api/scan/full", "/api/scan/quick", "/api/v0/scan", "/api/v1/analyze"}:
+        return 60, 60
+    return None
+
+
+def _consume_public_api_budget(request: Request, window_s: int, max_requests: int) -> tuple[bool, int]:
+    now = time.monotonic()
+    client_key = _public_client_key(request)
+    key = f"{client_key}:{request.url.path}"
+    if key not in _PUBLIC_API_REQUEST_LOG and len(_PUBLIC_API_REQUEST_LOG) >= _PUBLIC_API_CLIENT_LIMIT:
+        key = f"overflow:{request.url.path}"
+    bucket = _PUBLIC_API_REQUEST_LOG[key]
+    cutoff = now - window_s
+    while bucket and bucket[0] < cutoff:
+        bucket.popleft()
+    if len(bucket) >= max_requests:
+        retry_after = max(1, int(window_s - (now - bucket[0])))
+        return False, retry_after
+    bucket.append(now)
+    return True, 0
+
+
+@app.middleware("http")
+async def public_api_abuse_guard(request: Request, call_next):
+    if request.url.path.startswith("/api/"):
+        raw_length = request.headers.get("content-length")
+        if raw_length:
+            try:
+                if int(raw_length) > API_MAX_BODY_BYTES:
+                    return JSONResponse(status_code=413, content={"detail": "api_request_too_large"})
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "invalid_content_length"})
+        policy = _public_api_rate_policy(request.url.path) if request.method not in {"GET", "HEAD", "OPTIONS"} else None
+        if policy:
+            allowed, retry_after = _consume_public_api_budget(request, *policy)
+            if not allowed:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "rate_limited"},
+                    headers={"Retry-After": str(retry_after)},
+                )
+    return await call_next(request)
 
 
 def _partner_now_utc() -> str:
@@ -1005,7 +1114,7 @@ async def scan(req: ScanRequest):
             risk = data.get("risk_level", "UNKNOWN")
             signals = data.get("signals", [])
 
-            if score >= 70:
+            if score >= 70 and _SCAN_ALERTS_ENABLED:
                 verdict = "SUSPICIOUS"
                 action = "warn_and_verify"
             elif score >= 40:
@@ -1042,12 +1151,12 @@ async def scan(req: ScanRequest):
 
             # Push high-risk alerts to Telegram (fire-and-forget)
             if score >= 70:
-                snippet = req.content[:120].replace("*", "").replace("`", "")
-                alert = (
-                    f"🚨 *HIGH RISK scan on site*\n"
-                    f"Score: {score}/100 | Surface: {result['surface']}\n"
-                    f"Signals: {', '.join(signals[:3]) if signals else 'n/a'}\n"
-                    f"Content: `{snippet}`"
+                alert = _high_risk_alert(
+                    channel="legacy_scan",
+                    score=score,
+                    scam_type=str(data.get("scam_type", "unknown")),
+                    surface=result["surface"],
+                    signals=signals,
                 )
                 import asyncio
                 asyncio.ensure_future(_notify_telegram(alert))
@@ -1072,16 +1181,18 @@ async def scan_full(req: FullScanRequest):
     """Canonical local-first scan path used by the main frontend."""
     try:
         result = await _run_local_scan_contract(req.text, req.lang)
-        if result["risk_score"] >= 70:
-            snippet = req.text[:120].replace("*", "").replace("`", "")
+        if result["risk_score"] >= 70 and _SCAN_ALERTS_ENABLED:
             import asyncio
 
             asyncio.ensure_future(
                 _notify_telegram(
-                    f"🚨 *HIGH RISK scan*\n"
-                    f"Score: {result['risk_score']}\n"
-                    f"Type: {result.get('scam_type', 'unknown')}\n"
-                    f"Content: `{snippet}`"
+                    _high_risk_alert(
+                        channel="full_scan",
+                        score=result["risk_score"],
+                        scam_type=result.get("scam_type", "unknown"),
+                        surface=result.get("surface", "unknown"),
+                        signals=result.get("signals", []),
+                    )
                 )
             )
         return result
@@ -1122,9 +1233,10 @@ class AlertRequest(BaseModel):
     chat_id: Optional[str] = None
 
 
-@app.post("/api/alert")
-async def send_alert(req: AlertRequest):
-    """Push a message through the Telegram bot. Admin use."""
+@app.post("/api/alert", include_in_schema=False)
+async def send_alert(req: AlertRequest, request: Request):
+    """Push a message through the Telegram bot from loopback only."""
+    _require_local_security_operator(request)
     sent = await _notify_telegram(req.message, req.chat_id)
     return {"sent": sent, "channel": "telegram"}
 
@@ -1667,16 +1779,18 @@ async def chat(req: ChatRequest, request: Request):
             ]
         )
         suggestions = ["What should I do next?", "How to report fraud?", "Tell me about this scam type"]
-        if scan_result.get("risk_score", 0) >= 70:
-            snippet = message[:120].replace("*", "").replace("`", "")
+        if scan_result.get("risk_score", 0) >= 70 and _SCAN_ALERTS_ENABLED:
             import asyncio
 
             asyncio.ensure_future(
                 _notify_telegram(
-                    f"🚨 *HIGH RISK via chat*\n"
-                    f"Score: {scan_result['risk_score']}/100\n"
-                    f"Type: {scan_result.get('scam_type', 'unknown')}\n"
-                    f"`{snippet}`"
+                    _high_risk_alert(
+                        channel="chat",
+                        score=scan_result["risk_score"],
+                        scam_type=scan_result.get("scam_type", "unknown"),
+                        surface=scan_result.get("surface", "unknown"),
+                        signals=scan_result.get("signals", []),
+                    )
                 )
             )
         return {
@@ -1961,11 +2075,16 @@ async def radar_live():
 # ── Batch UI translation via Sarvam ───────────────────────────
 _TRANSLATE_CACHE: dict[str, dict[str, str]] = {}  # {lang: {en_text: translated}}
 
+class TranslateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    texts: list[str] = Field(default_factory=list, max_length=50)
+    lang: str = Field(default="en", min_length=2, max_length=16)
+
+
 @app.post("/api/translate")
-async def batch_translate(req: Request):
-    body = await req.json()
-    texts: list[str] = body.get("texts", [])
-    lang: str = body.get("lang", "en")
+async def batch_translate(req: TranslateRequest):
+    texts = [text[:2000] for text in req.texts]
+    lang = req.lang
     if lang == "en" or not texts:
         return {"translations": texts}
     # Check cache
@@ -2058,9 +2177,19 @@ def _legacy_session_id(body: dict[str, Any]) -> str:
         return provided
     return f"legacy-session-{uuid4().hex[:12]}"
 
+class LegacyAnalyticsEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    event: Literal["scan"] = "scan"
+    scan_type: str | None = Field(default=None, max_length=32)
+    verdict: str | None = Field(default=None, max_length=32)
+    score: float | None = Field(default=None, ge=0, le=100)
+    language: str | None = Field(default=None, max_length=16)
+    session_id: str | None = Field(default=None, max_length=128)
+
+
 @app.post("/api/analytics/event")
-async def log_event(req: Request):
-    body = await req.json()
+async def log_event(req: LegacyAnalyticsEvent):
+    body = req.model_dump(exclude_none=True)
     allowed = {"event", "scan_type", "verdict", "score", "language"}
     entry = {k: v for k, v in body.items() if k in allowed}
     # Normalize invalid verdicts — clients sometimes send ERROR for failed scans
@@ -2505,20 +2634,69 @@ async def v0_action_route(req: V0ActionRouteRequest):
 
 @app.post("/api/v0/loop/receipt")
 async def v0_loop_receipt(req: V0LoopReceiptRequest):
-    """Append a Chetana scam-check loop receipt for the completed scan."""
-    receipt = build_v0_loop_receipt(req)
+    """Recompute, validate, and sign a Chetana scam-check loop receipt."""
+    canonical_verdict = analyze_v0_scan(
+        V0ScanInput(
+            input_type=req.verdict.input_type,
+            text=req.input_text,
+            language_hint=req.verdict.language_hint,
+            source_name="receipt_recompute",
+            session_id=req.session_id,
+        )
+    )
+    fields = (
+        "verdict",
+        "risk_level",
+        "scam_type",
+        "confidence_band",
+        "evidence_state",
+        "incident_state",
+        "recommended_actions",
+    )
+    mismatches = [field for field in fields if getattr(req.verdict, field) != getattr(canonical_verdict, field)]
+    submitted_reasons = [reason.code for reason in req.verdict.reasons]
+    canonical_reasons = [reason.code for reason in canonical_verdict.reasons]
+    if submitted_reasons != canonical_reasons:
+        mismatches.append("reason_codes")
+    if mismatches:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "receipt_verdict_mismatch",
+                "mismatched_fields": sorted(set(mismatches)),
+            },
+        )
+
+    canonical_verdict = canonical_verdict.model_copy(update={"scan_id": req.verdict.scan_id})
+    canonical_action_route = build_v0_action_route(
+        V0ActionRouteRequest(
+            verdict=canonical_verdict,
+            input_text=req.input_text,
+            session_id=req.session_id,
+        )
+    )
+    canonical_request = req.model_copy(
+        update={
+            "verdict": canonical_verdict,
+            "evidence_pack": None,
+            "trust_bundle": None,
+            "action_route": canonical_action_route,
+        }
+    )
+    receipt = build_v0_loop_receipt(canonical_request)
     try:
         proof = issue_assessment_receipt(
-            verdict=req.verdict,
+            verdict=canonical_verdict,
             input_text=req.input_text,
             loop_event_hash=receipt.event_hash or receipt.iteration_hash,
             contract_hash=receipt.contract_hash,
-            action_route_hash=req.action_route.route_hash if req.action_route else None,
+            action_route_hash=canonical_action_route.route_hash,
         )
         return {
             "loop_receipt": receipt.model_dump(),
             "mirrorproof_receipt": proof.model_dump(),
             "mirrorproof_status": "signed",
+            "receipt_basis": "server_recomputed",
         }
     except Exception as exc:  # pragma: no cover - fail-open keeps the safety result usable
         logger.exception("mirrorproof_assessment_issue_failed", exc_info=exc)
@@ -2526,6 +2704,7 @@ async def v0_loop_receipt(req: V0LoopReceiptRequest):
             "loop_receipt": receipt.model_dump(),
             "mirrorproof_receipt": None,
             "mirrorproof_status": "unavailable",
+            "receipt_basis": "server_recomputed",
         }
 
 
@@ -3712,7 +3891,7 @@ def _require_local_security_operator(request: Request) -> None:
     if forwarded or host not in {"127.0.0.1", "::1", "localhost"}:
         raise HTTPException(status_code=404, detail="Not found")
 
-@app.post("/api/decode-firewall/inspect")
+@app.post("/api/decode-firewall/inspect", include_in_schema=False)
 async def fw_inspect(request: Request, file: UploadFile = File(None), text: str = Form(None)):
     """Loopback-only inspection surface for the Decode Firewall operator."""
     _require_local_security_operator(request)
@@ -3729,7 +3908,7 @@ async def fw_inspect(request: Request, file: UploadFile = File(None), text: str 
         raise HTTPException(status_code=400, detail="provide_file_or_text")
     return result.to_dict()
 
-@app.post("/api/decode-firewall/release")
+@app.post("/api/decode-firewall/release", include_in_schema=False)
 async def fw_release(request: Request, object_id: str = Form(...), target: str = Form(...)):
     """Loopback-only release of a quarantined object."""
     _require_local_security_operator(request)
@@ -3737,7 +3916,7 @@ async def fw_release(request: Request, object_id: str = Form(...), target: str =
         return {"error": "Decode Firewall not loaded"}
     return _fw_operator.release(object_id, target)
 
-@app.get("/api/decode-firewall/object/{object_id}")
+@app.get("/api/decode-firewall/object/{object_id}", include_in_schema=False)
 async def fw_object(object_id: str, request: Request):
     """Get stored analysis for an object from loopback only."""
     _require_local_security_operator(request)
@@ -3746,7 +3925,7 @@ async def fw_object(object_id: str, request: Request):
     obj = _fw_operator.show(object_id)
     return obj or {"error": "Not found"}
 
-@app.get("/api/decode-firewall/events/{object_id}")
+@app.get("/api/decode-firewall/events/{object_id}", include_in_schema=False)
 async def fw_events(object_id: str, request: Request):
     """Get an object event trail from loopback only."""
     _require_local_security_operator(request)

@@ -100,7 +100,32 @@ def test_loop_endpoint_returns_signed_mirrorproof(monkeypatch, tmp_path) -> None
     assert response.status_code == 200
     payload = response.json()
     assert payload["mirrorproof_status"] == "signed"
+    assert payload["receipt_basis"] == "server_recomputed"
     assert payload["mirrorproof_receipt"]["lineage"]["loop_event_hash"] == payload["loop_receipt"]["event_hash"]
+
+
+def test_loop_endpoint_refuses_to_sign_caller_fabricated_verdict() -> None:
+    client = TestClient(app)
+    text = "Police says pay Rs 999 now or you will be arrested."
+    verdict = analyze_scan(V0ScanInput(input_type="text", text=text, language_hint="en"))
+    forged = verdict.model_copy(
+        update={
+            "verdict": "low_signal",
+            "risk_level": "low",
+            "confidence_band": "low",
+        }
+    )
+
+    response = client.post(
+        "/api/v0/loop/receipt",
+        json={"verdict": forged.model_dump(), "input_text": text, "session_id": "forgery-test"},
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "receipt_verdict_mismatch"
+    assert "verdict" in detail["mismatched_fields"]
+    assert "risk_level" in detail["mismatched_fields"]
 
 
 def test_benchmark_statement_binds_suite_and_report(tmp_path) -> None:

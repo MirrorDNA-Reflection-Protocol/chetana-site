@@ -192,9 +192,9 @@ class V0Verdict(StrictModel):
 class V0ScanInput(StrictModel):
     input_type: InputType
     text: str = Field(default="", max_length=20000)
-    language_hint: str | None = None
-    source_name: str | None = None
-    session_id: str | None = None
+    language_hint: str | None = Field(default=None, max_length=16)
+    source_name: str | None = Field(default=None, max_length=256)
+    session_id: str | None = Field(default=None, max_length=128)
     extraction: V0ScanExtraction | None = None
 
 
@@ -312,22 +312,22 @@ class V0Event(StrictModel):
 
 class V0EventInput(StrictModel):
     event_name: EventName
-    session_id: str
-    user_id_hash: str | None = None
-    scan_id: str | None = None
+    session_id: str = Field(min_length=1, max_length=128)
+    user_id_hash: str | None = Field(default=None, max_length=128)
+    scan_id: str | None = Field(default=None, max_length=128)
     input_type: InputType | None = None
     verdict: VerdictValue | None = None
-    scam_type: str | None = None
+    scam_type: str | None = Field(default=None, max_length=80)
     confidence_band: ConfidenceBand | None = None
     share_channel: ShareChannel | None = None
     report_target: ReportTarget | None = None
     latency_ms: int | None = Field(default=None, ge=0)
     device_class: DeviceClass | None = None
-    language_hint: str | None = None
+    language_hint: str | None = Field(default=None, max_length=16)
     consent_class: ConsentClass = "C0"
     payload_class: PayloadClass = "derived_state"
     persistence_class: PersistenceClass = "P1"
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict, max_length=24)
 
 
 REASON_META: dict[ReasonCode, dict[str, Any]] = {
@@ -1356,7 +1356,7 @@ class V0ActionRoute(StrictModel):
 
 class V0LoopReceiptRequest(StrictModel):
     verdict: V0Verdict
-    input_text: str = Field(default="", max_length=20000)
+    input_text: str = Field(min_length=1, max_length=20000)
     evidence_pack: V0EvidencePack | None = None
     trust_bundle: V0TrustBundle | None = None
     action_route: V0ActionRoute | None = None

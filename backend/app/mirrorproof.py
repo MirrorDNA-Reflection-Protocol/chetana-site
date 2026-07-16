@@ -172,7 +172,8 @@ def _sha256(payload: bytes) -> str:
 
 
 def _write_private_key(path: Path, key: Ed25519PrivateKey) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
     material = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -191,6 +192,8 @@ def _load_private_key(path: Path = PRIVATE_KEY_PATH) -> Ed25519PrivateKey:
     else:
         if not path.exists():
             _write_private_key(path, Ed25519PrivateKey.generate())
+        os.chmod(path.parent, 0o700)
+        os.chmod(path, 0o600)
         loaded = serialization.load_pem_private_key(path.read_bytes(), password=None)
     if not isinstance(loaded, Ed25519PrivateKey):
         raise ValueError("mirrorproof_key_must_be_ed25519")
@@ -249,9 +252,11 @@ def _latest_hash(path: Path) -> str | None:
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, sort_keys=True, ensure_ascii=True) + "\n")
+    os.chmod(path, 0o600)
 
 
 def issue_assessment_receipt(

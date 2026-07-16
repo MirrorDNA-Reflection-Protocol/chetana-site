@@ -14,7 +14,10 @@ from fastapi.testclient import TestClient
 from app.incident.incident_mode import _get_session, _save_session
 from app.incident.models import IncidentSession
 from app.main import (
+    _PUBLIC_API_REQUEST_LOG,
     UPLOAD_MAX_BYTES,
+    _consume_public_api_budget,
+    _high_risk_alert,
     _read_upload_limited,
     _require_local_security_operator,
     _safe_frontend_file,
@@ -40,6 +43,73 @@ def test_firewall_operator_routes_are_hidden_from_public_requests() -> None:
 def test_firewall_operator_inspection_remains_available_on_loopback() -> None:
     request = Request({"type": "http", "client": ("127.0.0.1", 50000), "headers": []})
     _require_local_security_operator(request)
+
+
+def test_operator_and_retired_routes_fail_closed_on_public_edge() -> None:
+    client = TestClient(app)
+
+    alert = client.post("/api/alert", json={"message": "should not send"})
+    witness = client.get("/api/witness/anything")
+    schema = client.get("/api/openapi.json").json()["paths"]
+
+    assert alert.status_code == 404
+    assert witness.status_code == 410
+    assert witness.json()["replacement"] == "/api/v0/mirrorproof/verify"
+    assert "/api/alert" not in schema
+    assert "/api/decode-firewall/inspect" not in schema
+    assert "/api/witness/{path}" not in schema
+
+
+def test_public_api_budget_uses_validated_cloudflare_client_ip() -> None:
+    _PUBLIC_API_REQUEST_LOG.clear()
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "https",
+            "path": "/api/v0/events",
+            "query_string": b"",
+            "server": ("chetana.activemirror.ai", 443),
+            "client": ("127.0.0.1", 50000),
+            "headers": [(b"cf-connecting-ip", b"203.0.113.7")],
+        }
+    )
+
+    assert _consume_public_api_budget(request, 60, 2) == (True, 0)
+    assert _consume_public_api_budget(request, 60, 2) == (True, 0)
+    allowed, retry_after = _consume_public_api_budget(request, 60, 2)
+    assert allowed is False
+    assert retry_after > 0
+
+
+def test_telemetry_schemas_reject_unbounded_or_unknown_fields() -> None:
+    client = TestClient(app)
+
+    legacy = client.post(
+        "/api/analytics/event",
+        json={"event": "scan", "score": 101, "unexpected": "pollution"},
+    )
+    v0 = client.post(
+        "/api/v0/events",
+        json={"event_name": "scan_completed", "session_id": "x" * 129},
+    )
+
+    assert legacy.status_code == 422
+    assert v0.status_code == 422
+
+
+def test_high_risk_notifications_never_include_raw_user_content() -> None:
+    secret_message = "OTP 778899 and private victim message"
+    alert = _high_risk_alert(
+        channel="chat",
+        score=95,
+        scam_type="fake_kyc",
+        surface="identity trust",
+        signals=["credential request"],
+    )
+
+    assert secret_message not in alert
+    assert "Raw user content omitted" in alert
 
 
 def test_upload_reader_rejects_oversized_payload_before_processing() -> None:

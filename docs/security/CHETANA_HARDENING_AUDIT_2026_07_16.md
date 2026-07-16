@@ -93,6 +93,8 @@ The public witness route proxied arbitrary paths to a missing loopback service a
 
 Repair: the proxy is removed. The compatibility route returns `410` and points to the active MirrorProof verifier.
 
+Unknown `/api/*` GET paths now return JSON `404` instead of falling through to the SPA shell with an HTML `200`.
+
 ### Browser-to-localhost permission
 
 The production CSP allowed pages to connect to `http://localhost:8093`.
@@ -101,7 +103,7 @@ Repair: production `connect-src` is now same-origin only. Vite development conti
 
 ## Verification
 
-- Backend: 134 tests passed, 2 subtests passed
+- Backend: 135 tests passed, 2 subtests passed
 - Frontend: 3 tests passed; production build passed
 - Dependencies: `npm audit --omit=dev` reported 0 vulnerabilities; `pip check` reported no broken requirements
 - Python advisories: upgraded FastAPI to `0.139.1`, Starlette to `1.3.1`, and Pydantic to `2.13.4`; `pip-audit` then reported no known vulnerabilities

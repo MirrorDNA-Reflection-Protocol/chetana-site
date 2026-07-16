@@ -60,6 +60,13 @@ def test_operator_and_retired_routes_fail_closed_on_public_edge() -> None:
     assert "/api/witness/{path}" not in schema
 
 
+def test_unknown_api_get_does_not_fall_through_to_spa() -> None:
+    response = TestClient(app).get("/api/security/firewall/inspect")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 def test_public_api_budget_uses_validated_cloudflare_client_ip() -> None:
     _PUBLIC_API_REQUEST_LOG.clear()
     request = Request(

@@ -4083,4 +4083,6 @@ if frontend_dist.exists():
             # Hashed assets get long cache, everything else no-cache
             headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in str(file) else {"Cache-Control": "no-cache, no-store, must-revalidate"}
             return FileResponse(file, headers=headers)
+        if path == "api" or path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
         return FileResponse(frontend_dist / "index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})

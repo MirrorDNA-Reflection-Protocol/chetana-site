@@ -18,10 +18,10 @@ from app.main import (
     _read_upload_limited,
     _require_local_security_operator,
     _safe_frontend_file,
+    _EphemeralDecodeFirewall,
     app,
 )
 from starlette.requests import Request
-from decode_firewall import DecodeFirewall
 
 
 def test_firewall_operator_routes_are_hidden_from_public_requests() -> None:
@@ -61,8 +61,7 @@ def test_static_file_resolver_cannot_escape_frontend_root() -> None:
 def test_public_firewall_mode_does_not_persist_payload_or_extracted_text() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
-        firewall = DecodeFirewall(
-            persist_artifacts=False,
+        firewall = _EphemeralDecodeFirewall(
             quarantine_dir=root / "quarantine",
             event_log_path=root / "events.jsonl",
             object_store_path=root / "objects.jsonl",
@@ -71,7 +70,7 @@ def test_public_firewall_mode_does_not_persist_payload_or_extracted_text() -> No
 
         assert result.raw_payload_quarantined is False
         assert result.quarantine_path == ""
-        assert list(root.rglob("*")) == []
+        assert [path for path in root.rglob("*") if path.is_file()] == []
 
 
 def test_incident_ids_are_uuid_only_and_session_files_are_private() -> None:

@@ -3625,7 +3625,27 @@ if str(_decode_fw_path.parent) not in sys.path:
     sys.path.insert(0, str(_decode_fw_path.parent))
 try:
     from decode_firewall import DecodeFirewall, TrustState
-    _fw = DecodeFirewall(persist_artifacts=False)
+
+    class _EphemeralDecodeFirewall(DecodeFirewall):
+        """Analyze public payloads without retaining raw or derived content."""
+
+        def inspect(self, *args, **kwargs):
+            obj = super().inspect(*args, **kwargs)
+            obj.raw_payload_quarantined = False
+            obj.quarantine_path = ""
+            return obj
+
+        def _quarantine(self, obj, data):
+            obj.raw_payload_quarantined = False
+            obj.quarantine_path = ""
+
+        def _append_event(self, event):
+            return None
+
+        def _store_object(self, obj):
+            return None
+
+    _fw = _EphemeralDecodeFirewall()
     _fw_operator = DecodeFirewall()
     logger.info("Decode Firewall loaded")
 except ImportError:

@@ -57,6 +57,7 @@ def test_institutional_pages_and_json_contracts_are_public() -> None:
     for path, expected in (
         ("/observatory", "India Scam Readiness Observatory"),
         ("/partners/30-day-pilot", "One audience. Thirty days."),
+        ("/partners/goa", "Stop the scam before the money moves."),
         ("/partners/trust-room", "Institutional Trust Room"),
     ):
         response = client.get(path)
@@ -81,4 +82,5 @@ def test_sitemap_exposes_institutional_discovery_routes() -> None:
     response = client.get("/sitemap.xml")
     assert response.status_code == 200
     assert "https://chetana.activemirror.ai/observatory" in response.text
+    assert "https://chetana.activemirror.ai/partners/goa" in response.text
     assert "https://chetana.activemirror.ai/partners/trust-room" in response.text

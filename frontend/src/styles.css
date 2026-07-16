@@ -9662,3 +9662,200 @@ button.partner-desk-delete {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
+
+/* ── Simple public palette ───────────────────────────────────── */
+/* Familiar safety colors: blue action, green verified, amber caution, red danger. */
+:root,
+:root.theme-light {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-raised: #f7f8fa;
+  --bg-card: #ffffff;
+  --bg-card-solid: #ffffff;
+  --bg-nav: rgba(255, 255, 255, 0.96);
+  --bg-input: #ffffff;
+  --surface: #ffffff;
+  --text: #202124;
+  --text-bright: #111827;
+  --text-mid: #5f6368;
+  --muted: #5f6368;
+  --text-dim: #9aa0a6;
+  --heading: #111827;
+  --sub: #5f6368;
+  --dim: #9aa0a6;
+  --line: #d9dde3;
+  --line-bright: #bcc3cc;
+  --border: #d9dde3;
+  --glass: #ffffff;
+  --primary: #0b57d0;
+  --primary-bright: #0b57d0;
+  --primary-glow: rgba(11, 87, 208, 0.12);
+  --primary-light: #e8f0fe;
+  --safe: #137333;
+  --safe-light: #e6f4ea;
+  --green: #137333;
+  --danger: #b3261e;
+  --danger-light: #fce8e6;
+  --red: #b3261e;
+  --amber: #8a580e;
+  --amber-light: #fef7e0;
+  --saffron: #8a580e;
+  --saffron-glow: #fef7e0;
+  --warm: #8a580e;
+  --deep: #174ea6;
+  --teal: #137333;
+  --teal-light: #e6f4ea;
+  --violet: #0b57d0;
+  --violet-light: #e8f0fe;
+  --gradient: #0b57d0;
+}
+
+:root.theme-dark {
+  color-scheme: dark;
+  --bg: #111111;
+  --bg-raised: #191919;
+  --bg-card: #191919;
+  --bg-card-solid: #191919;
+  --bg-nav: rgba(17, 17, 17, 0.96);
+  --bg-input: #222222;
+  --surface: #191919;
+  --text: #eeeeee;
+  --text-bright: #ffffff;
+  --text-mid: #b8b8b8;
+  --muted: #b8b8b8;
+  --text-dim: #777777;
+  --heading: #ffffff;
+  --sub: #b8b8b8;
+  --dim: #777777;
+  --line: #3a3a3a;
+  --line-bright: #555555;
+  --border: #3a3a3a;
+  --glass: #191919;
+  --primary: #8ab4f8;
+  --primary-bright: #8ab4f8;
+  --primary-light: #1c3154;
+  --safe: #81c995;
+  --safe-light: #173b24;
+  --danger: #f28b82;
+  --danger-light: #4b1f1c;
+  --amber: #fdd663;
+  --amber-light: #463b16;
+  --teal: #81c995;
+  --teal-light: #173b24;
+}
+
+body::after { display: none; }
+
+.v0-shell-simple,
+.v0-shell-simple .v0-composer,
+.v0-lazy-panel,
+.v0-simple-step,
+.v0-hero-proof-list span,
+.v0-institution-note,
+.partner-hero,
+.partner-inquiry-panel,
+.partner-desk-panel,
+.partner-proof-tile,
+.partner-thesis-row,
+.partner-card,
+.partner-packet-panel,
+.partner-source-ladder,
+.partner-source-card,
+.partner-proof,
+.partner-step {
+  background: var(--bg-card-solid);
+  box-shadow: none;
+}
+
+.v0-shell-simple {
+  border-color: var(--line);
+}
+
+.v0-app-glyph {
+  color: #ffffff;
+  border-color: var(--primary);
+  background: var(--primary);
+  box-shadow: none;
+}
+
+.v0-shell-simple .v0-submit,
+.partner-primary {
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  background: var(--primary) !important;
+  box-shadow: none !important;
+}
+
+.v0-shell-simple .v0-upload-large .v0-upload-inner {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.v0-simple-tabs,
+.v0-shell-simple .v0-ghost-button,
+.partner-secondary {
+  color: var(--text-bright);
+  border-color: var(--line-bright);
+  background: var(--bg-card-solid);
+}
+
+.v0-simple-tabs button.active {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.v0-simple-step span {
+  color: #ffffff;
+  background: var(--primary);
+}
+
+.v0-institution-note,
+.partner-inquiry-privacy,
+.partner-metrics-note {
+  color: var(--text);
+  border-color: #a8c7fa;
+  background: var(--primary-light);
+}
+
+.partner-hero {
+  border-top: 5px solid var(--primary);
+}
+
+.partner-band span,
+.partner-proof .kicker,
+.partner-field span,
+.partner-thesis-row span,
+.partner-case-head span,
+.partner-case-row span,
+.partner-step span {
+  color: var(--primary);
+}
+
+.partner-field input,
+.partner-field select,
+.partner-field textarea,
+.partner-case-packet,
+.partner-case-head {
+  color: var(--text-bright);
+  border-color: var(--line);
+  background: var(--bg-input);
+}
+
+.partner-card-icon,
+.partner-source-card span {
+  color: var(--primary);
+  border-color: #a8c7fa;
+  background: var(--primary-light);
+}
+
+.partner-boundary {
+  color: var(--text);
+  border-color: #f0cc83;
+  background: var(--amber-light);
+}
+
+.powered-brand {
+  color: var(--primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}

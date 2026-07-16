@@ -114,6 +114,7 @@ from app.institutional import (  # noqa: E402
     build_observatory_payload,
     load_institutional_contract,
     render_observatory_html,
+    render_goa_pilot_html,
     render_pilot_html,
     render_trust_room_html,
 )
@@ -3159,6 +3160,7 @@ async def sitemap_xml():
   <url><loc>https://chetana.activemirror.ai/partners</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/india-kit</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/30-day-pilot</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://chetana.activemirror.ai/partners/goa</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/field-harness</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/packet</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://chetana.activemirror.ai/partners/outreach-kit</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
@@ -3341,6 +3343,16 @@ async def partners_30_day_pilot():
     return HTMLResponse(
         content=render_pilot_html(contract),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/partners/goa", include_in_schema=False)
+@app.get("/partners/goa/", include_in_schema=False)
+async def partners_goa_pilot():
+    contract = load_institutional_contract()
+    return HTMLResponse(
+        content=render_goa_pilot_html(contract),
+        headers={"Cache-Control": "public, max-age=300"},
     )
 
 

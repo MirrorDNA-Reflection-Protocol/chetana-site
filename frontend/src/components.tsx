@@ -71,7 +71,7 @@ export function BackgroundMesh() {
       inset: 0,
       zIndex: 0,
       pointerEvents: "none",
-      background: "radial-gradient(900px 500px at 50% -8%, rgba(201,163,94,.10), transparent 60%)",
+      background: "transparent",
     }} />
   );
 }
@@ -108,7 +108,7 @@ export function Nav({ page, setPage }: { page: PageId; setPage: (p: PageId) => v
         ))}
         <LanguagePicker />
         <button className="theme-toggle" onClick={() => {
-          document.documentElement.classList.toggle("theme-light");
+          document.documentElement.classList.toggle("theme-dark");
         }} aria-label="Toggle light or dark theme" title="Toggle theme">
           <Moon size={18} aria-hidden="true" />
         </button>
@@ -3677,51 +3677,27 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
       <div className="partner-hero">
         <div className="kicker kicker-glow">
           <ShieldCheck size={14} />
-          Banks, government programs, telecom, fintech, CSR
+          Built in Goa. Ready for a measured public pilot.
         </div>
-        <h1>Put Chetana in front of fraud loss.</h1>
+        <h1>Give every citizen a scam check before they act.</h1>
         <p>
-          Chetana is an independent scam checker for India. A user screenshots a message, taps what happened,
-          or adds a short note. Chetana gives a plain-language risk read, preserves the useful facts,
-          and routes them to 1930, cybercrime.gov.in, Chakshu, bank support, or merchant checks when needed.
+          Chetana is a Goa-built scam checker for India. A citizen sends a screenshot, message, payment request,
+          or voice note. Chetana gives a plain-language risk read and one safe next step, including 1930,
+          cybercrime.gov.in, Chakshu, bank support, or merchant verification when needed.
         </p>
         <div className="partner-actions">
-          <a className="partner-primary" href="#pilot-inquiry">
-            <MessageCircle size={17} />
-            Request pilot contact
-          </a>
-          <a className="partner-secondary" href="/partners/packet" target="_blank" rel="noreferrer">
-            <FileText size={17} />
-            Open pilot packet
-          </a>
-          <a className="partner-secondary" href="/partners/india-kit" target="_blank" rel="noreferrer">
-            <QrCode size={17} />
-            India kit
+          <a className="partner-primary" href="/partners/goa" target="_blank" rel="noreferrer">
+            <Building2 size={17} />
+            Open Goa pilot briefing
           </a>
           <a className="partner-secondary" href="/partners/30-day-pilot" target="_blank" rel="noreferrer">
             <BarChart3 size={17} />
-            30-day pilot
+            Review 30-day pilot
           </a>
-          <a className="partner-secondary" href="/assurance" target="_blank" rel="noreferrer">
-            <ShieldCheck size={17} />
-            Safety Lab
+          <a className="partner-secondary" href="#pilot-inquiry">
+            <MessageCircle size={17} />
+            Start written intake
           </a>
-          <a className="partner-secondary" href="/observatory" target="_blank" rel="noreferrer">
-            <BarChart3 size={17} />
-            India Observatory
-          </a>
-          <a className="partner-secondary" href="/partners/trust-room" target="_blank" rel="noreferrer">
-            <Lock size={17} />
-            Trust Room
-          </a>
-          <a className="partner-secondary" href="/partners/outreach-kit" target="_blank" rel="noreferrer">
-            <Share2 size={17} />
-            Outreach kit
-          </a>
-          <button className="partner-secondary" onClick={() => onNavigate("nexus")}>
-            <FileText size={17} />
-            Partner API
-          </button>
         </div>
         <div className="partner-boundary">
           <Info size={14} />
@@ -3731,8 +3707,8 @@ export function PartnerPage({ onNavigate }: { onNavigate: (p: PageId) => void })
 
       <div className="partner-band">
         <div>
-          <span>The sponsor case</span>
-          <strong>It is cheaper to fund a fraud pause than recover money after it moves.</strong>
+          <span>The public case</span>
+          <strong>Goa can prove a citizen-side fraud pause without waiting for a large systems integration.</strong>
         </div>
         <p>
           Chetana does not replace a bank, police portal, or government helpline. It makes the moment before

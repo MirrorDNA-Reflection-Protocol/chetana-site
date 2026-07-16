@@ -117,6 +117,52 @@ def render_pilot_html(contract: dict[str, Any]) -> str:
 </main></body></html>"""
 
 
+def render_goa_pilot_html(contract: dict[str, Any]) -> str:
+    pilot = contract["pilot"]
+    measures = "".join(f"<li>{html.escape(item)}</li>" for item in pilot["measures"])
+    timeline = "".join(
+        f"""<article class="card"><span class="tag">Days {html.escape(item['days'])}</span><h3>{html.escape(item['name'])}</h3><p>{html.escape(item['detail'])}</p></article>"""
+        for item in pilot["timeline"]
+    )
+    return f"""<!doctype html><html lang="en"><head>{_base_head('Chetana for Goa Government', 'A 30-day citizen scam-pause pilot built in Goa.', '/partners/goa')}
+  <style>
+    .goa-hero {{ display:grid; grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); gap:32px; align-items:end; padding-bottom:34px; }}
+    .goa-hero h1 {{ max-width:760px; font-size:clamp(3rem,8vw,6.6rem); }}
+    .goa-promise {{ padding:22px; border:2px solid var(--ink); border-radius:6px; }} .goa-promise strong {{ display:block; font-size:1.35rem; line-height:1.15; }}
+    .goa-stat {{ display:grid; gap:4px; padding:18px; border-top:4px solid var(--green); background:var(--soft); }} .goa-stat strong {{ font-size:2rem; line-height:1; }}
+    .goa-ask {{ padding:26px; color:#fff; background:var(--ink); border-radius:6px; }} .goa-ask p,.goa-ask li {{ color:#eef2f0; }} .goa-ask a {{ color:#fff; }}
+    .goa-flow {{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }} .goa-flow .card {{ border-top:4px solid var(--green); }}
+    .source {{ font-size:.78rem; line-height:1.45; }}
+    @media(max-width:780px) {{ .goa-hero,.goa-flow {{ grid-template-columns:1fr; }} }}
+  </style></head><body>
+<header><div><a href="/">Chetana</a><span>Goa Government Pilot Briefing</span></div></header><main>
+  <section class="goa-hero">
+    <div><div class="eyebrow">Built in Goa &middot; citizen safety &middot; 30-day pilot</div><h1>Stop the scam before the money moves.</h1><p class="lead">Chetana gives any citizen one simple place to check a suspicious screenshot, message, payment request, or voice note before acting. When harm has already happened, it routes them to 1930 and the correct official recovery rail.</p></div>
+    <aside class="goa-promise"><span class="tag">The proposal</span><strong>Make Goa the first proving ground for a public, privacy-preserving scam-pause layer.</strong><p>No bank integration. No police-system access. No citizen account required for the first pilot.</p></aside>
+  </section>
+
+  <section class="band"><div class="eyebrow">Why Goa, why now</div><h2>The state is strengthening response. Chetana adds the citizen-side prevention layer.</h2><div class="grid">
+    <article class="goa-stat"><strong>6,052</strong><span>cyber-fraud incidents reported in Goa since NCRP inception through 28 February 2025</span><p class="source">Official historical context, not current incidence or Chetana performance. <a href="https://mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/RS12032025/1517.pdf">MHA parliamentary answer</a></p></article>
+    <article class="goa-stat"><strong>Rs 149.06 crore</strong><span>amount reported in those Goa incidents</span><p class="source">Cumulative official figure through 28 February 2025. <a href="https://mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/RS12032025/1517.pdf">Open primary source</a></p></article>
+    <article class="goa-stat"><strong>2026</strong><span>Goa Police launched E-Zero FIR for cyber-financial fraud and PRISM</span><p class="source"><a href="https://dip.goa.gov.in/state-level-conference-of-dgps-igps-of-police-held/">Government of Goa release</a></p></article>
+  </div></section>
+
+  <section class="band"><div class="eyebrow">The citizen loop</div><h2>Four actions people can understand immediately.</h2><div class="goa-flow">
+    <article class="card"><span class="tag">1</span><h3>Send</h3><p>Screenshot, paste, speak, or tap what happened.</p></article>
+    <article class="card"><span class="tag">2</span><h3>Pause</h3><p>See a plain-language risk result before paying, sharing an OTP, or installing an app.</p></article>
+    <article class="card"><span class="tag">3</span><h3>Act</h3><p>Follow one primary next step: stop, verify, call 1930, report, or begin recovery.</p></article>
+    <article class="card"><span class="tag">4</span><h3>Measure</h3><p>PilotTrace records aggregate use and handoffs, never sponsor-visible raw scam content by default.</p></article>
+  </div></section>
+
+  <section class="band grid two"><div><div class="eyebrow">30-day Goa pilot</div><h2>Start narrow enough to prove.</h2><p>Choose one audience: senior citizens, women, students, small merchants, or government employees. Distribute one source-tagged link and QR through an existing Goa awareness channel. Chetana supplies the product, field harness, privacy boundary, and final decision packet.</p><div class="actions"><a class="primary" href="/partners#pilot-inquiry">Start written pilot intake</a><a href="/partners/30-day-pilot">Open full pilot contract</a><a href="/partners/trust-room">Review Trust Room</a></div></div><div><div class="eyebrow">Measured, not promised</div><h2>What Goa receives after 30 days</h2><ul>{measures}</ul></div></section>
+
+  <section class="band"><div class="eyebrow">Sequence</div><div class="grid two">{timeline}</div></section>
+
+  <section class="band grid two"><div class="goa-ask"><div class="eyebrow">The decision we need</div><h2>Approve a bounded Goa pilot.</h2><ul><li>Name one department owner.</li><li>Name one audience and distribution channel.</li><li>Approve official escalation wording and the privacy boundary.</li><li>Review the written result after 30 days: scale, revise, or stop.</li></ul><p><a href="mailto:paul@activemirror.ai">paul@activemirror.ai</a></p></div><div><div class="eyebrow">Strategic fit</div><h2>Goa already invites real-world government pilots.</h2><p>The Goa Open Innovation Challenge explicitly offers startups opportunities to pilot mature technology with government and industry. Goa's 2025 Startup Policy explicitly includes cybersecurity and AI ventures.</p><p class="source"><a href="https://www.startup.goa.gov.in/goa-open-innovation-challenge.html">Goa Open Innovation Challenge</a> &middot; <a href="https://www.startup.goa.gov.in/Notification/Goa-Startup-Policy-2025.pdf">Goa Startup Policy 2025</a> &middot; <a href="https://www.goa.gov.in/department/goa-police/">Goa Police 1930 guidance</a></p><div class="notice"><p><strong>Boundary:</strong> Chetana is independent. It does not claim Government of Goa, police, bank, RBI, NPCI, I4C, or CERT-In affiliation. A pilot would be an evaluation, not an endorsement.</p></div></div></section>
+  <p class="foot">Chetana is a private advisory scam checker built in Goa. It routes citizens toward official help; it does not replace official reporting, investigation, or emergency response.</p>
+</main></body></html>"""
+
+
 def render_trust_room_html(contract: dict[str, Any], assurance: dict[str, Any]) -> str:
     trust = contract["trust_room"]
     implemented = "".join(f"<li>{html.escape(item)}</li>" for item in trust["implemented"])

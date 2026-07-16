@@ -139,6 +139,7 @@ class MainLocalContractTests(unittest.TestCase):
         self.assertIn("https://chetana.activemirror.ai/partners", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/india-kit", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/30-day-pilot", sitemap_resp.text)
+        self.assertIn("https://chetana.activemirror.ai/partners/goa", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/field-harness", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/packet", sitemap_resp.text)
         self.assertIn("https://chetana.activemirror.ai/partners/outreach-kit", sitemap_resp.text)

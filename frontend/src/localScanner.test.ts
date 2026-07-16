@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { selectPreferredOcrResult, unreadableScreenshotResult } from "./localScanner";
+import { selectPreferredOcrResult, TESSERACT_LOCAL_ASSETS, unreadableScreenshotResult } from "./localScanner";
 
 describe("localScreenshotScan", () => {
+  it("keeps OCR worker, core, and language data on the Chetana origin", () => {
+    expect(Object.values(TESSERACT_LOCAL_ASSETS).every((path) => path.startsWith("/ocr/"))).toBe(true);
+  });
+
   it("returns low signal rather than low risk when OCR cannot read the image", async () => {
     const result = unreadableScreenshotResult();
 

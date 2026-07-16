@@ -3,6 +3,7 @@ dist/
 backend/frontend_dist/
 frontend/public/version.json
 frontend/public/.well-known/edge-truth.json
+frontend/public/ocr/
 *.tsbuildinfo
 __pycache__/
 *.pyc

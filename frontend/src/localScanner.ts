@@ -210,6 +210,12 @@ export function localPatternScan(text: string): LocalScanResult {
 let worker: any = null;
 let tesseractModule: typeof import("tesseract.js") | null = null;
 
+export const TESSERACT_LOCAL_ASSETS = {
+  workerPath: "/ocr/worker.min.js",
+  corePath: "/ocr/core",
+  langPath: "/ocr/lang",
+} as const;
+
 export interface BrowserOcrResult {
   text: string;
   confidence: number | null;
@@ -251,6 +257,7 @@ async function getWorker() {
   if (!worker) {
     const Tesseract = await getTesseract();
     worker = await Tesseract.createWorker("eng+hin", undefined, {
+      ...TESSERACT_LOCAL_ASSETS,
       logger: () => {},
     });
   }
@@ -270,7 +277,7 @@ async function preprocessForOCR(imageFile: File): Promise<Blob> {
       const canvas = document.createElement("canvas");
       canvas.width = img.width;
       canvas.height = img.height;
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
       ctx.drawImage(img, 0, 0);
 
       // Sample corners + center to detect dark background

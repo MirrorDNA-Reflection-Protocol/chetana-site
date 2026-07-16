@@ -104,9 +104,9 @@ Repair: production `connect-src` is now same-origin only. Vite development conti
 ## Verification
 
 - Backend: 143 tests passed, 2 subtests passed
-- Frontend: 3 tests passed; production build passed
+- Frontend: 4 tests passed; production build passed
 - Dependencies: `npm audit --omit=dev` reported 0 vulnerabilities; `pip check` reported no broken requirements
-- Python advisories: upgraded FastAPI to `0.139.1`, Starlette to `1.3.1`, and Pydantic to `2.13.4`; `pip-audit` then reported no known vulnerabilities
+- Python advisories: upgraded FastAPI to `0.139.1`, Starlette to `1.3.1`, Pydantic to `2.13.4`, and python-multipart to `0.0.32`; `pip-audit` then reported no known vulnerabilities
 - Python static analysis: Bandit reported no medium- or high-severity findings; remaining results were 14 low-severity warnings or consent-token false positives
 - Static checks: changed Python compiled; `git diff --check` passed
 - Secret scan: Git history retains 15 findings, including the removed historical TriMind default and generated bundle false positives. Current source has no validated credential; one ignored built xterm bundle produces a generic-key false positive.
@@ -119,6 +119,17 @@ Repair: production `connect-src` is now same-origin only. Vite development conti
 - Partner and research rate-limit identities now accept Cloudflare client IPs only from the loopback proxy boundary and ignore untrusted forwarding headers from direct peers.
 - Institutional API request models now reject unknown fields and bound language, source, URL, UPI, and phone inputs.
 - Local development CORS origins are disabled by default and require `CHETANA_ALLOW_DEVELOPMENT_ORIGINS=true`.
+
+## Public product-flow validation
+
+- A controlled public screenshot scan reproduced a production failure before this repair: Tesseract attempted to load its worker from jsDelivr, and the production same-origin CSP blocked it. The UI recovered instead of hanging, but screenshot OCR could not complete.
+- Tesseract's worker, WebAssembly core variants, and English/Hindi language data are now copied from pinned npm packages into versioned same-origin assets during development and production builds. The browser scanner is configured to use only `/ocr/` paths.
+- A fresh 390 x 844 browser session scanned a controlled police-impersonation/payment screenshot to `Likely scam`, showed stop/payment guidance plus 1930, cybercrime.gov.in, and Chakshu actions, and received a signed assessment receipt.
+- The fresh browser network trace showed the OCR worker, selected core, and both language packs returning `200` from `https://chetana.activemirror.ai/ocr/`; it contained no jsDelivr OCR request.
+- A controlled 9.26-second voice fixture transcribed through the public API in 3.17 seconds using local whisper.cpp. The response reported no external provider, no raw-audio retention, and successful temporary-file deletion.
+- The automated browser has no microphone device. The public voice UI failed immediately to a clear screenshot/text recovery message rather than entering an indefinite recording state.
+- Public negative-path probes returned `400` for missing local voice consent, `413` for an 8.5 MB voice file, and JSON `404` for an unknown API route.
+- Tesseract currently emits two non-fatal parameter compatibility notices during successful OCR. They do not interrupt or alter the returned assessment.
 
 ## Remaining risk
 

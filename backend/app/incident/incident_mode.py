@@ -73,6 +73,9 @@ def _ensure_private_session_root() -> Path:
     return _SESSION_ROOT
 
 
+_ensure_private_session_root()
+
+
 def _validate_incident_id(incident_id: str) -> str:
     try:
         parsed = UUID(incident_id, version=4)

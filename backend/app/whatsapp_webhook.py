@@ -24,7 +24,7 @@ import time
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Request, Response, Query
+from fastapi import APIRouter, HTTPException, Request, Response, Query
 
 from app.v0_runtime import V0ScanInput, V0Verdict, analyze_scan, log_event, V0EventInput
 
@@ -34,10 +34,12 @@ whatsapp_router = APIRouter(prefix="/api/webhook", tags=["whatsapp"])
 
 # ── Config ───────────────────────────────────────────────────────────
 
-VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "chetana-verify-2026")
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
 ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN", "")
 PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
 META_API = "https://graph.facebook.com/v21.0"
+MAX_WEBHOOK_BYTES = 1024 * 1024
 
 # Rate limiting: max 5 scans per phone per minute
 _rate_map: dict[str, list[float]] = {}
@@ -54,7 +56,7 @@ async def verify_webhook(
     challenge: str = Query(None, alias="hub.challenge"),
 ):
     """Meta sends a GET to verify the webhook URL."""
-    if mode == "subscribe" and token == VERIFY_TOKEN:
+    if VERIFY_TOKEN and mode == "subscribe" and token and hmac.compare_digest(token, VERIFY_TOKEN):
         logger.info("Webhook verified")
         return Response(content=challenge, media_type="text/plain")
     logger.warning(f"Webhook verification failed: mode={mode}")
@@ -66,7 +68,21 @@ async def verify_webhook(
 @whatsapp_router.post("/whatsapp")
 async def receive_message(request: Request):
     """Receive inbound WhatsApp messages from Meta Cloud API."""
-    body = await request.json()
+    if not APP_SECRET:
+        raise HTTPException(status_code=503, detail="whatsapp_webhook_not_configured")
+    raw_body = await request.body()
+    if len(raw_body) > MAX_WEBHOOK_BYTES:
+        raise HTTPException(status_code=413, detail="webhook_payload_too_large")
+    signature = request.headers.get("x-hub-signature-256", "")
+    expected = "sha256=" + hmac.new(APP_SECRET.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    if not signature or not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=401, detail="invalid_webhook_signature")
+    try:
+        body = json.loads(raw_body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="invalid_webhook_json") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid_webhook_payload")
 
     # Meta sends various webhook types; we only care about messages
     entries = body.get("entry", [])

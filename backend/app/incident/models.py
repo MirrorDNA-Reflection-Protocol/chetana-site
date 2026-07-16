@@ -9,7 +9,7 @@ Mirrors the IncidentModeResult JSON schema from:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Annotated, Any, List, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -69,13 +69,17 @@ class IncidentStartRequest(BaseModel):
     Caller sends a risk_level + optional category hint to enter incident mode.
     The scan_id links back to the originating scan result.
     """
-    scan_id:          Optional[str]               = Field(None, description="Originating scan result ID")
+    scan_id:          Optional[str]               = Field(None, max_length=128, description="Originating scan result ID")
     risk_level:       RiskBand                    = Field(RiskBand.red, description="Risk band from scanner")
     category:         Optional[IncidentCategory]  = Field(None, description="Category hint from scanner")
     score:            Optional[int]               = Field(None, ge=0, le=100, description="Scam score 0-100")
     processing_path:  ProcessingPath              = Field(ProcessingPath.local)
     guardian_recommended: bool                    = Field(False)
-    raw_signals:      Optional[List[str]]         = Field(None, description="Red-flag signals from scan")
+    raw_signals:      Optional[List[Annotated[str, Field(max_length=300)]]] = Field(
+        None,
+        max_length=24,
+        description="Red-flag signals from scan",
+    )
 
 
 class IncidentStartResponse(BaseModel):
@@ -95,10 +99,16 @@ class IncidentStatusResponse(BaseModel):
 
 
 class IncidentActionRequest(BaseModel):
-    incident_id:    str
-    action:         str   # "next", "alert_family", "call_1930", "cybercrime_portal",
-                          # "save_evidence", "follow_up_outcome"
-    payload:        Optional[dict[str, Any]] = None
+    incident_id:    str = Field(min_length=36, max_length=36)
+    action: Literal[
+        "next",
+        "alert_family",
+        "call_1930",
+        "cybercrime_portal",
+        "save_evidence",
+        "follow_up_outcome",
+    ]
+    payload: Optional[dict[str, Any]] = Field(default=None, max_length=8)
 
 
 class IncidentActionResponse(BaseModel):

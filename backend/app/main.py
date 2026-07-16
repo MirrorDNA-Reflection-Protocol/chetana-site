@@ -376,6 +376,8 @@ _RESEARCH_MAX_REQUESTS = 5
 _PARTNER_REQUEST_LOG: dict[str, deque[float]] = defaultdict(deque)
 _PARTNER_WINDOW_S = 60 * 60
 _PARTNER_MAX_REQUESTS = 12
+UPLOAD_MAX_BYTES = int(os.getenv("CHETANA_UPLOAD_MAX_BYTES", str(8 * 1024 * 1024)))
+FIREWALL_TEXT_MAX_CHARS = 20_000
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
@@ -392,9 +394,11 @@ def _compact_partner_text(value: str | None, max_len: int) -> str:
 
 
 def _append_partner_inquiry(payload: dict[str, Any]) -> None:
-    PARTNER_INQUIRIES_LOG.parent.mkdir(parents=True, exist_ok=True)
+    PARTNER_INQUIRIES_LOG.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(PARTNER_INQUIRIES_LOG.parent, 0o700)
     with PARTNER_INQUIRIES_LOG.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    os.chmod(PARTNER_INQUIRIES_LOG, 0o600)
 
 
 def _scam_check_link(source: str) -> str:
@@ -2007,7 +2011,10 @@ async def batch_translate(req: Request):
 import time as _time
 import json as _json
 _ANALYTICS_LOG = Path.home() / ".mirrordna" / "chetana" / "analytics.jsonl"
-_ANALYTICS_LOG.parent.mkdir(parents=True, exist_ok=True)
+_ANALYTICS_LOG.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+os.chmod(_ANALYTICS_LOG.parent, 0o700)
+if _ANALYTICS_LOG.exists():
+    os.chmod(_ANALYTICS_LOG, 0o600)
 
 _VALID_VERDICTS = {"SUSPICIOUS", "HIGH", "UNCLEAR", "MEDIUM", "LOW_RISK", "LOW", "SERVICE_UNAVAILABLE"}
 
@@ -2069,6 +2076,7 @@ async def log_event(req: Request):
     entry["ts"] = _time.time()
     with open(_ANALYTICS_LOG, "a") as f:
         f.write(_json.dumps(entry) + "\n")
+    os.chmod(_ANALYTICS_LOG, 0o600)
 
     if entry.get("event") == "scan":
         verdict, confidence_band = _legacy_verdict_to_v0(entry.get("verdict"), entry.get("score"))
@@ -2335,6 +2343,19 @@ async def _transcribe_voice_upload(
         ) from exc
 
 
+async def _read_upload_limited(
+    file: UploadFile,
+    *,
+    max_bytes: int = UPLOAD_MAX_BYTES,
+) -> bytes:
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="upload_too_large")
+    if not content:
+        raise HTTPException(status_code=400, detail="empty_upload")
+    return content
+
+
 @app.post("/api/v0/voice/transcribe")
 async def v0_voice_transcribe(
     file: UploadFile = File(...),
@@ -2363,9 +2384,7 @@ async def v0_scan_improve(
     clean_input_type = _clean_v0_input_type(input_type)
     local_text = (local_extracted_text or "")[:20000]
     parsed_quality = _parse_quality_snapshot(quality_snapshot)
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="empty_upload")
+    content = await _read_upload_limited(file)
 
     if not mistral_ocr_available():
         result = await _fallback_improve_result(
@@ -3606,10 +3625,12 @@ if str(_decode_fw_path.parent) not in sys.path:
     sys.path.insert(0, str(_decode_fw_path.parent))
 try:
     from decode_firewall import DecodeFirewall, TrustState
-    _fw = DecodeFirewall()
+    _fw = DecodeFirewall(persist_artifacts=False)
+    _fw_operator = DecodeFirewall()
     logger.info("Decode Firewall loaded")
 except ImportError:
     _fw = None
+    _fw_operator = None
     logger.warning("Decode Firewall not available — uploads ungated")
 
 
@@ -3662,41 +3683,56 @@ def _gate_text(text: str) -> dict | None:
 
 # ── Firewall API endpoints ────────────────────────────────────────────────
 
+def _require_local_security_operator(request: Request) -> None:
+    forwarded = any(
+        request.headers.get(name)
+        for name in ("cf-connecting-ip", "cf-ray", "forwarded", "x-forwarded-for", "x-real-ip")
+    )
+    host = request.client.host if request.client else ""
+    if forwarded or host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(status_code=404, detail="Not found")
+
 @app.post("/api/decode-firewall/inspect")
-async def fw_inspect(file: UploadFile = File(None), text: str = Form(None)):
-    """Inspect arbitrary content through the Decode Firewall."""
-    if not _fw:
+async def fw_inspect(request: Request, file: UploadFile = File(None), text: str = Form(None)):
+    """Loopback-only inspection surface for the Decode Firewall operator."""
+    _require_local_security_operator(request)
+    if not _fw_operator:
         return {"error": "Decode Firewall not loaded"}
     if file:
-        content = await file.read()
-        result = _fw.inspect(content, source_kind="api_inspect", source_name=file.filename or "", declared_type=file.content_type or "")
+        content = await _read_upload_limited(file)
+        result = _fw_operator.inspect(content, source_kind="api_inspect", source_name=file.filename or "", declared_type=file.content_type or "")
     elif text:
-        result = _fw.inspect_text(text, source_kind="api_inspect")
+        if len(text) > FIREWALL_TEXT_MAX_CHARS:
+            raise HTTPException(status_code=413, detail="firewall_text_too_large")
+        result = _fw_operator.inspect_text(text, source_kind="api_inspect")
     else:
-        return {"error": "Provide file or text"}
+        raise HTTPException(status_code=400, detail="provide_file_or_text")
     return result.to_dict()
 
 @app.post("/api/decode-firewall/release")
-async def fw_release(object_id: str = Form(...), target: str = Form(...)):
-    """Release a quarantined object."""
-    if not _fw:
+async def fw_release(request: Request, object_id: str = Form(...), target: str = Form(...)):
+    """Loopback-only release of a quarantined object."""
+    _require_local_security_operator(request)
+    if not _fw_operator:
         return {"error": "Decode Firewall not loaded"}
-    return _fw.release(object_id, target)
+    return _fw_operator.release(object_id, target)
 
 @app.get("/api/decode-firewall/object/{object_id}")
-async def fw_object(object_id: str):
-    """Get stored analysis for an object."""
-    if not _fw:
+async def fw_object(object_id: str, request: Request):
+    """Get stored analysis for an object from loopback only."""
+    _require_local_security_operator(request)
+    if not _fw_operator:
         return {"error": "Decode Firewall not loaded"}
-    obj = _fw.show(object_id)
+    obj = _fw_operator.show(object_id)
     return obj or {"error": "Not found"}
 
 @app.get("/api/decode-firewall/events/{object_id}")
-async def fw_events(object_id: str):
-    """Get event trail for an object."""
-    if not _fw:
+async def fw_events(object_id: str, request: Request):
+    """Get an object event trail from loopback only."""
+    _require_local_security_operator(request)
+    if not _fw_operator:
         return {"error": "Decode Firewall not loaded"}
-    return _fw.events(object_id)
+    return _fw_operator.events(object_id)
 
 
 # ── Upload endpoints (now gated) ─────────────────────────────────────────
@@ -3704,7 +3740,7 @@ async def fw_events(object_id: str):
 @app.post("/api/media/analyze")
 async def proxy_media_analyze(file: UploadFile = File(...), lang: str = Form("en")):
     """Proxy image/video analysis to Kavach — gated by Decode Firewall."""
-    content = await file.read()
+    content = await _read_upload_limited(file)
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
@@ -3762,7 +3798,7 @@ async def proxy_voice_analyze(
 @app.post("/api/media/ocr")
 async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
     """OCR: extract text from screenshot/image, then scan — gated by Decode Firewall."""
-    content = await file.read()
+    content = await _read_upload_limited(file)
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
@@ -3801,7 +3837,7 @@ async def proxy_media_ocr(file: UploadFile = File(...), lang: str = Form("en")):
 @app.post("/api/media/card")
 async def proxy_media_card(file: UploadFile = File(...), caption: str = Form(default="")):
     """Generate a shareable verdict card — gated by Decode Firewall."""
-    content = await file.read()
+    content = await _read_upload_limited(file)
     block = _gate_upload(content, file.filename, file.content_type)
     if block:
         return block
@@ -3829,14 +3865,22 @@ async def proxy_link_check(request: Request):
 
 
 # ── Serve frontend static files at root (MUST be after all API routes) ──
+def _safe_frontend_file(path: str) -> Path | None:
+    root = frontend_dist.resolve()
+    candidate = (root / path).resolve()
+    if candidate.is_relative_to(root) and candidate.is_file():
+        return candidate
+    return None
+
+
 if frontend_dist.exists():
     from fastapi.responses import FileResponse
 
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         """Serve static files or fall back to index.html for SPA routing."""
-        file = frontend_dist / path
-        if file.is_file():
+        file = _safe_frontend_file(path)
+        if file is not None:
             # Hashed assets get long cache, everything else no-cache
             headers = {"Cache-Control": "public, max-age=31536000, immutable"} if "/assets/" in str(file) else {"Cache-Control": "no-cache, no-store, must-revalidate"}
             return FileResponse(file, headers=headers)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -477,9 +478,13 @@ def _requests_credentials(text: str) -> bool:
     return False
 
 _V0_ROOT = Path.home() / ".mirrordna" / "chetana" / "v0"
-_V0_ROOT.mkdir(parents=True, exist_ok=True)
+_V0_ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
+os.chmod(_V0_ROOT, 0o700)
 V0_EVENTS_LOG = _V0_ROOT / "events.jsonl"
 V0_LOOP_RECEIPTS_LOG = _V0_ROOT / "loop_receipts.jsonl"
+for _private_log in (V0_EVENTS_LOG, V0_LOOP_RECEIPTS_LOG):
+    if _private_log.exists():
+        os.chmod(_private_log, 0o600)
 
 
 def now_utc() -> str:
@@ -495,9 +500,11 @@ def generate_event_id() -> str:
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    os.chmod(path, 0o600)
 
 
 def _stable_hash(payload: dict[str, Any]) -> str:

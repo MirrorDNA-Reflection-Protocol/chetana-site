@@ -44,7 +44,8 @@ from fastapi.security import APIKeyHeader
 # ── Config ────────────────────────────────────────────────────────────────
 
 DB_PATH = Path.home() / ".mirrordna" / "chetana" / "api_keys.db"
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+os.chmod(DB_PATH.parent, 0o700)
 
 TIERS = {
     "free":       {"daily_limit": 100,    "rpm": 10,   "price": "$0/mo"},
@@ -60,6 +61,7 @@ API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    os.chmod(DB_PATH, 0o600)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode=WAL")
@@ -67,6 +69,10 @@ def _connect() -> sqlite3.Connection:
         # WAL can fail intermittently under launchd restarts or filesystem pressure.
         # Fall back to the default journal mode instead of crashing import-time startup.
         conn.execute("PRAGMA journal_mode=DELETE")
+    for suffix in ("", "-wal", "-shm"):
+        candidate = Path(f"{DB_PATH}{suffix}")
+        if candidate.exists():
+            os.chmod(candidate, 0o600)
     return conn
 
 

@@ -22,9 +22,13 @@ from __future__ import annotations
 
 import logging
 import json
+import os
+import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -55,12 +59,34 @@ router = APIRouter(prefix="/api/incident", tags=["incident"])
 
 # ── Durable session store ────────────────────────────────────────────────────
 _SESSION_ROOT = Path.home() / ".mirrordna" / "chetana" / "incident_sessions"
-_SESSION_ROOT.mkdir(parents=True, exist_ok=True)
+_SESSION_ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
+os.chmod(_SESSION_ROOT, 0o700)
 _SESSION_TTL_SECONDS = 7 * 24 * 3600  # 7 days
+_SESSION_LOCK = threading.RLock()
+
+
+def _ensure_private_session_root() -> Path:
+    _SESSION_ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(_SESSION_ROOT, 0o700)
+    for session_path in _SESSION_ROOT.glob("*.json"):
+        os.chmod(session_path, 0o600)
+    return _SESSION_ROOT
+
+
+def _validate_incident_id(incident_id: str) -> str:
+    try:
+        parsed = UUID(incident_id, version=4)
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=404, detail="Incident session not found.") from exc
+    canonical = str(parsed)
+    if canonical != incident_id.lower():
+        raise HTTPException(status_code=404, detail="Incident session not found.")
+    return canonical
 
 
 def _session_path(incident_id: str) -> Path:
-    return _SESSION_ROOT / f"{incident_id}.json"
+    safe_id = _validate_incident_id(incident_id)
+    return _ensure_private_session_root() / f"{safe_id}.json"
 
 
 def _load_record(incident_id: str) -> dict[str, Any]:
@@ -75,7 +101,7 @@ def _load_record(incident_id: str) -> dict[str, Any]:
 
 
 def _find_session_by_scan(scan_id: str) -> IncidentSession | None:
-    for path in _SESSION_ROOT.glob("*.json"):
+    for path in _ensure_private_session_root().glob("*.json"):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
             created_at = float(record.get("created_at_epoch", 0))
@@ -103,19 +129,30 @@ def _get_session(incident_id: str) -> IncidentSession:
 
 
 def _save_session(session: IncidentSession) -> None:
-    path = _session_path(session.incident_id)
-    created_at = time.time()
-    if path.exists():
+    with _SESSION_LOCK:
+        path = _session_path(session.incident_id)
+        created_at = time.time()
+        if path.exists():
+            try:
+                created_at = float(json.loads(path.read_text(encoding="utf-8")).get("created_at_epoch", created_at))
+            except Exception:
+                created_at = time.time()
+        record = {
+            "created_at_epoch": created_at,
+            "updated_at_epoch": time.time(),
+            "session": session.model_dump(mode="json"),
+        }
+        fd, temp_name = tempfile.mkstemp(prefix=f".{session.incident_id}.", suffix=".tmp", dir=path.parent)
         try:
-            created_at = float(json.loads(path.read_text(encoding="utf-8")).get("created_at_epoch", created_at))
-        except Exception:
-            created_at = time.time()
-    record = {
-        "created_at_epoch": created_at,
-        "updated_at_epoch": time.time(),
-        "session": session.model_dump(mode="json"),
-    }
-    path.write_text(json.dumps(record, ensure_ascii=True, indent=2), encoding="utf-8")
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(record, handle, ensure_ascii=True, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temp_name, 0o600)
+            os.replace(temp_name, path)
+            os.chmod(path, 0o600)
+        finally:
+            Path(temp_name).unlink(missing_ok=True)
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -244,7 +281,7 @@ async def incident_action(req: IncidentActionRequest) -> IncidentActionResponse:
         
         bundle_req = {
             "scan_result": scan_payload,
-            "notes": (req.payload or {}).get("notes", "Evidence captured via Chetana Incident Mode.")
+            "notes": str((req.payload or {}).get("notes", "Evidence captured via Chetana Incident Mode."))[:1000]
         }
         
         try:

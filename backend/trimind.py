@@ -26,6 +26,7 @@ Then open http://localhost:8333
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import re
@@ -49,7 +50,7 @@ def _log(msg: str):
     logger.info(msg)
 
 # ── Security ──
-TRIMIND_API_KEY = os.environ.get("TRIMIND_API_KEY", "Zn6l2lPZoJG77TZ9GwoItE3mmxLu1zTjv4kqJrjYPT8")
+TRIMIND_API_KEY = os.environ.get("TRIMIND_API_KEY", "")
 LOCAL_NETS = {"127.0.0.1", "::1", "localhost"}
 
 # Rate limiting — per-IP, per-minute
@@ -86,7 +87,7 @@ def _check_auth(request: Request) -> bool:
     api_key = request.headers.get("x-api-key", "")
     token = auth.replace("Bearer ", "") if auth.startswith("Bearer ") else api_key
 
-    return token == TRIMIND_API_KEY
+    return bool(TRIMIND_API_KEY) and bool(token) and hmac.compare_digest(token, TRIMIND_API_KEY)
 
 
 @app.middleware("http")

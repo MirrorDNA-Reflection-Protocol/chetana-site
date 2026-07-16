@@ -1,4 +1,5 @@
 import json
+import stat
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -50,6 +51,8 @@ def test_research_candidate_stores_sanitized_text_not_raw(tmp_path: Path) -> Non
     assert "9876543210" not in stored["sanitized_text"]
     assert "victim@example.com" not in stored["sanitized_text"]
     assert stored["promotion_state"] == "blocked_pending_two_person_adjudication"
+    assert stat.S_IMODE(log.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(log.stat().st_mode) == 0o600
 
 
 def test_research_candidate_can_be_deleted_with_secret(tmp_path: Path) -> None:
@@ -66,6 +69,7 @@ def test_research_candidate_can_be_deleted_with_secret(tmp_path: Path) -> None:
     assert result.deleted is True
     assert receipt.candidate_id not in candidate_log.read_text(encoding="utf-8")
     assert "candidate_id_hash" in deletion_log.read_text(encoding="utf-8")
+    assert stat.S_IMODE(deletion_log.stat().st_mode) == 0o600
 
 
 def test_research_candidate_rejects_wrong_deletion_secret(tmp_path: Path) -> None:

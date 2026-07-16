@@ -11,7 +11,7 @@ from typing import Any, List, Literal, Optional
 
 import httpx
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api_keys import require_api_key
 from app.scan_guidance import enrich_v0_verdict
@@ -28,28 +28,32 @@ b2b_router = APIRouter(prefix="/api/v1", tags=["Partner API"])
 KAVACH_URL = "http://127.0.0.1:8790"
 
 
-class ScanRequest(BaseModel):
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ScanRequest(StrictModel):
     text: str = Field(..., min_length=1, max_length=20000, description="Message, transcript, OCR text, or payment context to analyze")
-    lang: str = Field("en", description="Language hint (en, hi, ta, te, etc.)")
+    lang: str = Field("en", max_length=16, description="Language hint (en, hi, ta, te, etc.)")
     input_type: Literal["text", "payment_screenshot", "qr_image", "mixed", "screenshot"] = Field(
         "text",
         description="Observed surface for the intake payload",
     )
-    source_name: Optional[str] = Field(None, description="Optional source system or channel name")
+    source_name: Optional[str] = Field(None, max_length=256, description="Optional source system or channel name")
     money_moved: bool = Field(False, description="Whether money has already moved")
     goods_released: bool = Field(False, description="Whether goods or access were already released")
 
 
-class LinkRequest(BaseModel):
-    url: str = Field(..., description="URL to check against threat feeds")
+class LinkRequest(StrictModel):
+    url: str = Field(..., min_length=1, max_length=2048, description="URL to check against threat feeds")
 
 
-class UPIRequest(BaseModel):
-    upi_id: str = Field(..., description="UPI ID to validate (e.g. name@upi)")
+class UPIRequest(StrictModel):
+    upi_id: str = Field(..., min_length=3, max_length=128, description="UPI ID to validate (e.g. name@upi)")
 
 
-class PhoneRequest(BaseModel):
-    phone: str = Field(..., description="Phone number to check")
+class PhoneRequest(StrictModel):
+    phone: str = Field(..., min_length=3, max_length=32, description="Phone number to check")
 
 
 class PartnerScanResponse(BaseModel):

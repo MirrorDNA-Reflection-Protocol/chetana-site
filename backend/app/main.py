@@ -332,15 +332,22 @@ async def witness_proxy(path: str):
         },
     )
 
+_PRODUCTION_CORS_ORIGINS = [
+    "https://chetana.activemirror.ai",
+    "https://activemirror.ai",
+]
+_DEVELOPMENT_ORIGINS = [
+    "http://localhost:8093",
+    "http://localhost:5173",
+    "http://localhost:8099",
+    "http://localhost:8096",
+    "http://127.0.0.1:8096",
+]
+_ALLOW_DEVELOPMENT_ORIGINS = os.getenv("CHETANA_ALLOW_DEVELOPMENT_ORIGINS", "").lower() == "true"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://chetana.activemirror.ai",
-        "https://activemirror.ai",
-        "http://localhost:8093",
-        "http://localhost:5173",
-        "http://localhost:8099",
-    ],
+    allow_origins=_PRODUCTION_CORS_ORIGINS + (_DEVELOPMENT_ORIGINS if _ALLOW_DEVELOPMENT_ORIGINS else []),
     allow_methods=["GET", "POST", "HEAD"],
     allow_headers=["Content-Type"],
     allow_credentials=True,
@@ -424,6 +431,8 @@ _PUBLIC_API_RATE_LIMITS: dict[str, tuple[int, int]] = {
     "/api/oracle/verify": (60, 20),
     "/api/link/check": (60, 30),
 }
+
+
 PARTNER_INQUIRIES_LOG = Path.home() / ".mirrordna" / "chetana" / "partners" / "inquiries.jsonl"
 _PARTNER_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 CHETANA_PUBLIC_ORIGIN = "https://chetana.activemirror.ai"
@@ -481,6 +490,15 @@ async def public_api_abuse_guard(request: Request, call_next):
                     return JSONResponse(status_code=413, content={"detail": "api_request_too_large"})
             except ValueError:
                 return JSONResponse(status_code=400, content={"detail": "invalid_content_length"})
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            received_bytes = 0
+            body_chunks: list[bytes] = []
+            async for chunk in request.stream():
+                received_bytes += len(chunk)
+                if received_bytes > API_MAX_BODY_BYTES:
+                    return JSONResponse(status_code=413, content={"detail": "api_request_too_large"})
+                body_chunks.append(chunk)
+            request._body = b"".join(body_chunks)
         policy = _public_api_rate_policy(request.url.path) if request.method not in {"GET", "HEAD", "OPTIONS"} else None
         if policy:
             allowed, retry_after = _consume_public_api_budget(request, *policy)
@@ -2625,25 +2643,24 @@ async def v0_events(req: V0EventInput):
     return {"ok": True, "event": event.model_dump()}
 
 
-@app.post("/api/v0/action-route")
-async def v0_action_route(req: V0ActionRouteRequest):
-    """Return the simplest next action route for a completed Chetana scan."""
-    route = build_v0_action_route(req)
-    return {"action_route": route.model_dump()}
-
-
-@app.post("/api/v0/loop/receipt")
-async def v0_loop_receipt(req: V0LoopReceiptRequest):
-    """Recompute, validate, and sign a Chetana scam-check loop receipt."""
-    canonical_verdict = analyze_v0_scan(
+async def _server_recomputed_verdict(
+    submitted,
+    input_text: str,
+    *,
+    source_name: str,
+    session_id: str | None = None,
+    error_code: str = "derived_verdict_mismatch",
+):
+    canonical = analyze_v0_scan(
         V0ScanInput(
-            input_type=req.verdict.input_type,
-            text=req.input_text,
-            language_hint=req.verdict.language_hint,
-            source_name="receipt_recompute",
-            session_id=req.session_id,
+            input_type=submitted.input_type,
+            text=input_text,
+            language_hint=submitted.language_hint,
+            source_name=source_name,
+            session_id=session_id,
         )
     )
+    canonical = await enrich_v0_verdict(canonical)
     fields = (
         "verdict",
         "risk_level",
@@ -2651,23 +2668,54 @@ async def v0_loop_receipt(req: V0LoopReceiptRequest):
         "confidence_band",
         "evidence_state",
         "incident_state",
+        "entities",
+        "summary_plain_language",
+        "safe_next_step",
+        "guidance",
         "recommended_actions",
     )
-    mismatches = [field for field in fields if getattr(req.verdict, field) != getattr(canonical_verdict, field)]
-    submitted_reasons = [reason.code for reason in req.verdict.reasons]
-    canonical_reasons = [reason.code for reason in canonical_verdict.reasons]
-    if submitted_reasons != canonical_reasons:
+    mismatches = [field for field in fields if getattr(submitted, field) != getattr(canonical, field)]
+    if [reason.code for reason in submitted.reasons] != [reason.code for reason in canonical.reasons]:
         mismatches.append("reason_codes")
     if mismatches:
         raise HTTPException(
             status_code=409,
-            detail={
-                "code": "receipt_verdict_mismatch",
-                "mismatched_fields": sorted(set(mismatches)),
-            },
+            detail={"code": error_code, "mismatched_fields": sorted(set(mismatches))},
         )
+    return canonical.model_copy(update={"scan_id": submitted.scan_id})
 
-    canonical_verdict = canonical_verdict.model_copy(update={"scan_id": req.verdict.scan_id})
+
+@app.post("/api/v0/action-route")
+async def v0_action_route(req: V0ActionRouteRequest):
+    """Return the simplest next action route for a completed Chetana scan."""
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict,
+        req.input_text,
+        source_name="action_route_recompute",
+        session_id=req.session_id,
+    )
+    route = build_v0_action_route(
+        req.model_copy(
+            update={
+                "verdict": canonical_verdict,
+                "trust_bundle": None,
+                "evidence_pack": None,
+            }
+        )
+    )
+    return {"action_route": route.model_dump()}
+
+
+@app.post("/api/v0/loop/receipt")
+async def v0_loop_receipt(req: V0LoopReceiptRequest):
+    """Recompute, validate, and sign a Chetana scam-check loop receipt."""
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict,
+        req.input_text,
+        source_name="receipt_recompute",
+        session_id=req.session_id,
+        error_code="receipt_verdict_mismatch",
+    )
     canonical_action_route = build_v0_action_route(
         V0ActionRouteRequest(
             verdict=canonical_verdict,
@@ -2723,38 +2771,45 @@ async def v0_mirrorproof_verify(req: MirrorProofVerifyRequest):
 @app.post("/api/v0/trust/send-guard")
 async def v0_send_guard(req: V0TrustRuntimeRequest):
     """Return the trust-runtime send decision for the current scan context."""
-    assessment = assess_send_guard(req)
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict, req.input_text, source_name=req.source_name or "send_guard_recompute"
+    )
+    assessment = assess_send_guard(req.model_copy(update={"verdict": canonical_verdict}))
     return {"send_guard": assessment.model_dump()}
 
 
 @app.post("/api/v0/trust/recovery")
 async def v0_recovery(req: V0TrustRuntimeRequest):
     """Return the structured recovery contract for the current scan context."""
-    packet = build_recovery_packet(req)
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict, req.input_text, source_name=req.source_name or "recovery_recompute"
+    )
+    packet = build_recovery_packet(req.model_copy(update={"verdict": canonical_verdict}))
     return {"recovery_packet": packet.model_dump()}
 
 
 @app.post("/api/v0/trust/merchant")
 async def v0_merchant_release(req: V0TrustRuntimeRequest):
     """Return a merchant release decision for payment-proof or QR-driven disputes."""
-    assessment = build_merchant_release_assessment(req)
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict, req.input_text, source_name=req.source_name or "merchant_recompute"
+    )
+    assessment = build_merchant_release_assessment(req.model_copy(update={"verdict": canonical_verdict}))
     return {"merchant_release": assessment.model_dump() if assessment else None}
 
 
 @app.post("/api/v0/trust/bundle")
 async def v0_trust_bundle(req: V0TrustRuntimeRequest):
     """Return the promoted trust-runtime bundle: send guard, merchant guard, and recovery."""
-    bundle = build_trust_bundle(req)
+    canonical_verdict = await _server_recomputed_verdict(
+        req.verdict, req.input_text, source_name=req.source_name or "trust_bundle_recompute"
+    )
+    bundle = build_trust_bundle(req.model_copy(update={"verdict": canonical_verdict}))
     return {"trust_bundle": bundle.model_dump()}
 
 
 def _partner_request_key(request: Request) -> str:
-    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()[:64]
-    if request.client and request.client.host:
-        return request.client.host[:64]
-    return "unknown"
+    return _public_client_key(request)
 
 
 def _check_partner_rate_limit(request: Request) -> None:
@@ -2787,14 +2842,9 @@ def _require_partner_same_origin(request: Request) -> None:
     if request.headers.get("sec-fetch-site", "").lower() == "cross-site":
         raise HTTPException(status_code=403, detail="cross_site_partner_request_blocked")
     origin = request.headers.get("origin")
-    allowed_origins = {
-        CHETANA_PUBLIC_ORIGIN,
-        "https://activemirror.ai",
-        "http://localhost:5173",
-        "http://localhost:8093",
-        "http://localhost:8096",
-        "http://127.0.0.1:8096",
-    }
+    allowed_origins = set(_PRODUCTION_CORS_ORIGINS)
+    if _ALLOW_DEVELOPMENT_ORIGINS:
+        allowed_origins.update(_DEVELOPMENT_ORIGINS)
     if origin and origin.rstrip("/") not in allowed_origins:
         raise HTTPException(status_code=403, detail="partner_origin_not_allowed")
 
@@ -3042,12 +3092,7 @@ async def partner_operator_review(
 
 
 def _research_request_key(request: Request) -> str:
-    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()[:64]
-    if request.client and request.client.host:
-        return request.client.host[:64]
-    return "unknown"
+    return _public_client_key(request)
 
 
 def _check_research_rate_limit(request: Request) -> None:

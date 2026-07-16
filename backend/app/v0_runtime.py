@@ -1308,7 +1308,7 @@ class V0MerchantReleaseAssessment(StrictModel):
 class V0TrustRuntimeRequest(StrictModel):
     verdict: V0Verdict
     input_text: str = Field(default="", max_length=20000)
-    source_name: str | None = None
+    source_name: str | None = Field(default=None, max_length=256)
     money_moved: bool = False
     goods_released: bool = False
 
@@ -1336,7 +1336,7 @@ class V0ActionRouteRequest(StrictModel):
     input_text: str = Field(default="", max_length=20000)
     trust_bundle: V0TrustBundle | None = None
     evidence_pack: V0EvidencePack | None = None
-    session_id: str | None = None
+    session_id: str | None = Field(default=None, max_length=128)
 
 
 class V0ActionRoute(StrictModel):

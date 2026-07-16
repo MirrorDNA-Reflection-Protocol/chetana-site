@@ -103,13 +103,22 @@ Repair: production `connect-src` is now same-origin only. Vite development conti
 
 ## Verification
 
-- Backend: 135 tests passed, 2 subtests passed
+- Backend: 143 tests passed, 2 subtests passed
 - Frontend: 3 tests passed; production build passed
 - Dependencies: `npm audit --omit=dev` reported 0 vulnerabilities; `pip check` reported no broken requirements
 - Python advisories: upgraded FastAPI to `0.139.1`, Starlette to `1.3.1`, and Pydantic to `2.13.4`; `pip-audit` then reported no known vulnerabilities
 - Python static analysis: Bandit reported no medium- or high-severity findings; remaining results were 14 low-severity warnings or consent-token false positives
 - Static checks: changed Python compiled; `git diff --check` passed
 - Secret scan: Git history retains 15 findings, including the removed historical TriMind default and generated bundle false positives. Current source has no validated credential; one ignored built xterm bundle produces a generic-key false positive.
+
+## Second-pass repairs
+
+- Research donation and deletion logs now use atomic private writes, `0700` parent directories, and `0600` files. Existing runtime research storage was repaired to the same modes.
+- Action routing, send guard, recovery, merchant release, trust bundles, and signed loop receipts now recompute the verdict from the submitted evidence and reject material caller/server mismatches with `409`.
+- API request size enforcement now counts streamed bytes before routing, so chunked requests cannot bypass the 9 MiB ceiling by omitting `Content-Length`.
+- Partner and research rate-limit identities now accept Cloudflare client IPs only from the loopback proxy boundary and ignore untrusted forwarding headers from direct peers.
+- Institutional API request models now reject unknown fields and bound language, source, URL, UPI, and phone inputs.
+- Local development CORS origins are disabled by default and require `CHETANA_ALLOW_DEVELOPMENT_ORIGINS=true`.
 
 ## Remaining risk
 

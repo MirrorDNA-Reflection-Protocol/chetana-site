@@ -11,6 +11,7 @@ import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
 
+from app import main as main_module
 from app.incident.incident_mode import _get_session, _save_session
 from app.incident.models import IncidentSession
 from app.main import (
@@ -24,6 +25,7 @@ from app.main import (
     _EphemeralDecodeFirewall,
     app,
 )
+from app.v0_runtime import V0ScanInput, analyze_scan
 from starlette.requests import Request
 
 
@@ -67,6 +69,27 @@ def test_unknown_api_get_does_not_fall_through_to_spa() -> None:
     assert response.json() == {"detail": "Not found"}
 
 
+def test_production_cors_does_not_advertise_local_development_origins() -> None:
+    client = TestClient(app)
+    local = client.options(
+        "/api/v0/scan",
+        headers={
+            "origin": "http://localhost:5173",
+            "access-control-request-method": "POST",
+        },
+    )
+    production = client.options(
+        "/api/v0/scan",
+        headers={
+            "origin": "https://chetana.activemirror.ai",
+            "access-control-request-method": "POST",
+        },
+    )
+
+    assert local.headers.get("access-control-allow-origin") is None
+    assert production.headers.get("access-control-allow-origin") == "https://chetana.activemirror.ai"
+
+
 def test_public_api_budget_uses_validated_cloudflare_client_ip() -> None:
     _PUBLIC_API_REQUEST_LOG.clear()
     request = Request(
@@ -87,6 +110,60 @@ def test_public_api_budget_uses_validated_cloudflare_client_ip() -> None:
     allowed, retry_after = _consume_public_api_budget(request, 60, 2)
     assert allowed is False
     assert retry_after > 0
+
+
+def test_secondary_rate_keys_ignore_untrusted_forwarding_headers() -> None:
+    request = Request(
+        {
+            "type": "http",
+            "client": ("203.0.113.22", 50000),
+            "headers": [(b"x-forwarded-for", b"198.51.100.99")],
+        }
+    )
+
+    assert main_module._partner_request_key(request) == "203.0.113.22"
+    assert main_module._research_request_key(request) == "203.0.113.22"
+
+
+def test_streamed_api_body_is_enforced_without_content_length(monkeypatch) -> None:
+    monkeypatch.setattr(main_module, "API_MAX_BODY_BYTES", 64)
+
+    def chunks():
+        yield b'{"event_name":"scan_completed","metadata":{"payload":"'
+        yield b"x" * 256
+        yield b'"}}'
+
+    response = TestClient(app).post(
+        "/api/v0/events",
+        content=chunks(),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "api_request_too_large"}
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    (
+        "/api/v0/action-route",
+        "/api/v0/trust/send-guard",
+        "/api/v0/trust/recovery",
+        "/api/v0/trust/merchant",
+        "/api/v0/trust/bundle",
+    ),
+)
+def test_derived_decision_endpoints_reject_fabricated_verdicts(endpoint: str) -> None:
+    text = "Police says pay Rs 999 now or you will be arrested."
+    verdict = analyze_scan(V0ScanInput(input_type="text", text=text, language_hint="en"))
+    forged = verdict.model_copy(
+        update={"verdict": "low_signal", "risk_level": "low", "confidence_band": "low"}
+    )
+
+    response = TestClient(app).post(endpoint, json={"verdict": forged.model_dump(), "input_text": text})
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "derived_verdict_mismatch"
 
 
 def test_telemetry_schemas_reject_unbounded_or_unknown_fields() -> None:

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import secrets
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -113,13 +114,20 @@ def _records(path: Path) -> list[dict]:
 
 
 def _write_records(path: Path, records: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        "".join(json.dumps(item, sort_keys=True, ensure_ascii=True) + "\n" for item in records),
-        encoding="utf-8",
-    )
-    temporary.replace(path)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write("".join(json.dumps(item, sort_keys=True, ensure_ascii=True) + "\n" for item in records))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
+        os.chmod(path, 0o600)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def purge_expired_candidates(
